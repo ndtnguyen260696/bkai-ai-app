@@ -2,26 +2,21 @@ import streamlit as st
 from PIL import Image
 import io
 import datetime
-
-from inference_sdk import InferenceHTTPClient
+from inference_sdk import InferenceHTTPClient  # cần thư viện inference-sdk
 
 # ===============================
-# CẤU HÌNH ROBOFLOW – LẤY Y HỆT
-# TRONG HÌNH BẠN GỬI
+# CẤU HÌNH KẾT NỐI ROBOFLOW
 # ===============================
-
 CLIENT = InferenceHTTPClient(
-    api_url="https://serverless.roboflow.com",
-    api_key="nWA6ayjI5bGNpXkkbsAb"  # API key của bạn
+    api_url="https://serverless.roboflow.com",   # đúng domain Roboflow
+    api_key="nWA6ayjI5bGNpXkkbsAb"               # thay bằng API key của bạn
 )
 
-MODEL_ID = "crack_segmentation_detection/4"  # Model ID + version
-
+MODEL_ID = "crack_segmentation_detection/4"  # model name + version
 
 # ===============================
-# CẤU HÌNH GIAO DIỆN STREAMLIT
+# CẤU HÌNH TRANG STREAMLIT
 # ===============================
-
 st.set_page_config(page_title="BKAI - Crack Segmentation", layout="wide")
 
 st.title("BKAI – Công nghệ AI phát hiện và phân đoạn vết nứt bê tông")
@@ -33,12 +28,13 @@ with st.form("upload_form"):
     email = st.text_input("Email")
     note = st.text_area("Ghi chú về ảnh / công trình (Note)")
     uploaded_file = st.file_uploader(
-        "Chọn ảnh bê tông (JPG/PNG)", type=["jpg", "jpeg", "png"]
+        "Chọn ảnh bê tông (JPG/PNG)", 
+        type=["jpg", "jpeg", "png"]
     )
     submitted = st.form_submit_button("Phân tích ảnh")
 
 # ===============================
-# XỬ LÝ ẢNH KHI BẤM “PHÂN TÍCH”
+# XỬ LÝ KHI NGƯỜI DÙNG BẤM “PHÂN TÍCH ẢNH”
 # ===============================
 if submitted and uploaded_file is not None:
     # Hiển thị ảnh gốc
@@ -72,12 +68,8 @@ if submitted and uploaded_file is not None:
         st.write("---")
         st.write("Thông tin người dùng:")
         st.write(f"- Tên: {name}")
-        st.write(f"- Email: {email}")
-        st.write(f"- Ghi chú: {note}")
-        st.write(f"- Thời gian phân tích: {datetime.datetime.now()}")
 
-elif submitted and uploaded_file is None:
-    st.warning("Vui lòng chọn một ảnh bê tông trước khi bấm 'Phân tích ảnh'.")
+
 
 
 
