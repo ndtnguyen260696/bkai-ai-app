@@ -8,10 +8,10 @@ import datetime
 # PASTE URL ROBOFLOW Ở ĐÂY
 # ==========================
 # Ví dụ: "https://detect.roboflow.com/crack_segmentation_detection/1?api_key=XXXX"
-ROBOFLOW_FULL_URL = api_url="https://serverless.roboflow.com",api_key="nWA6ayjI5bGNpXkkbsAb"
+ROBOFLOW_FULL_URL = "https://detect.roboflow.com/crack_segmentation_detection/1?api_key="nWA6ayjI5bGNpXkkbsAb"
 st.set_page_config(page_title="BKAI - Crack Segmentation", layout="wide")
 
-st.title("BKAI - AI phát hiện và phân đoạn vết nứt bê tông")
+st.title("BKAI - Công nghệ AI phát hiện và phân đoạn vết nứt bê tông")
 st.write("Upload ảnh bê tông, mô hình CNN  sẽ phân tích và trả về kết quả.")
 
 # ====== FORM NHẬP THÔNG TIN NGƯỜI DÙNG ======
@@ -81,6 +81,7 @@ if submitted and uploaded_file is not None:
 
 elif submitted and uploaded_file is None:
     st.warning("Vui lòng chọn một ảnh trước khi bấm Phân tích.")
+
 
 
 
