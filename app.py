@@ -6,8 +6,8 @@ import base64
 import datetime
 
 # ====== THÔNG TIN MODEL ROBOFLOW ======
-ROBOFLOW_API_KEY = "rfpF3sXSLiUwC2XccpJ0"  # <-- THAY Ở ĐÂY
-ROBOFLOW_MODEL_URL = "https://detect.roboflow.com/concrete-crack-detection/1"  # <-- THAY Ở ĐÂY
+ROBOFLOW_API_KEY = "nWA6ayjI5bGNpXkkbsAb"  # <-- THAY Ở ĐÂY
+ROBOFLOW_MODEL_URL = "https://serverless.roboflow.com"  # <-- THAY Ở ĐÂY
 
 st.set_page_config(page_title="BKAI - Crack Detection", layout="wide")
 
@@ -88,3 +88,4 @@ if submitted and uploaded_file is not None:
         st.error("Có lỗi khi gọi API mô hình AI. Vui lòng kiểm tra lại API key / URL.")
 elif submitted and uploaded_file is None:
     st.warning("Vui lòng chọn một ảnh trước khi bấm Phân tích.")
+
