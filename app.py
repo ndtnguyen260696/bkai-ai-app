@@ -2,17 +2,19 @@ import streamlit as st
 import requests
 from PIL import Image
 import io
-import base64
 import datetime
 
-# ====== THÔNG TIN MODEL ROBOFLOW ======
-ROBOFLOW_API_KEY = "nWA6ayjI5bGNpXkkbsAb"  # <-- THAY Ở ĐÂY
-ROBOFLOW_MODEL_URL = "https://serverless.roboflow.com"  # <-- THAY Ở ĐÂY
+# ==========================
+# PASTE URL ROBOFLOW Ở ĐÂY
+# ==========================
+# Ví dụ: "https://detect.roboflow.com/crack_segmentation_detection/1?api_key=XXXX"
+ROBOFLOW_FULL_URL = ""https://serverless.roboflow.com",
+    api_key="nWA6ayjI5bGNpXkkbsAb""
 
-st.set_page_config(page_title="BKAI - Crack Detection", layout="wide")
+st.set_page_config(page_title="BKAI - Crack Segmentation", layout="wide")
 
-st.title("BKAI - AI phát hiện vết nứt bê tông")
-st.write("Upload ảnh bê tông, hệ thống sẽ phân tích bằng mô hình AI (CNN/Mask R-CNN).")
+st.title("BKAI - AI phát hiện và phân đoạn vết nứt bê tông")
+st.write("Upload ảnh bê tông, mô hình AI (instance segmentation) sẽ phân tích và trả về kết quả.")
 
 # ====== FORM NHẬP THÔNG TIN NGƯỜI DÙNG ======
 with st.form("upload_form"):
@@ -27,23 +29,28 @@ if submitted and uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption="Ảnh gốc", use_column_width=True)
 
-    # Chuyển ảnh sang bytes để gửi lên Roboflow
+    # Chuyển ảnh sang bytes
     buf = io.BytesIO()
     image.save(buf, format="JPEG")
     img_bytes = buf.getvalue()
 
     with st.spinner("Đang gửi ảnh tới mô hình AI, vui lòng đợi..."):
         # Gửi request tới Roboflow
-        response = requests.post(
-            ROBOFLOW_MODEL_URL,
-            params={"api_key": ROBOFLOW_API_KEY},
-            data=img_bytes,
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
-        )
+        files = {"file": ("image.jpg", img_bytes, "image/jpeg")}
+        try:
+            response = requests.post(ROBOFLOW_FULL_URL, files=files)
+        except Exception as e:
+            st.error(f"Lỗi kết nối tới Roboflow: {e}")
+            st.stop()
 
-    if response.status_code == 200:
+    # ====== DEBUG: Hiển thị mã lỗi nếu có ======
+    if response.status_code != 200:
+        st.error("Có lỗi khi gọi API mô hình AI. Vui lòng kiểm tra lại URL trong ROBOFLOW_FULL_URL.")
+        st.code(f"Status code: {response.status_code}\nResponse text: {response.text}")
+    else:
         result = response.json()
-        st.subheader("Kết quả phân tích")
+        st.subheader("Kết quả phân tích (raw JSON)")
+        st.json(result)
 
         predictions = result.get("predictions", [])
 
@@ -52,22 +59,13 @@ if submitted and uploaded_file is not None:
             has_crack = False
         else:
             has_crack = True
-            st.error(f"⚠ Phát hiện {len(predictions)} vùng có khả năng là vết nứt.")
-            # Hiển thị chi tiết từng vùng nứt
+            st.error(f"⚠ Phát hiện {len(predictions)} vùng vết nứt.")
+            # In thông tin cơ bản
             for i, pred in enumerate(predictions, start=1):
-                x = pred.get("x")
-                y = pred.get("y")
-                w = pred.get("width")
-                h = pred.get("height")
-                conf = pred.get("confidence")
+                conf = pred.get("confidence", 0)
                 cls = pred.get("class", "crack")
+                st.write(f"- Mask {i}: lớp `{cls}`, độ tin cậy: {conf:.2f}")
 
-                st.write(
-                    f"- Vết nứt {i}: lớp `{cls}`, độ tin cậy: {conf:.2f}, "
-                    f"tọa độ tâm ({x:.0f}, {y:.0f}), kích thước ({w:.0f}x{h:.0f})"
-                )
-
-        # Phân tích nguyên nhân (gợi ý)
         st.subheader("Phân tích nguyên nhân (gợi ý)")
         if has_crack:
             st.write(
@@ -78,15 +76,13 @@ if submitted and uploaded_file is not None:
         else:
             st.write("Chưa ghi nhận vùng nứt rõ ràng, tuy nhiên vẫn cần kiểm tra thực tế hiện trường.")
 
-        # ====== LƯU LOG (ĐƠN GIẢN) ======
+        # Lưu log đơn giản trên server
         log_line = f"{datetime.datetime.now()};{name};{email};{has_crack};{note}\n"
         with open("logs.csv", "a", encoding="utf-8") as f:
             f.write(log_line)
 
-        st.info("Thông tin phân tích đã được lưu lại (demo trong file logs.csv trên server).")
-    else:
-        st.error("Có lỗi khi gọi API mô hình AI. Vui lòng kiểm tra lại API key / URL.")
 elif submitted and uploaded_file is None:
     st.warning("Vui lòng chọn một ảnh trước khi bấm Phân tích.")
+
 
 
