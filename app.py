@@ -10,7 +10,7 @@ import datetime
 # CẤU HÌNH: dán URL detect.roboflow.com từ Deploy -> Hosted API -> Python
 # Ví dụ: "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=XXXXXXXX"
 # ===============================
-ROBOFLOW_FULL_URL = "https://detect.roboflow.com/REPLACE_WITH_YOUR_MODEL_URL?api_key=REPLACE_WITH_KEY"
+ROBOFLOW_FULL_URL = "https://serverless.roboflow.com",api_key="nWA6ayjI5bGNpXkkbsAb""
 
 # ===============================
 # Hàm phụ: overlay mask (hỗ trợ 2 dạng: base64 data URL hoặc URL của ảnh mask)
@@ -162,6 +162,7 @@ if submitted:
                     st.write(f"- Email: {email}")
                     st.write(f"- Ghi chú: {note}")
                     st.write(f"- Thời gian: {datetime.datetime.now()}")
+
 
 
 
