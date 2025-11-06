@@ -11,7 +11,7 @@ import datetime
 #    Copy nguyên URL dạng:
 #    https://detect.roboflow.com/<model_id>/<version>?api_key=<API_KEY>
 # =========================================================
-ROBOFLOW_FULL_URL = "https:"https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
+ROBOFLOW_FULL_URL = "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
 
 
 # =========================================================
@@ -220,3 +220,4 @@ if submitted:
         elif not has_visible_crack:
             # Có crack nhưng tất cả dưới ngưỡng min_conf
             st.image(image, use_co_
+
