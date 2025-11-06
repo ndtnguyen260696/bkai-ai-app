@@ -219,5 +219,5 @@ if submitted:
             st.success("✅ Kết luận: **Không phát hiện vết nứt** trong ảnh này.")
         elif not has_visible_crack:
             # Có crack nhưng tất cả dưới ngưỡng min_conf
-            st.image(image, use_co_
+           st.image(image, use_column_width=True)
 
