@@ -3,31 +3,55 @@ import requests
 from PIL import Image, ImageDraw
 import io
 import datetime
-import math
 
 # =========================================================
-# 1. CẤU HÌNH URL ROBOFLOW
-#    → BẮT BUỘC phải sửa dòng dưới cho đúng dự án của bạn
+# 1. CẤU HÌNH ROBOFLOW
+#    → BẮT BUỘC: sửa dòng dưới cho đúng model của bạn
 #    Vào Roboflow: Project → Deploy → Hosted API → Python
 #    Copy nguyên URL dạng:
 #    https://detect.roboflow.com/<model_id>/<version>?api_key=<API_KEY>
 # =========================================================
-ROBOFLOW_FULL_URL = "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
+ROBOFLOW_FULL_URL = "https:"https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
 
 
 # =========================================================
-# 2. HÀM VẼ KHUNG VÀ ĐƯỜNG NỨT
+# 2. HÀM VẼ KHUNG VÀ POLYLINE VẾT NỨT
 # =========================================================
+def extract_poly_points(points_field):
+    """
+    Chuyển trường 'points' trong JSON thành list [(x,y), ...]
+    Hỗ trợ:
+      - dict: {"0-100":[[x,y],...], "100-200":[...], ...}
+      - list trực tiếp: [[x,y],[x,y],...]
+    """
+    flat = []
+
+    if isinstance(points_field, dict):
+        for k in sorted(points_field.keys()):
+            seg = points_field[k]
+            if isinstance(seg, list):
+                for pt in seg:
+                    if isinstance(pt, (list, tuple)) and len(pt) == 2:
+                        flat.append((pt[0], pt[1]))
+
+    elif isinstance(points_field, list):
+        for pt in points_field:
+            if isinstance(pt, (list, tuple)) and len(pt) == 2:
+                flat.append((pt[0], pt[1]))
+
+    return flat
+
+
 def draw_predictions(image: Image.Image, predictions, min_conf: float = 0.0) -> Image.Image:
     """
     Vẽ:
-      - Khung đỏ quanh vết nứt (bounding box)
-      - Đường nứt (polyline) nếu JSON có trường 'points'
+      - Khung tím quanh vùng nứt (bounding box)
+      - Đường polyline tím theo 'points' nếu có
     """
     overlay = image.copy()
     draw = ImageDraw.Draw(overlay)
 
-    for i, p in enumerate(predictions):
+    for p in predictions:
         conf = float(p.get("confidence", 0))
         if conf < min_conf:
             continue
@@ -36,52 +60,53 @@ def draw_predictions(image: Image.Image, predictions, min_conf: float = 0.0) -> 
         y = p.get("y")
         w = p.get("width")
         h = p.get("height")
-
         if None in (x, y, w, h):
             continue
 
-        # Roboflow dùng x,y là tâm box
+        # Roboflow: x,y là tâm box
         x0 = x - w / 2
         y0 = y - h / 2
         x1 = x + w / 2
         y1 = y + h / 2
 
-        # Khung đỏ
-        draw.rectangle([x0, y0, x1, y1], outline="red", width=3)
+        # Khung tím
+        draw.rectangle([x0, y0, x1, y1], outline="#A020F0", width=3)
 
-        # Ghi nhãn: crack (0.91)
         cls = p.get("class", "crack")
         label = f"{cls} ({conf:.2f})"
-        # Vẽ nền label đơn giản
-        text_x, text_y = x0 + 3, y0 + 3
-        draw.text((text_x, text_y), label, fill="red")
+        draw.text((x0 + 3, y0 + 3), label, fill="#A020F0")
 
-        # Thử vẽ đường nứt nếu có 'points'
-        points = p.get("points")
-        if points:
-            flat_points = []
-
-            # points kiểu dict: {"0-100":[[x,y],...], "100-200":[...],...}
-            if isinstance(points, dict):
-                # Duyệt theo thứ tự key để đường được liền
-                for k in sorted(points.keys()):
-                    segment = points[k]
-                    if isinstance(segment, list):
-                        for pt in segment:
-                            if isinstance(pt, (list, tuple)) and len(pt) == 2:
-                                flat_points.append(tuple(pt))
-
-            # points kiểu list trực tiếp: [[x,y],[x,y],...]
-            elif isinstance(points, list):
-                for pt in points:
-                    if isinstance(pt, (list, tuple)) and len(pt) == 2:
-                        flat_points.append(tuple(pt))
-
-            # Vẽ đường vàng theo polyline
-            if len(flat_points) >= 2:
-                draw.line(flat_points, fill="yellow", width=2)
+        # Vẽ polyline theo 'points' (nếu model trả về)
+        pts = p.get("points")
+        flat_pts = extract_poly_points(pts) if pts is not None else []
+        if len(flat_pts) >= 2:
+            draw.line(flat_pts, fill="#A020F0", width=2)
 
     return overlay
+
+
+def estimate_severity(p, img_w, img_h):
+    """
+    Ước lượng "mức độ nghiêm trọng" dựa trên diện tích box so với ảnh:
+      - < 1%  : Nhỏ
+      - 1–5%  : Trung bình
+      - > 5%  : Lớn
+    """
+    w = float(p.get("width", 0))
+    h = float(p.get("height", 0))
+    if img_w <= 0 or img_h <= 0:
+        return "Không xác định"
+
+    area_box = w * h
+    area_img = img_w * img_h
+    ratio = area_box / area_img
+
+    if ratio < 0.01:
+        return "Nhỏ"
+    elif ratio < 0.05:
+        return "Trung bình"
+    else:
+        return "Lớn"
 
 
 # =========================================================
@@ -89,163 +114,109 @@ def draw_predictions(image: Image.Image, predictions, min_conf: float = 0.0) -> 
 # =========================================================
 st.set_page_config(page_title="BKAI - Crack Segmentation", layout="wide")
 
-st.title("BKAI – Công nghệ AI phát hiện và phân tích vết nứt bê tông")
+st.title("BKAI – Phát hiện & phân tích vết nứt bê tông bằng AI")
+
 st.write(
     """
-Ứng dụng này cho phép bạn **upload ảnh bê tông**, mô hình AI sẽ:
-- Phát hiện các vùng có vết nứt
-- Vẽ khung và đường crack lên ảnh
-- Hiển thị biểu đồ **độ tin cậy (confidence)** của từng vết nứt
+Tải một ảnh bê tông bất kỳ. Hệ thống sẽ:
+- Kết luận: **Có vết nứt** hay **Không phát hiện vết nứt**
+- Vẽ **khung + đường polyline** bao quanh vết nứt
+- Hiển thị **biểu đồ độ tin cậy (confidence)** cho từng vết nứt
+- Ước lượng **mức độ nghiêm trọng** dựa trên kích thước vùng nứt
 """
 )
 
-# Thanh bên: cấu hình
-st.sidebar.header("Cấu hình phân tích")
+# Thanh bên
+st.sidebar.header("Cấu hình")
 min_conf = st.sidebar.slider(
-    "Ngưỡng độ tin cậy tối thiểu (confidence)", 0.0, 1.0, 0.3, 0.05
+    "Ngưỡng confidence tối thiểu để hiển thị (0–1)",
+    0.0, 1.0, 0.3, 0.05
 )
-st.sidebar.write("Chỉ hiển thị các vết nứt có confidence ≥", round(min_conf, 2))
+st.sidebar.caption("Chỉ vết nứt có độ tin cậy ≥ ngưỡng này mới được vẽ.")
 
-# Form nhập
+# Form upload
 with st.form("upload_form"):
-    name = st.text_input("Họ và tên (tùy chọn)")
+    name = st.text_input("Họ tên (tùy chọn)")
     email = st.text_input("Email (tùy chọn)")
     note = st.text_area("Ghi chú về ảnh / công trình (tùy chọn)")
     uploaded_file = st.file_uploader("Chọn ảnh bê tông (JPG/PNG)", type=["jpg", "jpeg", "png"])
     submitted = st.form_submit_button("Phân tích ảnh")
 
+
 # =========================================================
-# 4. XỬ LÝ SAU KHI NGƯỜI DÙNG NHẤN "PHÂN TÍCH ẢNH"
+# 4. XỬ LÝ KHI NGƯỜI DÙNG BẤM "PHÂN TÍCH ẢNH"
 # =========================================================
 if submitted:
     if uploaded_file is None:
         st.warning("Vui lòng chọn một ảnh trước khi bấm **Phân tích ảnh**.")
-    else:
-        # Đọc ảnh
-        try:
-            image = Image.open(uploaded_file).convert("RGB")
-        except Exception as e:
-            st.error(f"Không đọc được ảnh: {e}")
-            st.stop()
+        st.stop()
 
-        # Hiển thị ảnh gốc & chuẩn bị layout 2 cột
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("Ảnh gốc")
+    # Đọc ảnh
+    try:
+        image = Image.open(uploaded_file).convert("RGB")
+    except Exception as e:
+        st.error(f"Không đọc được ảnh: {e}")
+        st.stop()
+
+    img_w, img_h = image.size
+
+    # Hai cột: ảnh gốc & ảnh kết quả
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Ảnh gốc")
+        st.image(image, use_column_width=True)
+
+    st.info("Đang gửi ảnh tới Roboflow…")
+
+    # Chuẩn bị bytes
+    buf = io.BytesIO()
+    image.save(buf, format="JPEG")
+    img_bytes = buf.getvalue()
+
+    # Gửi request
+    try:
+        resp = requests.post(
+            ROBOFLOW_FULL_URL,
+            files={"file": ("image.jpg", img_bytes, "image/jpeg")},
+            timeout=60,
+        )
+    except requests.exceptions.RequestException as e:
+        st.error(f"Lỗi khi gọi API Roboflow: {e}")
+        st.stop()
+
+    if resp.status_code != 200:
+        st.error("Roboflow trả lỗi. Hãy kiểm tra lại ROBOFLOW_FULL_URL (model_id, version, api_key).")
+        st.write(f"Status code: {resp.status_code}")
+        st.text(resp.text[:1500])
+        st.stop()
+
+    try:
+        result = resp.json()
+    except Exception as e:
+        st.error(f"Không parse được JSON trả về: {e}")
+        st.text(resp.text[:2000])
+        st.stop()
+
+    # ===== JSON raw (ẩn trong expander) =====
+    with st.expander("Xem JSON raw (chi tiết kết quả từ model)", expanded=False):
+        st.json(result)
+
+    predictions = result.get("predictions", [])
+    preds_conf = [p for p in predictions if float(p.get("confidence", 0)) >= min_conf]
+
+    has_crack = len(predictions) > 0
+    has_visible_crack = len(preds_conf) > 0
+
+    # =====================================================
+    # 4.1. ẢNH ĐÃ VẼ VẾT NỨT + KẾT LUẬN
+    # =====================================================
+    with col2:
+        st.subheader("Kết quả trên ảnh")
+
+        if not has_crack:
             st.image(image, use_column_width=True)
-
-        st.info("Đang gửi ảnh tới Roboflow, vui lòng chờ vài giây...")
-
-        # Chuyển ảnh sang bytes
-        buf = io.BytesIO()
-        image.save(buf, format="JPEG")
-        img_bytes = buf.getvalue()
-
-        # Gửi request tới Roboflow
-        try:
-            response = requests.post(
-                ROBOFLOW_FULL_URL,
-                files={"file": ("image.jpg", img_bytes, "image/jpeg")},
-                timeout=60,
-            )
-        except requests.exceptions.RequestException as e:
-            st.error(f"Lỗi khi gọi API Roboflow: {e}")
-            st.stop()
-
-        # Kiểm tra mã trả về
-        if response.status_code != 200:
-            st.error("Roboflow trả về lỗi. Kiểm tra lại URL & API key trong ROBOFLOW_FULL_URL.")
-            st.write(f"Status code: {response.status_code}")
-            st.text(response.text[:1500])
-            st.stop()
-
-        # Parse JSON
-        try:
-            result = response.json()
-        except Exception as e:
-            st.error(f"Không parse được JSON trả về: {e}")
-            st.text(response.text[:2000])
-            st.stop()
-
-        # Hiển thị JSON raw để debug / nghiên cứu
-        with st.expander("Xem chi tiết JSON (kết quả raw từ model)", expanded=False):
-            st.json(result)
-
-        predictions = result.get("predictions", [])
-
-        # Lọc theo confidence
-        filtered_preds = [p for p in predictions if float(p.get("confidence", 0)) >= min_conf]
-
-        # =====================================================
-        # 4.1. ẢNH CÓ ĐÁNH DẤU VẾT NỨT
-        # =====================================================
-        annotated = draw_predictions(image, filtered_preds, min_conf=min_conf)
-
-        with col2:
-            st.subheader("Ảnh có đánh dấu vết nứt")
-            if len(filtered_preds) == 0:
-                st.image(image, use_column_width=True)
-                st.info("Không có vết nứt nào đạt ngưỡng confidence đã chọn.")
-            else:
-                st.image(annotated, use_column_width=True)
-
-        # =====================================================
-        # 4.2. THỐNG KÊ & BIỂU ĐỒ ĐỘ TIN CẬY
-        # =====================================================
-        st.subheader("Thống kê kết quả phân tích")
-
-        total_found = len(predictions)
-        total_used = len(filtered_preds)
-
-        if total_found == 0:
-            st.write("🔍 **Model không phát hiện vết nứt nào trong ảnh này.**")
-        else:
-            confidences = [float(p.get("confidence", 0)) for p in predictions]
-            max_conf = max(confidences)
-            min_conf_pred = min(confidences)
-            avg_conf = sum(confidences) / len(confidences)
-
-            st.markdown(
-                f"""
-- Tổng số vết nứt model phát hiện: **{total_found}**
-- Số vết nứt hiển thị (confidence ≥ {min_conf:.2f}): **{total_used}**
-- Độ tin cậy cao nhất: **{max_conf:.2f}**
-- Độ tin cậy thấp nhất: **{min_conf_pred:.2f}**
-- Độ tin cậy trung bình: **{avg_conf:.2f}**
-                """
-            )
-
-            # Chuẩn bị dữ liệu vẽ biểu đồ cột
-            chart_data = {
-                "Crack ID": [f"Crack {i+1}" for i in range(len(confidences))],
-                "Confidence": confidences,
-            }
-
-            st.write("### Biểu đồ độ tin cậy của từng vết nứt")
-            st.bar_chart(
-                data={"Confidence": confidences},
-                x=None,
-                y="Confidence"
-            )
-            st.caption("Mỗi cột tương ứng với một vết nứt, trục Y là confidence (0–1).")
-
-        # =====================================================
-        # 4.3. HIỂN THỊ THÔNG TIN NGƯỜI DÙNG (LOG)
-        # =====================================================
-        st.write("---")
-        st.subheader("Thông tin phiên phân tích")
-        st.write(f"- Thời gian: **{datetime.datetime.now()}**")
-        if name:
-            st.write(f"- Người dùng: **{name}**")
-        if email:
-            st.write(f"- Email: **{email}**")
-        if note:
-            st.write(f"- Ghi chú: {note}")
-
-
-
-
-
-
-
-
+            st.success("✅ Kết luận: **Không phát hiện vết nứt** trong ảnh này.")
+        elif not has_visible_crack:
+            # Có crack nhưng tất cả dưới ngưỡng min_conf
+            st.image(image, use_co_
