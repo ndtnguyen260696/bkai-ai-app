@@ -63,8 +63,8 @@ def mask_from_url(url):
 # Streamlit UI
 # ===============================
 st.set_page_config(page_title="BKAI - Crack Segmentation", layout="wide")
-st.title("BKAI – Phân tích vết nứt bê tông (Roboflow Hosted API)")
-st.write("Upload ảnh, model sẽ trả kết quả segmentation/detection. (Thay `ROBOFLOW_FULL_URL` bằng URL của bạn.)")
+st.title("BKAI – Model CNN Phân tích vết nứt bê tông ")
+st.write("Upload ảnh, model CNN sẽ trả kết quả ảnh bê tông nứt hay không nứt.")
 
 with st.form("upload_form"):
     name = st.text_input("Họ và tên")
@@ -162,6 +162,7 @@ if submitted:
                     st.write(f"- Email: {email}")
                     st.write(f"- Ghi chú: {note}")
                     st.write(f"- Thời gian: {datetime.datetime.now()}")
+
 
 
 
