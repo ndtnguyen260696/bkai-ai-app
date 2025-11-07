@@ -7,25 +7,19 @@ import requests
 from PIL import Image, ImageDraw
 
 # =========================================================
-# 1. CẤU HÌNH ROBOFLOW VÀ LOGO
+# 1. CẤU HÌNH ROBOFLOW
+#    VÀO: Roboflow -> Project -> Deploy -> Hosted API -> Python
+#    COPY NGUYÊN URL dạng:
+#    https://detect.roboflow.com/<model_id>/<version>?api_key=<API_KEY>
+#    DÁN VÀO GIỮA CẶP DẤU " " Ở DÒNG DƯỚI (KHÔNG THÊM GÌ KHÁC)
 # =========================================================
-
-# VÀO Roboflow: Project -> Deploy -> Hosted API -> Python
-# COPY NGUYÊN URL DẠNG:
-#   https://detect.roboflow.com/<model_id>/<version>?api_key=<API_KEY>
-# DÁN VÀO GIỮA CẶP " " DƯỚI ĐÂY (KHÔNG THÊM BẤT KỲ " HOẶC CHỮ NÀO KHÁC)
 ROBOFLOW_FULL_URL = "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
-
-# Đường dẫn / URL logo BKAI (tùy bạn đặt):
-# - Nếu file logo nằm cùng thư mục với app.py: BKAI_LOGO = "bkai_logo.png"
-# - Nếu dùng link web: BKAI_LOGO = "https://....png"
-BKAI_LOGO = "bkai_logo.png"  # sửa nếu tên file / URL khác
+#           ↑ THAY BẰNG URL CỦA BẠN, NHƯNG CHỈ ĐƯỢC CÓ 1 CẶP " "
 
 
 # =========================================================
-# 2. HÀM HỖ TRỢ
+# 2. HÀM XỬ LÝ HỖ TRỢ
 # =========================================================
-
 def extract_poly_points(points_field):
     """
     Chuyển trường 'points' trong JSON thành list [(x,y), ...]
@@ -52,24 +46,12 @@ def extract_poly_points(points_field):
 
 def draw_predictions(image: Image.Image, predictions, min_conf: float) -> Image.Image:
     """
-    Vẽ Instance Segmentation:
+    Vẽ:
       - Khung tím quanh vùng nứt (bounding box)
-      - ĐƯỜNG & VÙNG segmentation theo 'points' (Instance Segmentation)
+      - Đường polyline tím theo 'points' nếu có
     """
-    # Chuyển ảnh sang RGBA để hỗ trợ alpha (trong suốt)
-    base = image.convert("RGBA")
-
-    # Lớp để vẽ box + text
-    box_draw = ImageDraw.Draw(base)
-
-    # Lớp riêng để vẽ mask (tô màu vùng nứt)
-    mask_layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    mask_draw = ImageDraw.Draw(mask_layer)
-
-    # Màu tím
-    purple_rgb = (160, 32, 240)        # #A020F0
-    purple_rgba = (160, 32, 240, 255)
-    purple_fill = (160, 32, 240, 80)   # tím trong suốt để tô vùng
+    overlay = image.copy()
+    draw = ImageDraw.Draw(overlay)
 
     for p in predictions:
         conf = float(p.get("confidence", 0))
@@ -83,34 +65,27 @@ def draw_predictions(image: Image.Image, predictions, min_conf: float) -> Image.
         if None in (x, y, w, h):
             continue
 
-        # Roboflow: x, y là tâm box
+        # Roboflow: x,y là tâm box
         x0 = x - w / 2
         y0 = y - h / 2
         x1 = x + w / 2
         y1 = y + h / 2
 
-        # Khung tím quanh vùng nứt
-        box_draw.rectangle([x0, y0, x1, y1], outline=purple_rgb, width=3)
+        # Khung tím
+        draw.rectangle([x0, y0, x1, y1], outline="#A020F0", width=3)
 
-        # Nhãn class + confidence
+        # Nhãn
         cls = p.get("class", "crack")
         label = f"{cls} ({conf:.2f})"
-        box_draw.text((x0 + 4, y0 + 4), label, fill=purple_rgb)
+        draw.text((x0 + 4, y0 + 4), label, fill="#A020F0")
 
-        # ===== VẼ INSTANCE SEGMENTATION TỪ 'points' =====
+        # Polyline nếu có points
         pts = p.get("points")
         flat_pts = extract_poly_points(pts) if pts else []
+        if len(flat_pts) >= 2:
+            draw.line(flat_pts, fill="#A020F0", width=2)
 
-        # Nếu model trả về đa giác (>= 3 điểm), ta tô vùng polygon
-        if len(flat_pts) >= 3:
-            mask_draw.polygon(flat_pts, outline=purple_rgba, fill=purple_fill)
-        # Nếu chỉ có đường (>= 2 điểm) thì vẽ polyline
-        elif len(flat_pts) >= 2:
-            mask_draw.line(flat_pts, fill=purple_rgba, width=2)
-
-    # Ghép lớp mask (tím trong suốt) lên ảnh gốc có box + text
-    combined = Image.alpha_composite(base, mask_layer).convert("RGB")
-    return combined
+    return overlay
 
 
 def estimate_severity(p, img_w, img_h):
@@ -154,10 +129,9 @@ def resize_for_speed(image: Image.Image, max_side: int):
 # =========================================================
 # 3. GIAO DIỆN STREAMLIT
 # =========================================================
-
 st.set_page_config(page_title="BKAI - Crack Segmentation", layout="wide")
 
-# CSS nền tối cho đẹp
+# Một chút CSS cho đẹp hơn
 st.markdown(
     """
     <style>
@@ -166,46 +140,36 @@ st.markdown(
         color: #e5e7eb;
     }
     .block-container {
-        padding-top: 1.2rem;
-        padding-bottom: 1.2rem;
+        padding-top: 1.5rem;
+        padding-bottom: 1.5rem;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# Sidebar: logo BKAI + config
-with st.sidebar:
-    if BKAI_LOGO:  # nếu bạn đã có file/logo
-        st.image(BKAI_LOGO, caption="BKAI", use_column_width=True)
-    st.markdown("### ⚙️ Cấu hình phân tích")
-    min_conf = st.slider(
-        "Ngưỡng confidence tối thiểu để hiển thị",
-        0.0, 1.0, 0.3, 0.05,
-    )
-    max_side = st.slider(
-        "Giới hạn kích thước cạnh dài nhất của ảnh (px)",
-        400, 1600, 900, 100,
-    )
-    st.caption("Ảnh lớn sẽ được thu nhỏ về kích thước này để tăng tốc xử lý.")
-
-# Header chính
-col_logo, col_title = st.columns([1, 4])
-with col_logo:
-    if BKAI_LOGO:
-        st.image(BKAI_LOGO, width=90)
-with col_title:
-    st.title("🧠 BKAI – Phát hiện & phân tích vết nứt bê tông")
-
+st.title("🧠 BKAI – Hệ thống phát hiện & phân tích vết nứt bê tông")
 st.markdown(
     """
-Ứng dụng sử dụng **mô hình AI trên Roboflow** để:
+Ứng dụng này sử dụng **mô hình AI trên Roboflow** để:
 - ✅ Kết luận: **Có vết nứt / Không phát hiện vết nứt**
-- 🟣 Hiển thị **Instance Segmentation** (tô vùng nứt + đường polyline)
-- 📊 Thống kê & **biểu đồ độ tin cậy (confidence)** cho từng vết nứt
-- 🚦 Ước lượng **mức độ nghiêm trọng** dựa trên kích thước vùng nứt
+- 🟣 Vẽ **khung + đường polyline** ôm sát vết nứt
+- 📊 Hiển thị **biểu đồ độ tin cậy (confidence)** cho từng vết nứt
+- 🚦 Ước lượng **mức độ nghiêm trọng** dựa trên kích thước vết nứt
 """
 )
+
+# ----- Sidebar -----
+st.sidebar.header("⚙️ Cấu hình phân tích")
+min_conf = st.sidebar.slider(
+    "Ngưỡng confidence tối thiểu để hiển thị",
+    0.0, 1.0, 0.3, 0.05,
+)
+max_side = st.sidebar.slider(
+    "Giới hạn kích thước cạnh dài nhất của ảnh (px)",
+    400, 1600, 900, 100,
+)
+st.sidebar.caption("Ảnh lớn sẽ được thu nhỏ về kích thước này để tăng tốc xử lý.")
 
 # ----- Form upload -----
 with st.form("upload_form"):
@@ -214,6 +178,7 @@ with st.form("upload_form"):
     note = st.text_area("Ghi chú về ảnh / công trình (tùy chọn)")
     uploaded_file = st.file_uploader("📷 Chọn ảnh bê tông (JPG/PNG)", type=["jpg", "jpeg", "png"])
     submitted = st.form_submit_button("🚀 Phân tích ảnh")
+
 
 # =========================================================
 # 4. XỬ LÝ CHÍNH
@@ -283,7 +248,7 @@ if submitted:
 
     # ----- Ảnh đã vẽ kết quả + kết luận -----
     with col2:
-        st.subheader("Ảnh đã đánh dấu vết nứt (Instance Segmentation)")
+        st.subheader("Ảnh đã đánh dấu vết nứt")
         if not has_crack:
             st.image(image, use_column_width=True)
             st.success("✅ Kết luận: **Không phát hiện vết nứt** trong ảnh này.")
@@ -317,7 +282,7 @@ if submitted:
         min_conf_pred = min(conf_all)
         avg_conf = sum(conf_all) / len(conf_all)
 
-        # 4 thẻ metric
+        # 3 thẻ metric
         mcol1, mcol2, mcol3, mcol4 = st.columns(4)
         mcol1.metric("Số vùng nghi là vết nứt", len(predictions))
         mcol2.metric("Số vùng hiển thị", len(preds_conf))
