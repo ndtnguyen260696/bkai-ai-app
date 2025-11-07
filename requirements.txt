@@ -1,6 +1,9 @@
 streamlit
-Pillow
 requests
-inference-sdk
+Pillow
+pandas
+matplotlib
+reportlab
+
 
 
