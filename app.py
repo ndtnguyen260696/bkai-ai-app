@@ -14,7 +14,8 @@ from PIL import Image, ImageDraw
 # COPY NGUYÊN URL DẠNG:
 #   https://detect.roboflow.com/<model_id>/<version>?api_key=<API_KEY>
 # DÁN VÀO GIỮA CẶP " " DƯỚI ĐÂY
-ROBOFLOW_FULL_URL = "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=THAY_API_KEY_VÀO_ĐÂY"
+ROBOFLOW_FULL_URL = "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
+
 #               ↑ THAY BẰNG URL CỦA BẠN (CHỈ 1 CẶP DẤU " ")
 
 
@@ -400,3 +401,4 @@ if submitted:
         st.write(f"- Email: {email}")
     if note:
         st.write(f"- Ghi chú: {note}")
+
