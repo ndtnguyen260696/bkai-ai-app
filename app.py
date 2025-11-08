@@ -156,7 +156,7 @@ def estimate_severity(p, img_w, img_h):
 
 def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf"):
     """Tạo file PDF báo cáo, dùng font Unicode (TimesVN/DejaVu).
-    ĐÃ GIỚI HẠN KÍCH THƯỚC ẢNH ĐỂ TRÁNH LayoutError.
+    ĐÃ GIỚI HẠN KÍCH THƯỚC ẢNH VÀ ĐỂ BẢNG TỰ CANH CHO VỪA TRANG.
     """
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -205,7 +205,10 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
 
     # Logo + tiêu đề
     if os.path.exists(LOGO_PATH):
-        story.append(RLImage(LOGO_PATH, width=40 * mm))
+        logo_flow = RLImage(LOGO_PATH)
+        # Giới hạn logo không vượt quá chiều rộng frame và 30mm chiều cao
+        logo_flow._restrictSize(doc.width, 30 * mm)
+        story.append(logo_flow)
         story.append(Spacer(1, 6 * mm))
 
     story.append(Paragraph("BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG", title_style))
@@ -236,7 +239,8 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
             ]
         )
 
-    tbl = Table(data, colWidths=[35 * mm, 35 * mm, 40 * mm, 55 * mm])
+    # KHÔNG set colWidths nữa → để ReportLab tự co cho vừa frame
+    tbl = Table(data)
     tbl.setStyle(
         TableStyle(
             [
@@ -246,6 +250,7 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
                 ("FONTSIZE", (0, 0), (-1, -1), 9),
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
                 ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ]
         )
     )
@@ -265,6 +270,7 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
     doc.build(story)
     buf.seek(0)
     return buf
+
     
 # =========================================================
 # 3. HÀM STAGE 2 (DEMO)
@@ -567,4 +573,5 @@ if analyze_btn:
         # ---------------- TAB STAGE 2 ----------------
         with tab_stage2:
             show_stage2_demo()
+
 
