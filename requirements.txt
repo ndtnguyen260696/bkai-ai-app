@@ -4,6 +4,8 @@ pillow
 matplotlib
 pandas
 reportlab
+pip install streamlit bcrypt
+
 
 
 
