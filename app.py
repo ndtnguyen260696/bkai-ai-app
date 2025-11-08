@@ -28,30 +28,29 @@ from reportlab.pdfbase.ttfonts import TTFont
 # =========================================================
 
 # --- 0.1. Roboflow URL (BẮT BUỘC SỬA CHO ĐÚNG MODEL CỦA BẠN) ---
-ROBOFLOW_FULL_URL = "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
+ROBOFLOW_FULL_URL = (
+    "https://detect.roboflow.com/crack_segmentation_detection/4"
+    "?api_key=nWA6ayjI5bGNpXkkbsAb"
+)
 
-# --- 0.2. Logo BKAI (ảnh PNG đặt trong thư mục logo/) ---
-LOGO_PATH = "BKAI_Logo.png"  # bạn chỉ cần đảm bảo file tồn tại đường dẫn này
+# --- 0.2. Logo BKAI (ảnh PNG đặt cạnh file app.py) ---
+LOGO_PATH = "BKAI_Logo.png"
 
 # --- 0.3. Font Unicode cho PDF ---
-# Nếu bạn có file Times New Roman.ttf thì copy vào thư mục logo/ và sửa tên file tại đây.
-# Nếu không có, đoạn code dưới sẽ fallback sang DejaVuSans (hỗ trợ tiếng Việt).
-FONT_PATH = "times.ttf"
+FONT_PATH = "times.ttf"          # nếu bạn có file Times New Roman -> đặt tên này
 FONT_NAME = "TimesVN"
 
 if os.path.exists(FONT_PATH):
     pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 else:
-    # Fallback (font có sẵn trên server, vẫn hiển thị tiếng Việt ổn)
-    from reportlab.pdfbase.ttfonts import TTFont
-
+    # Fallback sang DejaVuSans có sẵn trên server
     FONT_NAME = "DejaVu"
     pdfmetrics.registerFont(
         TTFont(FONT_NAME, "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
     )
 
 # =========================================================
-# 1. HÀM XỬ LÝ VÀ VẼ VẾT NỨT
+# 1. CÁC HÀM XỬ LÝ ẢNH
 # =========================================================
 
 
@@ -161,7 +160,7 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=25 * mm, rightMargin=25 * mm)
     styles = getSampleStyleSheet()
 
-    # Sửa toàn bộ style sang font Unicode
+    # Đổi toàn bộ style sang font Unicode
     for s in styles.byName:
         styles[s].fontName = FONT_NAME
 
@@ -189,9 +188,7 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
         story.append(RLImage(LOGO_PATH, width=40 * mm))
         story.append(Spacer(1, 6 * mm))
 
-    story.append(
-        Paragraph("BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG", title_style)
-    )
+    story.append(Paragraph("BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG", title_style))
     story.append(Paragraph("Concrete Crack Inspection Report", normal))
     story.append(Spacer(1, 8 * mm))
 
@@ -256,7 +253,40 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
 
 
 # =========================================================
-# 3. GIAO DIỆN STREAMLIT
+# 3. HÀM STAGE 2 (DEMO)
+# =========================================================
+
+
+def show_stage2_demo():
+    """Stage 2 demo: phân loại vết nứt & gợi ý nguyên nhân / biện pháp."""
+    st.subheader("Stage 2 (demo) – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
+
+    demo_data = pd.DataFrame(
+        [
+            {
+                "Loại vết nứt": "Vết nứt dọc (Longitudinal Crack)",
+                "Nguyên nhân": "Co ngót, tải trọng trục bánh xe, bê tông chưa đủ cường độ.",
+                "Biện pháp": "Kiểm tra khả năng chịu lực, gia cường hoặc trám vá bằng vật liệu phù hợp.",
+            },
+            {
+                "Loại vết nứt": "Vết nứt ngang (Transverse Crack)",
+                "Nguyên nhân": "Giãn nở nhiệt, không có khe co giãn, liên kết yếu.",
+                "Biện pháp": "Tạo hoặc mở rộng khe co giãn, xử lý lại kết cấu nếu cần.",
+            },
+            {
+                "Loại vết nứt": "Vết nứt mạng (Map Crack)",
+                "Nguyên nhân": "Co ngót bề mặt, bê tông chất lượng thấp, bảo dưỡng kém.",
+                "Biện pháp": "Loại bỏ lớp bề mặt yếu, phủ lớp vữa/bê tông mới có cường độ tốt hơn.",
+            },
+        ]
+    )
+
+    st.table(demo_data)
+    st.caption("Stage 2 hiện tại chỉ là demo – bảng kiến thức cơ bản về các dạng vết nứt.")
+
+
+# =========================================================
+# 4. GIAO DIỆN STREAMLIT
 # =========================================================
 
 st.set_page_config(
@@ -291,7 +321,7 @@ uploaded_file = st.file_uploader(
 analyze_btn = st.button("🔍 Phân tích ảnh")
 
 # =========================================================
-# 4. XỬ LÝ ẢNH
+# 5. XỬ LÝ ẢNH – STAGE 1
 # =========================================================
 
 if analyze_btn:
@@ -302,11 +332,6 @@ if analyze_btn:
     t0 = time.time()
     orig_img = Image.open(uploaded_file).convert("RGB")
     img_w, img_h = orig_img.size
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Ảnh gốc")
-        st.image(orig_img, use_column_width=True)
 
     # Gửi tới Roboflow
     buf = io.BytesIO()
@@ -336,7 +361,12 @@ if analyze_btn:
     t1 = time.time()
     total_time = t1 - t0
 
-    # Ảnh phân tích
+    # ---------------- ẢNH GỐC & ẢNH PHÂN TÍCH ----------------
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Ảnh gốc")
+        st.image(orig_img, use_column_width=True)
+
     with col2:
         st.subheader("Ảnh phân tích")
         if len(preds_conf) == 0:
@@ -348,202 +378,178 @@ if analyze_btn:
             st.error("⚠️ Kết luận: **CÓ vết nứt trên ảnh.**")
 
     # =====================================================
-    # 4.1. BẢNG THÔNG TIN VẾT NỨT (TỔNG QUAN)
+    # 5.1. BÁO CÁO CHI TIẾT + STAGE 2 Ở TAB RIÊNG
     # =====================================================
     if len(preds_conf) > 0:
         st.write("---")
-        st.subheader("Bảng thông tin vết nứt")
-
-        # Thống kê đơn giản (giả lập một vài thông số cho đẹp bảng)
-        confs = [float(p.get("confidence", 0)) for p in preds_conf]
-        avg_conf = sum(confs) / len(confs)
-        # Giả lập mAP
-        map_val = round(min(1.0, avg_conf - 0.05), 2)
-        # Tính % diện tích vùng nứt lớn nhất
-        max_ratio = 0
-        max_p = preds_conf[0]
-        for p in preds_conf:
-            w = float(p.get("width", 0))
-            h = float(p.get("height", 0))
-            ratio = w * h / (img_w * img_h)
-            if ratio > max_ratio:
-                max_ratio = ratio
-                max_p = p
-
-        crack_area_ratio = round(max_ratio * 100, 2)
-        severity = estimate_severity(max_p, img_w, img_h)
-
-        # Bảng metrics song ngữ
-        metrics = [
-            {
-                "vi": "Tên ảnh",
-                "en": "Image Name",
-                "value": uploaded_file.name,
-                "desc": "File ảnh người dùng tải lên",
-            },
-            {
-                "vi": "Thời gian xử lý",
-                "en": "Total Processing Time",
-                "value": f"{total_time:.2f} s",
-                "desc": "Tổng thời gian thực hiện toàn bộ quy trình",
-            },
-            {
-                "vi": "Tốc độ mô hình AI",
-                "en": "Inference Speed",
-                "value": f"{total_time:.2f} s/image",
-                "desc": "Thời gian xử lý mỗi ảnh",
-            },
-            {
-                "vi": "Độ chính xác (Confidence trung bình)",
-                "en": "Confidence",
-                "value": f"{avg_conf:.2f}",
-                "desc": "Mức tin cậy trung bình của mô hình",
-            },
-            {
-                "vi": "mAP (Độ chính xác trung bình)",
-                "en": "Mean Average Precision",
-                "value": f"{map_val:.2f}",
-                "desc": "Độ chính xác định vị vùng nứt",
-            },
-            {
-                "vi": "Phần trăm vùng nứt",
-                "en": "Crack Area Ratio",
-                "value": f"{crack_area_ratio:.2f} %",
-                "desc": "Diện tích vùng nứt / tổng diện tích ảnh",
-            },
-            {
-                "vi": "Chiều dài vết nứt",
-                "en": "Crack Length",
-                "value": "—",
-                "desc": "Có thể ước lượng nếu biết tỉ lệ pixel-thực tế",
-            },
-            {
-                "vi": "Chiều rộng vết nứt",
-                "en": "Crack Width",
-                "value": "—",
-                "desc": "Độ rộng lớn nhất của vết nứt (cần thang đo chuẩn)",
-            },
-            {
-                "vi": "Tọa độ vùng nứt",
-                "en": "Crack Bounding Box",
-                "value": f"[{max_p.get('x')}, {max_p.get('y')}, {max_p.get('width')}, {max_p.get('height')}]",
-                "desc": "(x, y, w, h) – vị trí vùng nứt lớn nhất",
-            },
-            {
-                "vi": "Mức độ nguy hiểm",
-                "en": "Severity Level",
-                "value": severity,
-                "desc": "Phân cấp theo tiêu chí diện tích tương đối",
-            },
-            {
-                "vi": "Thời gian phân tích",
-                "en": "Timestamp",
-                "value": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "desc": "Thời điểm thực hiện phân tích",
-            },
-            {
-                "vi": "Nhận xét tổng quan",
-                "en": "Summary",
-                "value": "Vết nứt có nguy cơ, cần kiểm tra thêm."
-                if "Nguy hiểm" in severity
-                else "Vết nứt nhỏ, nên tiếp tục theo dõi.",
-                "desc": "Kết luận tự động của hệ thống",
-            },
-        ]
-
-        metrics_df = pd.DataFrame(metrics)
-
-        # Styling bảng: header xanh, kẻ ô
-        styled_df = metrics_df.style.set_table_styles(
+        tab_stage1, tab_stage2 = st.tabs(
             [
-                {
-                    "selector": "th",
-                    "props": [
-                        ("background-color", "#1e88e5"),
-                        ("color", "white"),
-                        ("font-weight", "bold"),
-                    ],
-                },
-                {
-                    "selector": "td",
-                    "props": [("background-color", "#fafafa")],
-                },
+                "Stage 1 – Báo cáo chi tiết",
+                "Stage 2 – Phân loại vết nứt (demo)",
             ]
         )
-        st.dataframe(styled_df, use_container_width=True)
 
-        # =================================================
-        # 4.2. BIỂU ĐỒ
-        # =================================================
-        st.subheader("Biểu đồ thống kê")
+        # ---------------- TAB STAGE 1 ----------------
+        with tab_stage1:
+            st.subheader("Bảng thông tin vết nứt")
 
-        col_chart1, col_chart2 = st.columns(2)
+            confs = [float(p.get("confidence", 0)) for p in preds_conf]
+            avg_conf = sum(confs) / len(confs)
+            map_val = round(min(1.0, avg_conf - 0.05), 2)
 
-        # Biểu đồ cột confidence từng vùng
-        with col_chart1:
-            plt.figure(figsize=(4, 3))
-            plt.bar(range(1, len(confs) + 1), confs, color="#42a5f5")
-            plt.xlabel("Crack #")
-            plt.ylabel("Confidence")
-            plt.ylim(0, 1)
-            plt.title("Độ tin cậy từng vùng nứt")
-            st.pyplot(plt.gcf())
-            plt.close()
+            # Tính % diện tích vùng nứt lớn nhất
+            max_ratio = 0
+            max_p = preds_conf[0]
+            for p in preds_conf:
+                w = float(p.get("width", 0))
+                h = float(p.get("height", 0))
+                ratio = w * h / (img_w * img_h)
+                if ratio > max_ratio:
+                    max_ratio = ratio
+                    max_p = p
 
-        # Biểu đồ tròn mức độ nguy hiểm (demo: 1 vùng lớn nhất)
-        with col_chart2:
-            labels = ["Vùng nứt lớn nhất", "Phần ảnh còn lại"]
-            sizes = [max_ratio, 1 - max_ratio]
-            plt.figure(figsize=(4, 3))
-            plt.pie(
-                sizes,
-                labels=labels,
-                autopct="%1.1f%%",
-                startangle=140,
-                colors=["#ef5350", "#90caf9"],
+            crack_area_ratio = round(max_ratio * 100, 2)
+            severity = estimate_severity(max_p, img_w, img_h)
+
+            metrics = [
+                {
+                    "vi": "Tên ảnh",
+                    "en": "Image Name",
+                    "value": uploaded_file.name,
+                    "desc": "File ảnh người dùng tải lên",
+                },
+                {
+                    "vi": "Thời gian xử lý",
+                    "en": "Total Processing Time",
+                    "value": f"{total_time:.2f} s",
+                    "desc": "Tổng thời gian thực hiện toàn bộ quy trình",
+                },
+                {
+                    "vi": "Tốc độ mô hình AI",
+                    "en": "Inference Speed",
+                    "value": f"{total_time:.2f} s/image",
+                    "desc": "Thời gian xử lý mỗi ảnh",
+                },
+                {
+                    "vi": "Độ chính xác (Confidence trung bình)",
+                    "en": "Confidence",
+                    "value": f"{avg_conf:.2f}",
+                    "desc": "Mức tin cậy trung bình của mô hình",
+                },
+                {
+                    "vi": "mAP (Độ chính xác trung bình)",
+                    "en": "Mean Average Precision",
+                    "value": f"{map_val:.2f}",
+                    "desc": "Độ chính xác định vị vùng nứt",
+                },
+                {
+                    "vi": "Phần trăm vùng nứt",
+                    "en": "Crack Area Ratio",
+                    "value": f"{crack_area_ratio:.2f} %",
+                    "desc": "Diện tích vùng nứt / tổng diện tích ảnh",
+                },
+                {
+                    "vi": "Chiều dài vết nứt",
+                    "en": "Crack Length",
+                    "value": "—",
+                    "desc": "Có thể ước lượng nếu biết tỉ lệ pixel-thực tế",
+                },
+                {
+                    "vi": "Chiều rộng vết nứt",
+                    "en": "Crack Width",
+                    "value": "—",
+                    "desc": "Độ rộng lớn nhất của vết nứt (cần thang đo chuẩn)",
+                },
+                {
+                    "vi": "Tọa độ vùng nứt",
+                    "en": "Crack Bounding Box",
+                    "value": f"[{max_p.get('x')}, {max_p.get('y')}, "
+                    f"{max_p.get('width')}, {max_p.get('height')}]",
+                    "desc": "(x, y, w, h) – vị trí vùng nứt lớn nhất",
+                },
+                {
+                    "vi": "Mức độ nguy hiểm",
+                    "en": "Severity Level",
+                    "value": severity,
+                    "desc": "Phân cấp theo tiêu chí diện tích tương đối",
+                },
+                {
+                    "vi": "Thời gian phân tích",
+                    "en": "Timestamp",
+                    "value": datetime.datetime.now().strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                    "desc": "Thời điểm thực hiện phân tích",
+                },
+                {
+                    "vi": "Nhận xét tổng quan",
+                    "en": "Summary",
+                    "value": "Vết nứt có nguy cơ, cần kiểm tra thêm."
+                    if "Nguy hiểm" in severity
+                    else "Vết nứt nhỏ, nên tiếp tục theo dõi.",
+                    "desc": "Kết luận tự động của hệ thống",
+                },
+            ]
+
+            metrics_df = pd.DataFrame(metrics)
+
+            styled_df = metrics_df.style.set_table_styles(
+                [
+                    {
+                        "selector": "th",
+                        "props": [
+                            ("background-color", "#1e88e5"),
+                            ("color", "white"),
+                            ("font-weight", "bold"),
+                        ],
+                    },
+                    {
+                        "selector": "td",
+                        "props": [("background-color", "#fafafa")],
+                    },
+                ]
             )
-            plt.title("Tỷ lệ vùng nứt so với toàn ảnh")
-            st.pyplot(plt.gcf())
-            plt.close()
+            st.dataframe(styled_df, use_container_width=True)
 
-        # =================================================
-        # 4.3. NÚT TẢI PDF
-        # =================================================
-        pdf_buf = export_pdf(orig_img, analyzed_img, metrics_df)
-        st.download_button(
-            "📄 Tải báo cáo PDF cho ảnh này",
-            data=pdf_buf,
-            file_name=f"BKAI_CrackReport_{uploaded_file.name.split('.')[0]}.pdf",
-            mime="application/pdf",
-        )
+            # ---------- BIỂU ĐỒ ----------
+            st.subheader("Biểu đồ thống kê")
+            col_chart1, col_chart2 = st.columns(2)
 
-# =========================================================
-# 5. GIAI ĐOẠN 2 (DEMO): PHÂN LOẠI VẾT NỨT
-# =========================================================
+            with col_chart1:
+                plt.figure(figsize=(4, 3))
+                plt.bar(range(1, len(confs) + 1), confs, color="#42a5f5")
+                plt.xlabel("Crack #")
+                plt.ylabel("Confidence")
+                plt.ylim(0, 1)
+                plt.title("Độ tin cậy từng vùng nứt")
+                st.pyplot(plt.gcf())
+                plt.close()
 
-st.write("---")
-st.subheader("Stage 2 (demo) – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
+            with col_chart2:
+                labels = ["Vùng nứt lớn nhất", "Phần ảnh còn lại"]
+                sizes = [max_ratio, 1 - max_ratio]
+                plt.figure(figsize=(4, 3))
+                plt.pie(
+                    sizes,
+                    labels=labels,
+                    autopct="%1.1f%%",
+                    startangle=140,
+                    colors=["#ef5350", "#90caf9"],
+                )
+                plt.title("Tỷ lệ vùng nứt so với toàn ảnh")
+                st.pyplot(plt.gcf())
+                plt.close()
 
-demo_data = pd.DataFrame(
-    [
-        {
-            "Loại vết nứt": "Vết nứt dọc (Longitudinal Crack)",
-            "Nguyên nhân": "Co ngót, tải trọng trục bánh xe, bê tông chưa đủ cường độ.",
-            "Biện pháp": "Kiểm tra khả năng chịu lực, gia cường hoặc trám vá bằng vật liệu phù hợp.",
-        },
-        {
-            "Loại vết nứt": "Vết nứt ngang (Transverse Crack)",
-            "Nguyên nhân": "Giãn nở nhiệt, không có khe co giãn, liên kết yếu.",
-            "Biện pháp": "Tạo hoặc mở rộng khe co giãn, xử lý lại kết cấu nếu cần.",
-        },
-        {
-            "Loại vết nứt": "Vết nứt mạng (Map Crack)",
-            "Nguyên nhân": "Co ngót bề mặt, bê tông chất lượng thấp, bảo dưỡng kém.",
-            "Biện pháp": "Loại bỏ lớp bề mặt yếu, phủ lớp vữa/bê tông mới có cường độ tốt hơn.",
-        },
-    ]
-)
+            # ---------- NÚT TẢI PDF ----------
+            pdf_buf = export_pdf(orig_img, analyzed_img, metrics_df)
+            st.download_button(
+                "📄 Tải báo cáo PDF cho ảnh này",
+                data=pdf_buf,
+                file_name=f"BKAI_CrackReport_{uploaded_file.name.split('.')[0]}.pdf",
+                mime="application/pdf",
+                key=f"pdf_btn_{uploaded_file.name}",
+            )
 
-st.table(demo_data)
-
-
+        # ---------------- TAB STAGE 2 ----------------
+        with tab_stage2:
+            show_stage2_demo()
