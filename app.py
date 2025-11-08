@@ -32,12 +32,12 @@ ROBOFLOW_FULL_URL = (
     "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
 
 # --- 0.2. Logo BKAI (ảnh PNG đặt trong thư mục logo/) ---
-LOGO_PATH = "logo/bkai_logo.png"  # bạn chỉ cần đảm bảo file tồn tại đường dẫn này
+LOGO_PATH = "BKAI_Logo.png"  # bạn chỉ cần đảm bảo file tồn tại đường dẫn này
 
 # --- 0.3. Font Unicode cho PDF ---
 # Nếu bạn có file Times New Roman.ttf thì copy vào thư mục logo/ và sửa tên file tại đây.
 # Nếu không có, đoạn code dưới sẽ fallback sang DejaVuSans (hỗ trợ tiếng Việt).
-FONT_PATH = "logo/TimesNewRoman.ttf"
+FONT_PATH = "times.ttf"
 FONT_NAME = "TimesVN"
 
 if os.path.exists(FONT_PATH):
@@ -546,3 +546,4 @@ demo_data = pd.DataFrame(
 )
 
 st.table(demo_data)
+
