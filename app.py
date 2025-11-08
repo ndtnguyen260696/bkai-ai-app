@@ -1,222 +1,200 @@
 import streamlit as st
 import pandas as pd
+import requests
+from PIL import Image, ImageDraw
+import io
 import matplotlib.pyplot as plt
-import datetime
-from PIL import Image
+import time
 
-# --------------------------------------------------------
-# 1. CẤU HÌNH CƠ BẢN
-# --------------------------------------------------------
-st.set_page_config(page_title="BKAI Crack Report", layout="wide")
+# ==============================
+# 1️⃣ CẤU HÌNH CHUNG
+# ==============================
+st.set_page_config(page_title="BKAI – Concrete Crack Detection", layout="wide")
 
-# CSS đơn giản cho giống PDF: căn giữa, đường kẻ ngang...
-st.markdown(
-    """
-    <style>
-    body { background-color: #ffffff; }
-    .block-container { padding-top: 1.5rem; padding-bottom: 1.5rem; }
-    h1, h2, h3, h4 { color: #0f172a; font-family: Arial, sans-serif; }
-    table, th, td { font-size: 14px !important; }
-    </style>
-    """,
-    unsafe_allow_html=True,
+# CSS giao diện giống website BKAI
+st.markdown("""
+<style>
+body { background-color: #f8fafc; color: #1e293b; }
+h1,h2,h3,h4,h5 { color:#0f172a; text-align:center; font-family: 'Segoe UI'; }
+header, footer {visibility: hidden;}
+[data-testid="stSidebar"] {background-color: #f1f5f9;}
+div.block-container {padding-top: 1rem;}
+.bkai-title {text-align:center; color:#0f172a; font-weight:bold; font-size:28px;}
+</style>
+""", unsafe_allow_html=True)
+
+# ==============================
+# 2️⃣ LOGO VÀ HEADER
+# ==============================
+col_logo, col_title = st.columns([1,4])
+with col_logo:
+    st.image("bkai_logo.png", width=120)
+with col_title:
+    st.markdown("<h1 class='bkai-title'>BKAI – AI Concrete Crack Inspection Platform</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center;'>Ứng dụng AI phát hiện và phân loại vết nứt bê tông – Powered by BKAI</p>", unsafe_allow_html=True)
+st.divider()
+
+# ==============================
+# 3️⃣ TRANG ĐĂNG NHẬP
+# ==============================
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    st.subheader("🔐 Đăng nhập để sử dụng hệ thống")
+    with st.form("login_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Mật khẩu", type="password")
+        submit = st.form_submit_button("Đăng nhập")
+
+        if submit:
+            # 👉 DEMO: Cho phép mọi email hợp lệ đăng nhập
+            if "@" in email and len(password) >= 3:
+                st.session_state.logged_in = True
+                st.success("✅ Đăng nhập thành công!")
+                st.experimental_rerun()
+            else:
+                st.error("❌ Sai thông tin đăng nhập.")
+    st.stop()
+
+# ==============================
+# 4️⃣ TRANG PHÂN TÍCH ẢNH
+# ==============================
+st.success(f"Xin chào **{email}**, hãy tải ảnh để hệ thống phân tích 🔍")
+
+# Link mô hình Roboflow CNN
+ROBOFLOW_URL = "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
+
+# Upload nhiều ảnh (tối đa 20)
+uploaded_files = st.file_uploader(
+    "📂 Tải lên ảnh bê tông cần phân tích (1–20 ảnh)",
+    type=["jpg","jpeg","png"],
+    accept_multiple_files=True,
+    help="Bạn có thể chọn nhiều ảnh cùng lúc để phân tích song song."
 )
 
+if uploaded_files:
+    for idx, file in enumerate(uploaded_files, start=1):
+        st.divider()
+        st.markdown(f"### 🖼️ Ảnh {idx}: `{file.name}`")
 
-# --------------------------------------------------------
-# 2. HÀM VẼ TOÀN BỘ BÁO CÁO LÊN WEB
-# --------------------------------------------------------
-def render_web_report(
-    img_orig: Image.Image,
-    img_result: Image.Image,
-    df_overview: pd.DataFrame,
-    conf_bar_values: dict,
-    crack_present_ratio=(1, 0),
-):
-    """
-    Hiển thị giao diện báo cáo giống PDF:
-      - Logo + tiêu đề tiếng Việt & Anh
-      - Hai ảnh (Ảnh gốc / Ảnh phân tích)
-      - Bảng Overview (song ngữ)
-      - Biểu đồ Confidence Scores (bar)
-      - Biểu đồ Crack Presence (pie)
-    """
+        # Đọc ảnh
+        image = Image.open(file).convert("RGB")
+        buf = io.BytesIO()
+        image.save(buf, format="JPEG")
+        img_bytes = buf.getvalue()
 
-    # ================= TOP: LOGO + TIÊU ĐỀ =====================
-    col_logo, col_title = st.columns([1, 3])
+        # ===============================
+        # GỬI YÊU CẦU TỚI ROBOFLOW
+        # ===============================
+        with st.spinner("⏳ Đang phân tích ảnh bằng mô hình CNN..."):
+            t0 = time.time()
+            try:
+                resp = requests.post(ROBOFLOW_URL, files={"file": ("image.jpg", img_bytes, "image/jpeg")})
+                latency = time.time() - t0
+                data = resp.json()
+            except Exception as e:
+                st.error(f"Lỗi khi gọi API Roboflow: {e}")
+                continue
 
-    with col_logo:
-        # 👉 Thay 'bkai_logo.png' bằng đường dẫn logo thật của bạn
-        try:
-            st.image("bkai_logo.png", width=110)
-        except Exception:
-            st.write("BKAI LOGO")
+        preds = data.get("predictions", [])
+        conf_thresh = 0.3
+        preds = [p for p in preds if p["confidence"] >= conf_thresh]
 
-    with col_title:
-        st.markdown(
-            """
-            <h2 style="text-align:center; margin-bottom:0;">
-              BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG
-            </h2>
-            <h4 style="text-align:center; margin-top:4px; color:#1e293b;">
-              Concrete Crack Inspection Report
-            </h4>
-            """,
-            unsafe_allow_html=True,
+        # ===============================
+        # HIỂN THỊ ẢNH
+        # ===============================
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(image, caption="Ảnh gốc / Original Image", use_column_width=True)
+
+        # Vẽ box và label
+        annotated = image.copy()
+        draw = ImageDraw.Draw(annotated)
+        for p in preds:
+            x, y, w, h = p["x"], p["y"], p["width"], p["height"]
+            x0, y0, x1, y1 = x - w/2, y - h/2, x + w/2, y + h/2
+            label = f"{p['class']} {p['confidence']:.2f}"
+            draw.rectangle([x0, y0, x1, y1], outline="green", width=3)
+            draw.text((x0, y0-12), label, fill="black")
+
+        with col2:
+            st.image(annotated, caption="Ảnh đã phân tích / Analyzed Image", use_column_width=True)
+
+        # ===============================
+        # KẾT LUẬN CHUNG
+        # ===============================
+        if preds:
+            st.error("⚠️ Có vết nứt được phát hiện!")
+        else:
+            st.success("✅ Không phát hiện vết nứt rõ ràng.")
+
+        # ===============================
+        # BẢNG THỐNG KÊ KẾT QUẢ
+        # ===============================
+        total_cracks = len(preds)
+        avg_conf = sum(p["confidence"] for p in preds)/total_cracks if total_cracks>0 else 0
+
+        df = pd.DataFrame(
+            {
+                "Thông số / Parameter": [
+                    "Số vùng nứt / Crack regions",
+                    "Độ tin cậy TB / Avg confidence",
+                    "Ngưỡng phát hiện / Threshold",
+                    "Thời gian xử lý / Inference time (s)",
+                    "Kết luận / Conclusion"
+                ],
+                "Giá trị / Value": [
+                    total_cracks,
+                    f"{avg_conf:.2f}",
+                    f"{conf_thresh:.2f}",
+                    f"{latency:.2f}",
+                    "Có vết nứt / Crack detected" if preds else "Không có / None"
+                ]
+            }
         )
-        today = datetime.date.today().strftime("%B %d, %Y")
-        st.markdown(
-            f"<p style='text-align:right; font-size:14px;'>{today}</p>",
-            unsafe_allow_html=True,
-        )
+        st.subheader("📊 Báo cáo chi tiết / Crack Analysis Summary")
+        st.table(df)
 
-    st.markdown("<hr>", unsafe_allow_html=True)
+        # ===============================
+        # BIỂU ĐỒ MINH HỌA
+        # ===============================
+        st.subheader("📈 Biểu đồ minh họa / Visual Charts")
 
-    # ============ HAI ẢNH: GỐC / PHÂN TÍCH ==============
-    col1, col2 = st.columns(2)
+        if preds:
+            confs = [p["confidence"] for p in preds]
+            widths = [p["width"] for p in preds]
+            heights = [p["height"] for p in preds]
 
-    with col1:
-        st.markdown(
-            "<h4 style='text-align:center;'>Ảnh gốc</h4>",
-            unsafe_allow_html=True,
-        )
-        st.image(img_orig, use_column_width=True)
-        st.markdown(
-            "<p style='text-align:center;'>Ảnh gốc / Original Image</p>",
-            unsafe_allow_html=True,
-        )
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                # Biểu đồ bar độ tin cậy
+                fig, ax = plt.subplots()
+                ax.bar(range(len(confs)), confs, color="#0ea5e9")
+                ax.set_title("Confidence per crack")
+                ax.set_xlabel("Crack #")
+                ax.set_ylabel("Confidence")
+                st.pyplot(fig)
 
-    with col2:
-        st.markdown(
-            "<h4 style='text-align:center;'>Ảnh phân tích</h4>",
-            unsafe_allow_html=True,
-        )
-        st.image(img_result, use_column_width=True)
-        st.markdown(
-            "<p style='text-align:center;'>Ảnh phân tích / Result Image</p>",
-            unsafe_allow_html=True,
-        )
+            with col_b:
+                # Pie chart tỷ lệ có/không nứt
+                fig2, ax2 = plt.subplots()
+                ax2.pie([len(preds), 20-len(preds)], labels=["Crack", "No Crack"],
+                        autopct="%1.0f%%", colors=["#ef4444", "#22c55e"])
+                ax2.set_title("Crack Presence Ratio")
+                st.pyplot(fig2)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+            with col_c:
+                # Scatter chiều rộng – chiều cao
+                fig3, ax3 = plt.subplots()
+                ax3.scatter(widths, heights, c=confs, cmap="plasma", s=80)
+                ax3.set_xlabel("Width (px)")
+                ax3.set_ylabel("Height (px)")
+                ax3.set_title("Crack Size Distribution")
+                st.pyplot(fig3)
 
-    # ================ BẢNG OVERVIEW ======================
-    st.markdown(
-        "<h3 style='text-align:center;'>Overview</h3>",
-        unsafe_allow_html=True,
-    )
-    st.table(df_overview)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # ============== 2 BIỂU ĐỒ DƯỚI CÙNG ==================
-    col_chart1, col_chart2 = st.columns(2)
-
-    # Biểu đồ bar: Confidence Scores
-    with col_chart1:
-        st.markdown(
-            "<h4 style='text-align:center;'>Confidence Scores</h4>",
-            unsafe_allow_html=True,
-        )
-        fig1, ax1 = plt.subplots(figsize=(4, 3))
-        labels = list(conf_bar_values.keys())
-        values = list(conf_bar_values.values())
-        ax1.bar(labels, values, color="#0ea5e9")
-        ax1.set_ylim(0, 1)
-        ax1.set_ylabel("Score")
-        plt.xticks(rotation=20)
-        st.pyplot(fig1)
-
-    # Biểu đồ pie: Crack Presence
-    with col_chart2:
-        st.markdown(
-            "<h4 style='text-align:center;'>Crack Presence</h4>",
-            unsafe_allow_html=True,
-        )
-        present, absent = crack_present_ratio
-        fig2, ax2 = plt.subplots(figsize=(4, 3))
-        ax2.pie(
-            [present, absent],
-            labels=["Present", "Absent"],
-            autopct="%1.0f%%",
-            colors=["#1d4ed8", "#93c5fd"],
-        )
-        st.pyplot(fig2)
-
-    st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown(
-        "<p style='text-align:center; font-size:12px;'>"
-        "BKAI © 2025 – Powered by AI for Construction Excellence"
-        "</p>",
-        unsafe_allow_html=True,
-    )
-
-
-# --------------------------------------------------------
-# 3. PHẦN MAIN: DEMO + GIẢI THÍCH CẦN THAY Ở ĐÂU
-# --------------------------------------------------------
-st.sidebar.header("Demo cấu trúc báo cáo")
-st.sidebar.write("1. Upload ảnh gốc & ảnh đã phân tích.")
-st.sidebar.write("2. App sẽ hiển thị giao diện giống PDF.")
-st.sidebar.write("3. Sau này chỉ cần thay số liệu demo bằng kết quả mô hình thật.")
-
-# 👉 Cho phép user upload 2 ảnh để xem layout
-orig_file = st.file_uploader("Ảnh gốc / Original Image", type=["jpg", "jpeg", "png"])
-result_file = st.file_uploader(
-    "Ảnh phân tích / Result Image (có box + mask)", type=["jpg", "jpeg", "png"]
-)
-
-if orig_file and result_file:
-    img_orig = Image.open(orig_file).convert("RGB")
-    img_result = Image.open(result_file).convert("RGB")
-
-    # ----------------------------------------------------
-    # 3.1. TẠO BẢNG OVERVIEW DEMO (bạn SẼ THAY CÁC GIÁ TRỊ NÀY)
-    # ----------------------------------------------------
-    # ► Ở bản thật, các con số dưới đây sẽ được lấy từ model:
-    #   - confidence, mAP, detection_score, segmentation_score,
-    #   - inference_time_ms, conclusion_text, ...
-    confidence_demo = 0.50
-    map_demo = 0.48
-    detection_demo = 0.35
-    segmentation_demo = 0.65
-    inference_time_ms_demo = 52
-    conclusion_demo = "Có vết nứt / Cracks present in images"
-
-    # Bảng 4 cột giống hình: bên trái & bên phải
-    df_overview = pd.DataFrame(
-        [
-            ["Confidence", f"{confidence_demo:.2f}", "Độ chính xác", f"{confidence_demo:.2f}"],
-            ["mAP", f"{map_demo:.2f}", "Segmentation", f"{segmentation_demo:.2f}"],
-            ["Detection", f"{detection_demo:.2f}", "Inference Time", f"{inference_time_ms_demo} ms"],
-            ["Conclusion", conclusion_demo, "", ""],
-        ],
-        columns=["Metric (Left)", "Value", "Metric (Right)", "Value "],
-    )
-
-    # ----------------------------------------------------
-    # 3.2. DỮ LIỆU VẼ BIỂU ĐỒ DEMO
-    # ----------------------------------------------------
-    # Bar chart: 3 cột như hình: Confidence, mAP, Segmentation
-    conf_bar_values = {
-        "Confidence": confidence_demo,
-        "mAP": map_demo,
-        "Segmentation": segmentation_demo,
-    }
-
-    # Pie chart: 100% Present (demo). Nếu muốn lấy theo model:
-    #   present_ratio = số ảnh/vùng có nứt / tổng
-    crack_present_ratio = (1, 0)  # (present, absent)
-
-    # ----------------------------------------------------
-    # 3.3. GỌI HÀM VẼ BÁO CÁO
-    # ----------------------------------------------------
-    render_web_report(
-        img_orig=img_orig,
-        img_result=img_result,
-        df_overview=df_overview,
-        conf_bar_values=conf_bar_values,
-        crack_present_ratio=crack_present_ratio,
-    )
+        else:
+            st.info("Không có vết nứt để hiển thị biểu đồ.")
 
 else:
-    st.info("⬆️ Hãy upload cả 2 ảnh (gốc & đã phân tích) để xem giao diện báo cáo.")
+    st.info("⬆️ Hãy đăng nhập và tải lên ảnh để bắt đầu phân tích.")
