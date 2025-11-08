@@ -155,9 +155,18 @@ def estimate_severity(p, img_w, img_h):
 
 
 def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf"):
-    """Tạo file PDF báo cáo, dùng font Unicode (TimesVN/DejaVu)."""
+    """Tạo file PDF báo cáo, dùng font Unicode (TimesVN/DejaVu).
+    ĐÃ GIỚI HẠN KÍCH THƯỚC ẢNH ĐỂ TRÁNH LayoutError.
+    """
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=25 * mm, rightMargin=25 * mm)
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=25 * mm,
+        rightMargin=25 * mm,
+        topMargin=20 * mm,
+        bottomMargin=20 * mm,
+    )
     styles = getSampleStyleSheet()
 
     # Đổi toàn bộ style sang font Unicode
@@ -183,6 +192,17 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
 
     story = []
 
+    # ---- hàm phụ: tạo RLImage đã được giới hạn size ----
+    def make_rl_image(pil_img):
+        tmp = io.BytesIO()
+        pil_img.save(tmp, format="PNG")
+        tmp.seek(0)
+        img_flow = RLImage(tmp)
+        # Giới hạn kích thước: max 120mm x 90mm để luôn vừa khung
+        max_w, max_h = 120 * mm, 90 * mm
+        img_flow._restrictSize(max_w, max_h)
+        return img_flow
+
     # Logo + tiêu đề
     if os.path.exists(LOGO_PATH):
         story.append(RLImage(LOGO_PATH, width=40 * mm))
@@ -194,18 +214,12 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
 
     # Ảnh gốc
     story.append(Paragraph("Ảnh gốc / Original Image", h2))
-    img_buf = io.BytesIO()
-    original_img.save(img_buf, format="PNG")
-    img_buf.seek(0)
-    story.append(RLImage(img_buf, width=120 * mm))
+    story.append(make_rl_image(original_img))
     story.append(Spacer(1, 6 * mm))
 
     # Ảnh kết quả
     story.append(Paragraph("Ảnh phân tích / Result Image", h2))
-    img2_buf = io.BytesIO()
-    analyzed_img.save(img2_buf, format="PNG")
-    img2_buf.seek(0)
-    story.append(RLImage(img2_buf, width=120 * mm))
+    story.append(make_rl_image(analyzed_img))
     story.append(Spacer(1, 6 * mm))
 
     # Bảng metrics
@@ -247,11 +261,11 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
         )
     )
 
+    # Build PDF
     doc.build(story)
     buf.seek(0)
     return buf
-
-
+    
 # =========================================================
 # 3. HÀM STAGE 2 (DEMO)
 # =========================================================
@@ -553,3 +567,4 @@ if analyze_btn:
         # ---------------- TAB STAGE 2 ----------------
         with tab_stage2:
             show_stage2_demo()
+
