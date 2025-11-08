@@ -4,9 +4,10 @@ pillow
 matplotlib
 pandas
 reportlab
-
-
-
+bcrypt
+numpy
+opencv
+torch
 
 
 
