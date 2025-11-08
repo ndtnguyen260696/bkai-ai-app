@@ -1,8 +1,8 @@
 import csv
 import os
-import bcrypt
+import hashlib
 
-# Đường dẫn đến file lưu thông tin người dùng
+# File lưu thông tin người dùng
 USER_DB_PATH = "users.csv"
 
 
@@ -12,6 +12,11 @@ def init_user_db():
         with open(USER_DB_PATH, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["username", "email", "password_hash"])
+
+
+def _hash_password(password: str) -> str:
+    """Hash mật khẩu bằng SHA-256 (không cần cài thêm thư viện)."""
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
 def load_users():
@@ -26,7 +31,7 @@ def load_users():
 
 
 def user_exists(username):
-    """Kiểm tra xem người dùng đã tồn tại chưa."""
+    """Kiểm tra user đã tồn tại chưa."""
     users = load_users()
     return username in users
 
@@ -36,11 +41,11 @@ def register_user(username, email, password):
     if user_exists(username):
         return False, "Tên đăng nhập đã tồn tại."
 
-    password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+    password_hash = _hash_password(password)
 
     with open(USER_DB_PATH, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow([username, email, password_hash.decode("utf-8")])
+        writer.writerow([username, email, password_hash])
 
     return True, "Đăng ký thành công."
 
@@ -52,7 +57,7 @@ def authenticate_user(username, password):
     if not user:
         return False, "Không tìm thấy tài khoản."
 
-    stored_hash = user["password_hash"].encode("utf-8")
-    if bcrypt.checkpw(password.encode("utf-8"), stored_hash):
+    stored_hash = user["password_hash"]
+    if stored_hash == _hash_password(password):
         return True, "Đăng nhập thành công."
     return False, "Mật khẩu không đúng."
