@@ -28,8 +28,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 # =========================================================
 
 # --- 0.1. Roboflow URL (BẮT BUỘC SỬA CHO ĐÚNG MODEL CỦA BẠN) ---
-ROBOFLOW_FULL_URL = (
-    "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
+ROBOFLOW_FULL_URL = "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
 
 # --- 0.2. Logo BKAI (ảnh PNG đặt trong thư mục logo/) ---
 LOGO_PATH = "BKAI_Logo.png"  # bạn chỉ cần đảm bảo file tồn tại đường dẫn này
@@ -546,4 +545,5 @@ demo_data = pd.DataFrame(
 )
 
 st.table(demo_data)
+
 
