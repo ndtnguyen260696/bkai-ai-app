@@ -34,7 +34,7 @@ ROBOFLOW_FULL_URL = (
 )
 
 # TODO 2: LOGO BKAI – Đặt file logo trong thư mục "logo/"
-BKAI_LOGO = "logo/bkai_logo.png"
+BKAI_LOGO = "logo.png"
 
 # TODO 3: Tỉ lệ mm / pixel (tạm thời demo, bạn chỉnh theo thực tế)
 MM_PER_PIXEL = 0.2  # 1 pixel ≈ 0.2 mm (ví dụ)
@@ -583,3 +583,4 @@ if btn_analyze:
         mime="application/pdf",
         key="download_pdf",  # key riêng → không lỗi DuplicateElementId
     )
+
