@@ -10,8 +10,8 @@ import requests
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from auth import register_user, authenticate_user, init_user_db
 from PIL import Image, ImageDraw
-
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import (
@@ -583,4 +583,5 @@ if btn_analyze:
         mime="application/pdf",
         key="download_pdf",  # key riêng → không lỗi DuplicateElementId
     )
+
 
