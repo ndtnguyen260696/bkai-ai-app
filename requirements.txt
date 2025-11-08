@@ -1,9 +1,11 @@
 streamlit
 requests
-Pillow
-pandas
+pillow
 matplotlib
+pandas
 reportlab
+
+
 
 
 
