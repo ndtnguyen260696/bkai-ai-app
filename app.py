@@ -30,7 +30,7 @@ from reportlab.platypus.doctemplate import LayoutError
 
 # --- 0.1. Roboflow URL (BẮT BUỘC SỬA CHO ĐÚNG MODEL CỦA BẠN) ---
 ROBOFLOW_FULL_URL = (
-    "http://localhost:9001?api_key="nWA6ayjI5bGNpXkkbsAb"
+    "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
 )
 
 # --- 0.2. Logo BKAI (ảnh PNG đặt cạnh file app.py) ---
@@ -894,6 +894,7 @@ if analyze_btn:
 
         with tab_stage2:
             show_stage2_demo()
+
 
 
 
