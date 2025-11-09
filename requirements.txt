@@ -4,9 +4,6 @@ pillow
 matplotlib
 pandas
 reportlab
-bcrypt
-
-
 
 
 
