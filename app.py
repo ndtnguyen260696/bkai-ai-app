@@ -362,7 +362,7 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
 
 def show_stage2_demo(key_prefix="stage2"):
     """Stage 2 demo: phân loại vết nứt & gợi ý nguyên nhân / biện pháp."""
-    st.subheader("Stage 2 (demo) – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
+    st.subheader("Stage 2– Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
 
     options = [
         "Vết nứt dọc (Longitudinal Crack)",
@@ -717,7 +717,7 @@ if analyze_btn:
         analyzed_img = None
 
         with col2:
-            st.subheader("Ảnh phân tích (box + label + mask màu xanh)")
+            st.subheader("Ảnh phân tích")
             if len(preds_conf) == 0:
                 st.image(orig_img, use_column_width=True)
                 st.success("✅ Kết luận: **Không phát hiện vết nứt rõ ràng**.")
@@ -905,6 +905,7 @@ if analyze_btn:
 
         with tab_stage2:
             show_stage2_demo()
+
 
 
 
