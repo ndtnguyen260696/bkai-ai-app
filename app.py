@@ -161,10 +161,31 @@ def estimate_severity(p, img_w, img_h):
 # =========================================================
 
 
-def export_pdf(original_img, analyzed_img, metrics_df, mask_img=None, filename="bkai_report.pdf"):
-    """Tạo file PDF báo cáo, dùng font Unicode (TimesVN/DejaVu)."""
+def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf"):
+    """Tạo file PDF báo cáo, dùng font Unicode (TimesVN/DejaVu), 
+    đã giới hạn kích thước ảnh + sửa lại độ rộng bảng để tránh LayoutError.
+    """
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=25 * mm, rightMargin=25 * mm)
+
+    # Đặt lại cả 4 lề để ta chủ động tính khung
+    left_margin = 25 * mm
+    right_margin = 25 * mm
+    top_margin = 20 * mm
+    bottom_margin = 20 * mm
+
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=left_margin,
+        rightMargin=right_margin,
+        topMargin=top_margin,
+        bottomMargin=bottom_margin,
+    )
+
+    page_w, page_h = A4
+    content_width = page_w - left_margin - right_margin
+    content_height = page_h - top_margin - bottom_margin
+
     styles = getSampleStyleSheet()
 
     # Đổi toàn bộ style sang font Unicode
@@ -190,8 +211,38 @@ def export_pdf(original_img, analyzed_img, metrics_df, mask_img=None, filename="
 
     story = []
 
-    # Logo + tiêu đề
+    # ===== Hàm phụ: thêm ảnh và tự scale cho vừa khung =====
+    def add_pil_image(pil_img, title_text):
+        if pil_img is None:
+            return
+
+        # Đảm bảo là ảnh RGB của PIL
+        from PIL import Image as PILImage
+        if not isinstance(pil_img, PILImage.Image):
+            pil_img = pil_img.convert("RGB")
+
+        w, h = pil_img.size
+        # scale để ảnh không vượt quá content_width / content_height
+        scale = min(content_width / w, content_height / h, 1.0)
+
+        img_buf = io.BytesIO()
+        pil_img.save(img_buf, format="PNG")
+        img_buf.seek(0)
+
+        story.append(Paragraph(title_text, h2))
+        story.append(Spacer(1, 4 * mm))
+        story.append(
+            RLImage(
+                img_buf,
+                width=w * scale,
+                height=h * scale,
+            )
+        )
+        story.append(Spacer(1, 6 * mm))
+
+    # ===== Logo + tiêu đề =====
     if os.path.exists(LOGO_PATH):
+        # Logo mặc định nhỏ nên không cần scale
         story.append(RLImage(LOGO_PATH, width=40 * mm))
         story.append(Spacer(1, 6 * mm))
 
@@ -199,34 +250,16 @@ def export_pdf(original_img, analyzed_img, metrics_df, mask_img=None, filename="
     story.append(Paragraph("Concrete Crack Inspection Report", normal))
     story.append(Spacer(1, 8 * mm))
 
-    # Ảnh gốc
-    story.append(Paragraph("Ảnh gốc / Original Image", h2))
-    img_buf = io.BytesIO()
-    original_img.save(img_buf, format="PNG")
-    img_buf.seek(0)
-    story.append(RLImage(img_buf, width=120 * mm))
-    story.append(Spacer(1, 6 * mm))
+    # ===== Ảnh gốc =====
+    add_pil_image(original_img, "Ảnh gốc / Original Image")
 
-    # Ảnh kết quả
-    story.append(Paragraph("Ảnh phân tích / Result Image", h2))
-    img2_buf = io.BytesIO()
-    analyzed_img.save(img2_buf, format="PNG")
-    img2_buf.seek(0)
-    story.append(RLImage(img2_buf, width=120 * mm))
-    story.append(Spacer(1, 6 * mm))
+    # ===== Ảnh kết quả =====
+    add_pil_image(analyzed_img, "Ảnh phân tích / Result Image")
 
-    # Ảnh mask nếu có
-    if mask_img is not None:
-        story.append(Paragraph("Ảnh mask vùng nứt / Crack Mask Image", h2))
-        img3_buf = io.BytesIO()
-        mask_img.save(img3_buf, format="PNG")
-        img3_buf.seek(0)
-        story.append(RLImage(img3_buf, width=120 * mm))
-        story.append(Spacer(1, 6 * mm))
-
-    # Bảng metrics
+    # ===== Bảng metrics =====
     story.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2))
 
+    # Header + data
     data = [["Chỉ số (VI)", "Metric (EN)", "Giá trị / Value", "Ý nghĩa / Description"]]
     for _, row in metrics_df.iterrows():
         data.append(
@@ -238,7 +271,15 @@ def export_pdf(original_img, analyzed_img, metrics_df, mask_img=None, filename="
             ]
         )
 
-    tbl = Table(data, colWidths=[35 * mm, 35 * mm, 40 * mm, 55 * mm])
+    # Chia content_width cho 4 cột (tỷ lệ 0.2, 0.2, 0.2, 0.4 chẳng hạn)
+    col_widths = [
+        0.2 * content_width,  # VI
+        0.2 * content_width,  # EN
+        0.2 * content_width,  # Value
+        0.4 * content_width,  # Description
+    ]
+
+    tbl = Table(data, colWidths=col_widths, repeatRows=1)
     tbl.setStyle(
         TableStyle(
             [
@@ -248,13 +289,14 @@ def export_pdf(original_img, analyzed_img, metrics_df, mask_img=None, filename="
                 ("FONTSIZE", (0, 0), (-1, -1), 9),
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
                 ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ]
         )
     )
     story.append(tbl)
     story.append(Spacer(1, 8 * mm))
 
-    # Footer
+    # ===== Footer =====
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     story.append(
         Paragraph(
@@ -263,6 +305,7 @@ def export_pdf(original_img, analyzed_img, metrics_df, mask_img=None, filename="
         )
     )
 
+    # Build PDF
     doc.build(story)
     buf.seek(0)
     return buf
@@ -807,5 +850,6 @@ if analyze_btn:
 
         with tab_stage2:
             show_stage2_demo()
+
 
 
