@@ -73,16 +73,21 @@ def extract_poly_points(points_field):
 
 def draw_predictions_with_mask(
     image: Image.Image, predictions, min_conf: float = 0.0
-) -> Image.Image:
+):
     """
     Vẽ:
       - Box xanh lá (bounding box)
       - Polyline + vùng tô đỏ trong suốt quanh vết nứt
       - Nhãn dạng 'crack 0.92' trên mép box
+    Đồng thời tạo thêm ảnh mask trắng/đen cho vùng nứt.
     """
     base = image.convert("RGB")
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
+
+    # Ảnh mask: nền đen, vùng nứt trắng
+    mask = Image.new("L", base.size, 0)
+    draw_mask = ImageDraw.Draw(mask)
 
     for p in predictions:
         conf = float(p.get("confidence", 0))
@@ -115,14 +120,22 @@ def draw_predictions_with_mask(
         pts_raw = p.get("points")
         flat_pts = extract_poly_points(pts_raw) if pts_raw is not None else []
         if len(flat_pts) >= 3:
-            # tô polygon đỏ trong suốt
+            # tô polygon đỏ trong suốt trên overlay
             draw.polygon(flat_pts, fill=(255, 0, 0, 80))
             # vẽ outline đỏ đậm
             draw.line(flat_pts + [flat_pts[0]], fill=(255, 0, 0, 200), width=3)
 
+            # vẽ lên mask (trắng)
+            draw_mask.polygon(flat_pts, fill=255)
+
     # Ghép overlay lên base
     result = Image.alpha_composite(base.convert("RGBA"), overlay)
-    return result.convert("RGB")
+    result = result.convert("RGB")
+
+    # Chuyển mask sang RGB để hiển thị dễ hơn
+    mask_rgb = mask.convert("RGB")
+
+    return result, mask_rgb
 
 
 def estimate_severity(p, img_w, img_h):
@@ -154,7 +167,7 @@ def estimate_severity(p, img_w, img_h):
 # =========================================================
 
 
-def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf"):
+def export_pdf(original_img, analyzed_img, metrics_df, mask_img=None, filename="bkai_report.pdf"):
     """Tạo file PDF báo cáo, dùng font Unicode (TimesVN/DejaVu)."""
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=25 * mm, rightMargin=25 * mm)
@@ -207,6 +220,15 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
     img2_buf.seek(0)
     story.append(RLImage(img2_buf, width=120 * mm))
     story.append(Spacer(1, 6 * mm))
+
+    # Ảnh mask nếu có
+    if mask_img is not None:
+        story.append(Paragraph("Ảnh mask vùng nứt / Crack Mask Image", h2))
+        img3_buf = io.BytesIO()
+        mask_img.save(img3_buf, format="PNG")
+        img3_buf.seek(0)
+        story.append(RLImage(img3_buf, width=120 * mm))
+        story.append(Spacer(1, 6 * mm))
 
     # Bảng metrics
     story.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2))
@@ -315,8 +337,11 @@ min_conf = st.sidebar.slider(
 )
 st.sidebar.caption("Chỉ hiển thị những vết nứt có độ tin cậy ≥ ngưỡng này.")
 
-uploaded_file = st.file_uploader(
-    "Tải một ảnh bê tông (JPG/PNG)", type=["jpg", "jpeg", "png"]
+# Cho phép tải NHIỀU ảnh
+uploaded_files = st.file_uploader(
+    "Tải một hoặc nhiều ảnh bê tông (JPG/PNG)",
+    type=["jpg", "jpeg", "png"],
+    accept_multiple_files=True,
 )
 analyze_btn = st.button("🔍 Phân tích ảnh")
 
@@ -325,231 +350,243 @@ analyze_btn = st.button("🔍 Phân tích ảnh")
 # =========================================================
 
 if analyze_btn:
-    if uploaded_file is None:
-        st.warning("Vui lòng chọn một ảnh trước khi bấm **Phân tích**.")
+    if not uploaded_files:
+        st.warning("Vui lòng chọn ít nhất một ảnh trước khi bấm **Phân tích**.")
         st.stop()
 
-    t0 = time.time()
-    orig_img = Image.open(uploaded_file).convert("RGB")
-    img_w, img_h = orig_img.size
-
-    # Gửi tới Roboflow
-    buf = io.BytesIO()
-    orig_img.save(buf, format="JPEG")
-    buf.seek(0)
-
-    with st.spinner("Đang gửi ảnh tới mô hình AI trên Roboflow..."):
-        try:
-            resp = requests.post(
-                ROBOFLOW_FULL_URL,
-                files={"file": ("image.jpg", buf.getvalue(), "image/jpeg")},
-                timeout=60,
-            )
-        except Exception as e:
-            st.error(f"Lỗi gọi API Roboflow: {e}")
-            st.stop()
-
-    if resp.status_code != 200:
-        st.error("Roboflow trả lỗi. Hãy kiểm tra lại URL ROBOFLOW_FULL_URL.")
-        st.text(resp.text[:2000])
-        st.stop()
-
-    result = resp.json()
-    predictions = result.get("predictions", [])
-    preds_conf = [p for p in predictions if float(p.get("confidence", 0)) >= min_conf]
-
-    t1 = time.time()
-    total_time = t1 - t0
-
-    # ---------------- ẢNH GỐC & ẢNH PHÂN TÍCH ----------------
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Ảnh gốc")
-        st.image(orig_img, use_column_width=True)
-
-    with col2:
-        st.subheader("Ảnh phân tích")
-        if len(preds_conf) == 0:
-            st.image(orig_img, use_column_width=True)
-            st.success("✅ Kết luận: **Không phát hiện vết nứt rõ ràng**.")
-        else:
-            analyzed_img = draw_predictions_with_mask(orig_img, preds_conf, min_conf)
-            st.image(analyzed_img, use_column_width=True)
-            st.error("⚠️ Kết luận: **CÓ vết nứt trên ảnh.**")
-
-    # =====================================================
-    # 5.1. BÁO CÁO CHI TIẾT + STAGE 2 Ở TAB RIÊNG
-    # =====================================================
-    if len(preds_conf) > 0:
+    for idx, uploaded_file in enumerate(uploaded_files, start=1):
         st.write("---")
-        tab_stage1, tab_stage2 = st.tabs(
-            [
-                "Stage 1 – Báo cáo chi tiết",
-                "Stage 2 – Phân loại vết nứt (demo)",
-            ]
-        )
+        st.markdown(f"## Ảnh {idx}: `{uploaded_file.name}`")
 
-        # ---------------- TAB STAGE 1 ----------------
-        with tab_stage1:
-            st.subheader("Bảng thông tin vết nứt")
+        t0 = time.time()
+        orig_img = Image.open(uploaded_file).convert("RGB")
+        img_w, img_h = orig_img.size
 
-            confs = [float(p.get("confidence", 0)) for p in preds_conf]
-            avg_conf = sum(confs) / len(confs)
-            map_val = round(min(1.0, avg_conf - 0.05), 2)
+        # Gửi tới Roboflow
+        buf = io.BytesIO()
+        orig_img.save(buf, format="JPEG")
+        buf.seek(0)
 
-            # Tính % diện tích vùng nứt lớn nhất
-            max_ratio = 0
-            max_p = preds_conf[0]
-            for p in preds_conf:
-                w = float(p.get("width", 0))
-                h = float(p.get("height", 0))
-                ratio = w * h / (img_w * img_h)
-                if ratio > max_ratio:
-                    max_ratio = ratio
-                    max_p = p
+        with st.spinner(f"Đang gửi ảnh {idx} tới mô hình AI trên Roboflow..."):
+            try:
+                resp = requests.post(
+                    ROBOFLOW_FULL_URL,
+                    files={"file": ("image.jpg", buf.getvalue(), "image/jpeg")},
+                    timeout=60,
+                )
+            except Exception as e:
+                st.error(f"Lỗi gọi API Roboflow cho ảnh {uploaded_file.name}: {e}")
+                continue
 
-            crack_area_ratio = round(max_ratio * 100, 2)
-            severity = estimate_severity(max_p, img_w, img_h)
+        if resp.status_code != 200:
+            st.error(f"Roboflow trả lỗi cho ảnh {uploaded_file.name}.")
+            st.text(resp.text[:2000])
+            continue
 
-            metrics = [
-                {
-                    "vi": "Tên ảnh",
-                    "en": "Image Name",
-                    "value": uploaded_file.name,
-                    "desc": "File ảnh người dùng tải lên",
-                },
-                {
-                    "vi": "Thời gian xử lý",
-                    "en": "Total Processing Time",
-                    "value": f"{total_time:.2f} s",
-                    "desc": "Tổng thời gian thực hiện toàn bộ quy trình",
-                },
-                {
-                    "vi": "Tốc độ mô hình AI",
-                    "en": "Inference Speed",
-                    "value": f"{total_time:.2f} s/image",
-                    "desc": "Thời gian xử lý mỗi ảnh",
-                },
-                {
-                    "vi": "Độ chính xác (Confidence trung bình)",
-                    "en": "Confidence",
-                    "value": f"{avg_conf:.2f}",
-                    "desc": "Mức tin cậy trung bình của mô hình",
-                },
-                {
-                    "vi": "mAP (Độ chính xác trung bình)",
-                    "en": "Mean Average Precision",
-                    "value": f"{map_val:.2f}",
-                    "desc": "Độ chính xác định vị vùng nứt",
-                },
-                {
-                    "vi": "Phần trăm vùng nứt",
-                    "en": "Crack Area Ratio",
-                    "value": f"{crack_area_ratio:.2f} %",
-                    "desc": "Diện tích vùng nứt / tổng diện tích ảnh",
-                },
-                {
-                    "vi": "Chiều dài vết nứt",
-                    "en": "Crack Length",
-                    "value": "—",
-                    "desc": "Có thể ước lượng nếu biết tỉ lệ pixel-thực tế",
-                },
-                {
-                    "vi": "Chiều rộng vết nứt",
-                    "en": "Crack Width",
-                    "value": "—",
-                    "desc": "Độ rộng lớn nhất của vết nứt (cần thang đo chuẩn)",
-                },
-                {
-                    "vi": "Tọa độ vùng nứt",
-                    "en": "Crack Bounding Box",
-                    "value": f"[{max_p.get('x')}, {max_p.get('y')}, "
-                    f"{max_p.get('width')}, {max_p.get('height')}]",
-                    "desc": "(x, y, w, h) – vị trí vùng nứt lớn nhất",
-                },
-                {
-                    "vi": "Mức độ nguy hiểm",
-                    "en": "Severity Level",
-                    "value": severity,
-                    "desc": "Phân cấp theo tiêu chí diện tích tương đối",
-                },
-                {
-                    "vi": "Thời gian phân tích",
-                    "en": "Timestamp",
-                    "value": datetime.datetime.now().strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    ),
-                    "desc": "Thời điểm thực hiện phân tích",
-                },
-                {
-                    "vi": "Nhận xét tổng quan",
-                    "en": "Summary",
-                    "value": "Vết nứt có nguy cơ, cần kiểm tra thêm."
-                    if "Nguy hiểm" in severity
-                    else "Vết nứt nhỏ, nên tiếp tục theo dõi.",
-                    "desc": "Kết luận tự động của hệ thống",
-                },
-            ]
+        result = resp.json()
+        predictions = result.get("predictions", [])
+        preds_conf = [
+            p for p in predictions if float(p.get("confidence", 0)) >= min_conf
+        ]
 
-            metrics_df = pd.DataFrame(metrics)
+        t1 = time.time()
+        total_time = t1 - t0
 
-            styled_df = metrics_df.style.set_table_styles(
+        # ---------------- ẢNH GỐC & ẢNH PHÂN TÍCH ----------------
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("Ảnh gốc")
+            st.image(orig_img, use_column_width=True)
+
+        analyzed_img = None
+        mask_img = None
+
+        with col2:
+            st.subheader("Ảnh phân tích (box + mask)")
+            if len(preds_conf) == 0:
+                st.image(orig_img, use_column_width=True)
+                st.success("✅ Kết luận: **Không phát hiện vết nứt rõ ràng**.")
+            else:
+                analyzed_img, mask_img = draw_predictions_with_mask(
+                    orig_img, preds_conf, min_conf
+                )
+                st.image(analyzed_img, use_column_width=True)
+                st.error("⚠️ Kết luận: **CÓ vết nứt trên ảnh.**")
+
+        # Chỉ khi có vết nứt mới làm báo cáo chi tiết + PDF
+        if len(preds_conf) > 0 and analyzed_img is not None:
+            st.write("---")
+            tab_stage1, tab_stage2 = st.tabs(
                 [
-                    {
-                        "selector": "th",
-                        "props": [
-                            ("background-color", "#1e88e5"),
-                            ("color", "white"),
-                            ("font-weight", "bold"),
-                        ],
-                    },
-                    {
-                        "selector": "td",
-                        "props": [("background-color", "#fafafa")],
-                    },
+                    "Stage 1 – Báo cáo chi tiết",
+                    "Stage 2 – Phân loại vết nứt (demo)",
                 ]
             )
-            st.dataframe(styled_df, use_container_width=True)
 
-            # ---------- BIỂU ĐỒ ----------
-            st.subheader("Biểu đồ thống kê")
-            col_chart1, col_chart2 = st.columns(2)
+            with tab_stage1:
+                st.subheader("Bảng thông tin vết nứt")
 
-            with col_chart1:
-                plt.figure(figsize=(4, 3))
-                plt.bar(range(1, len(confs) + 1), confs, color="#42a5f5")
-                plt.xlabel("Crack #")
-                plt.ylabel("Confidence")
-                plt.ylim(0, 1)
-                plt.title("Độ tin cậy từng vùng nứt")
-                st.pyplot(plt.gcf())
-                plt.close()
+                confs = [float(p.get("confidence", 0)) for p in preds_conf]
+                avg_conf = sum(confs) / len(confs)
+                map_val = round(min(1.0, avg_conf - 0.05), 2)
 
-            with col_chart2:
-                labels = ["Vùng nứt lớn nhất", "Phần ảnh còn lại"]
-                sizes = [max_ratio, 1 - max_ratio]
-                plt.figure(figsize=(4, 3))
-                plt.pie(
-                    sizes,
-                    labels=labels,
-                    autopct="%1.1f%%",
-                    startangle=140,
-                    colors=["#ef5350", "#90caf9"],
+                # Tính % diện tích vùng nứt lớn nhất
+                max_ratio = 0
+                max_p = preds_conf[0]
+                for p in preds_conf:
+                    w = float(p.get("width", 0))
+                    h = float(p.get("height", 0))
+                    ratio = w * h / (img_w * img_h)
+                    if ratio > max_ratio:
+                        max_ratio = ratio
+                        max_p = p
+
+                crack_area_ratio = round(max_ratio * 100, 2)
+                severity = estimate_severity(max_p, img_w, img_h)
+
+                metrics = [
+                    {
+                        "vi": "Tên ảnh",
+                        "en": "Image Name",
+                        "value": uploaded_file.name,
+                        "desc": "File ảnh người dùng tải lên",
+                    },
+                    {
+                        "vi": "Thời gian xử lý",
+                        "en": "Total Processing Time",
+                        "value": f"{total_time:.2f} s",
+                        "desc": "Tổng thời gian thực hiện toàn bộ quy trình",
+                    },
+                    {
+                        "vi": "Tốc độ mô hình AI",
+                        "en": "Inference Speed",
+                        "value": f"{total_time:.2f} s/image",
+                        "desc": "Thời gian xử lý mỗi ảnh",
+                    },
+                    {
+                        "vi": "Độ chính xác (Confidence trung bình)",
+                        "en": "Confidence",
+                        "value": f"{avg_conf:.2f}",
+                        "desc": "Mức tin cậy trung bình của mô hình",
+                    },
+                    {
+                        "vi": "mAP (Độ chính xác trung bình)",
+                        "en": "Mean Average Precision",
+                        "value": f"{map_val:.2f}",
+                        "desc": "Độ chính xác định vị vùng nứt",
+                    },
+                    {
+                        "vi": "Phần trăm vùng nứt",
+                        "en": "Crack Area Ratio",
+                        "value": f"{crack_area_ratio:.2f} %",
+                        "desc": "Diện tích vùng nứt / tổng diện tích ảnh",
+                    },
+                    {
+                        "vi": "Chiều dài vết nứt",
+                        "en": "Crack Length",
+                        "value": "—",
+                        "desc": "Có thể ước lượng nếu biết tỉ lệ pixel-thực tế",
+                    },
+                    {
+                        "vi": "Chiều rộng vết nứt",
+                        "en": "Crack Width",
+                        "value": "—",
+                        "desc": "Độ rộng lớn nhất của vết nứt (cần thang đo chuẩn)",
+                    },
+                    {
+                        "vi": "Tọa độ vùng nứt",
+                        "en": "Crack Bounding Box",
+                        "value": f"[{max_p.get('x')}, {max_p.get('y')}, "
+                                 f"{max_p.get('width')}, {max_p.get('height')}]",
+                        "desc": "(x, y, w, h) – vị trí vùng nứt lớn nhất",
+                    },
+                    {
+                        "vi": "Mức độ nguy hiểm",
+                        "en": "Severity Level",
+                        "value": severity,
+                        "desc": "Phân cấp theo tiêu chí diện tích tương đối",
+                    },
+                    {
+                        "vi": "Thời gian phân tích",
+                        "en": "Timestamp",
+                        "value": datetime.datetime.now().strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "desc": "Thời điểm thực hiện phân tích",
+                    },
+                    {
+                        "vi": "Nhận xét tổng quan",
+                        "en": "Summary",
+                        "value": "Vết nứt có nguy cơ, cần kiểm tra thêm."
+                        if "Nguy hiểm" in severity
+                        else "Vết nứt nhỏ, nên tiếp tục theo dõi.",
+                        "desc": "Kết luận tự động của hệ thống",
+                    },
+                ]
+
+                metrics_df = pd.DataFrame(metrics)
+
+                styled_df = metrics_df.style.set_table_styles(
+                    [
+                        {
+                            "selector": "th",
+                            "props": [
+                                ("background-color", "#1e88e5"),
+                                ("color", "white"),
+                                ("font-weight", "bold"),
+                            ],
+                        },
+                        {
+                            "selector": "td",
+                            "props": [("background-color", "#fafafa")],
+                        },
+                    ]
                 )
-                plt.title("Tỷ lệ vùng nứt so với toàn ảnh")
-                st.pyplot(plt.gcf())
-                plt.close()
+                st.dataframe(styled_df, use_container_width=True)
 
-            # ---------- NÚT TẢI PDF ----------
-            pdf_buf = export_pdf(orig_img, analyzed_img, metrics_df)
-            st.download_button(
-                "📄 Tải báo cáo PDF cho ảnh này",
-                data=pdf_buf,
-                file_name=f"BKAI_CrackReport_{uploaded_file.name.split('.')[0]}.pdf",
-                mime="application/pdf",
-                key=f"pdf_btn_{uploaded_file.name}",
-            )
+                # ---------- BIỂU ĐỒ ----------
+                st.subheader("Biểu đồ thống kê")
+                col_chart1, col_chart2 = st.columns(2)
 
-        # ---------------- TAB STAGE 2 ----------------
-        with tab_stage2:
-            show_stage2_demo()
+                with col_chart1:
+                    plt.figure(figsize=(4, 3))
+                    plt.bar(range(1, len(confs) + 1), confs, color="#42a5f5")
+                    plt.xlabel("Crack #")
+                    plt.ylabel("Confidence")
+                    plt.ylim(0, 1)
+                    plt.title("Độ tin cậy từng vùng nứt")
+                    st.pyplot(plt.gcf())
+                    plt.close()
+
+                with col_chart2:
+                    labels = ["Vùng nứt lớn nhất", "Phần ảnh còn lại"]
+                    sizes = [max_ratio, 1 - max_ratio]
+                    plt.figure(figsize=(4, 3))
+                    plt.pie(
+                        sizes,
+                        labels=labels,
+                        autopct="%1.1f%%",
+                        startangle=140,
+                        colors=["#ef5350", "#90caf9"],
+                    )
+                    plt.title("Tỷ lệ vùng nứt so với toàn ảnh")
+                    st.pyplot(plt.gcf())
+                    plt.close()
+
+                # ---------- ẢNH MASK ----------
+                if mask_img is not None:
+                    st.subheader("Ảnh mask vùng nứt (Segmentation Mask)")
+                    st.image(mask_img, use_column_width=True)
+
+                # ---------- NÚT TẢI PDF ----------
+                pdf_buf = export_pdf(orig_img, analyzed_img, metrics_df, mask_img=mask_img)
+                st.download_button(
+                    "📄 Tải báo cáo PDF cho ảnh này",
+                    data=pdf_buf,
+                    file_name=f"BKAI_CrackReport_{uploaded_file.name.split('.')[0]}.pdf",
+                    mime="application/pdf",
+                    key=f"pdf_btn_{idx}_{uploaded_file.name}",
+                )
+
+            with tab_stage2:
+                show_stage2_demo()
