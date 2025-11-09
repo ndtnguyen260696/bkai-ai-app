@@ -22,6 +22,7 @@ from reportlab.lib import colors
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus.doctemplate import LayoutError
 
 # =========================================================
 # 0. CẤU HÌNH CHUNG
@@ -162,153 +163,197 @@ def estimate_severity(p, img_w, img_h):
 
 
 def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf"):
-    """Tạo file PDF báo cáo, dùng font Unicode (TimesVN/DejaVu), 
-    đã giới hạn kích thước ảnh + sửa lại độ rộng bảng để tránh LayoutError.
+    """Tạo file PDF báo cáo, dùng font Unicode (TimesVN/DejaVu),
+    đã giới hạn kích thước ảnh + bọc bảng bằng Paragraph để tránh LayoutError.
+    Nếu vẫn lỗi thì sinh một PDF rút gọn.
     """
-    buf = io.BytesIO()
 
-    # Đặt lại cả 4 lề để ta chủ động tính khung
+    # ---------- CẤU HÌNH DOC & KHUNG NỘI DUNG ----------
     left_margin = 25 * mm
     right_margin = 25 * mm
     top_margin = 20 * mm
     bottom_margin = 20 * mm
 
-    doc = SimpleDocTemplate(
-        buf,
-        pagesize=A4,
-        leftMargin=left_margin,
-        rightMargin=right_margin,
-        topMargin=top_margin,
-        bottomMargin=bottom_margin,
-    )
-
     page_w, page_h = A4
     content_width = page_w - left_margin - right_margin
     content_height = page_h - top_margin - bottom_margin
 
-    styles = getSampleStyleSheet()
+    # Hàm xây PDF chính, để có thể gọi lại khi cần
+    def build_story(buf):
+        doc = SimpleDocTemplate(
+            buf,
+            pagesize=A4,
+            leftMargin=left_margin,
+            rightMargin=right_margin,
+            topMargin=top_margin,
+            bottomMargin=bottom_margin,
+        )
 
-    # Đổi toàn bộ style sang font Unicode
-    for s in styles.byName:
-        styles[s].fontName = FONT_NAME
+        styles = getSampleStyleSheet()
+        for s in styles.byName:
+            styles[s].fontName = FONT_NAME
 
-    title_style = ParagraphStyle(
-        "TitleVN",
-        parent=styles["Title"],
-        fontName=FONT_NAME,
-        alignment=1,
-        fontSize=20,
-        leading=24,
-    )
-    h2 = ParagraphStyle(
-        "Heading2VN",
-        parent=styles["Heading2"],
-        fontName=FONT_NAME,
-        spaceBefore=12,
-        spaceAfter=6,
-    )
-    normal = ParagraphStyle("NormalVN", parent=styles["Normal"], fontName=FONT_NAME)
+        title_style = ParagraphStyle(
+            "TitleVN",
+            parent=styles["Title"],
+            fontName=FONT_NAME,
+            alignment=1,
+            fontSize=20,
+            leading=24,
+        )
+        h2 = ParagraphStyle(
+            "Heading2VN",
+            parent=styles["Heading2"],
+            fontName=FONT_NAME,
+            spaceBefore=12,
+            spaceAfter=6,
+        )
+        normal = ParagraphStyle(
+            "NormalVN",
+            parent=styles["Normal"],
+            fontName=FONT_NAME,
+            leading=13,
+        )
 
-    story = []
+        story = []
 
-    # ===== Hàm phụ: thêm ảnh và tự scale cho vừa khung =====
-    def add_pil_image(pil_img, title_text):
-        if pil_img is None:
-            return
-
-        # Đảm bảo là ảnh RGB của PIL
+        # ===== Hàm phụ: thêm ảnh và tự scale cho vừa khung (chỉ chiếm tối đa 40% chiều cao) =====
         from PIL import Image as PILImage
-        if not isinstance(pil_img, PILImage.Image):
-            pil_img = pil_img.convert("RGB")
 
-        w, h = pil_img.size
-        # scale để ảnh không vượt quá content_width / content_height
-        scale = min(content_width / w, content_height / h, 1.0)
+        def add_pil_image(pil_img, title_text):
+            if pil_img is None:
+                return
 
-        img_buf = io.BytesIO()
-        pil_img.save(img_buf, format="PNG")
-        img_buf.seek(0)
+            if not isinstance(pil_img, PILImage.Image):
+                pil_img = pil_img.convert("RGB")
 
-        story.append(Paragraph(title_text, h2))
-        story.append(Spacer(1, 4 * mm))
-        story.append(
-            RLImage(
-                img_buf,
-                width=w * scale,
-                height=h * scale,
+            w, h = pil_img.size
+            # Giới hạn rất an toàn: rộng <= content_width, cao <= 0.4 * content_height
+            max_h = content_height * 0.4
+            scale = min(content_width / w, max_h / h, 1.0)
+
+            img_buf = io.BytesIO()
+            pil_img.save(img_buf, format="PNG")
+            img_buf.seek(0)
+
+            story.append(Paragraph(title_text, h2))
+            story.append(Spacer(1, 4 * mm))
+            story.append(
+                RLImage(
+                    img_buf,
+                    width=w * scale,
+                    height=h * scale,
+                )
+            )
+            story.append(Spacer(1, 6 * mm))
+
+        # ===== Logo + tiêu đề =====
+        if os.path.exists(LOGO_PATH):
+            story.append(RLImage(LOGO_PATH, width=40 * mm))
+            story.append(Spacer(1, 6 * mm))
+
+        story.append(Paragraph("BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG", title_style))
+        story.append(Paragraph("Concrete Crack Inspection Report", normal))
+        story.append(Spacer(1, 8 * mm))
+
+        # ===== Ảnh gốc =====
+        add_pil_image(original_img, "Ảnh gốc / Original Image")
+
+        # ===== Ảnh kết quả =====
+        add_pil_image(analyzed_img, "Ảnh phân tích / Result Image")
+
+        # ===== Bảng metrics =====
+        story.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2))
+
+        # Header
+        data = [[
+            Paragraph("Chỉ số (VI)", normal),
+            Paragraph("Metric (EN)", normal),
+            Paragraph("Giá trị / Value", normal),
+            Paragraph("Ý nghĩa / Description", normal),
+        ]]
+
+        # Các dòng dữ liệu: dùng Paragraph để tự wrap
+        for _, row in metrics_df.iterrows():
+            vi_txt = Paragraph(str(row["vi"]), normal)
+            en_txt = Paragraph(str(row["en"]), normal)
+            val_txt = Paragraph(str(row["value"]), normal)
+            desc_txt = Paragraph(str(row["desc"]), normal)
+            data.append([vi_txt, en_txt, val_txt, desc_txt])
+
+        # Chia content_width cho 4 cột (0.2, 0.2, 0.2, 0.4)
+        col_widths = [
+            0.2 * content_width,
+            0.2 * content_width,
+            0.2 * content_width,
+            0.4 * content_width,
+        ]
+
+        tbl = Table(data, colWidths=col_widths, repeatRows=1)
+        tbl.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e88e5")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, -1), FONT_NAME),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                    ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ]
             )
         )
-        story.append(Spacer(1, 6 * mm))
+        story.append(tbl)
+        story.append(Spacer(1, 8 * mm))
 
-    # ===== Logo + tiêu đề =====
-    if os.path.exists(LOGO_PATH):
-        # Logo mặc định nhỏ nên không cần scale
-        story.append(RLImage(LOGO_PATH, width=40 * mm))
-        story.append(Spacer(1, 6 * mm))
-
-    story.append(Paragraph("BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG", title_style))
-    story.append(Paragraph("Concrete Crack Inspection Report", normal))
-    story.append(Spacer(1, 8 * mm))
-
-    # ===== Ảnh gốc =====
-    add_pil_image(original_img, "Ảnh gốc / Original Image")
-
-    # ===== Ảnh kết quả =====
-    add_pil_image(analyzed_img, "Ảnh phân tích / Result Image")
-
-    # ===== Bảng metrics =====
-    story.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2))
-
-    # Header + data
-    data = [["Chỉ số (VI)", "Metric (EN)", "Giá trị / Value", "Ý nghĩa / Description"]]
-    for _, row in metrics_df.iterrows():
-        data.append(
-            [
-                row["vi"],
-                row["en"],
-                str(row["value"]),
-                row["desc"],
-            ]
+        # ===== Footer =====
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        story.append(
+            Paragraph(
+                f"BKAI © {datetime.datetime.now().year} – Report generated at {now_str}",
+                normal,
+            )
         )
 
-    # Chia content_width cho 4 cột (tỷ lệ 0.2, 0.2, 0.2, 0.4 chẳng hạn)
-    col_widths = [
-        0.2 * content_width,  # VI
-        0.2 * content_width,  # EN
-        0.2 * content_width,  # Value
-        0.4 * content_width,  # Description
-    ]
+        doc.build(story)
 
-    tbl = Table(data, colWidths=col_widths, repeatRows=1)
-    tbl.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e88e5")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, -1), FONT_NAME),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ]
+    # --------- THỬ BUILD BẢN ĐẦY ĐỦ, NẾU LỖI THÌ LÀM BẢN RÚT GỌN ----------
+    buf = io.BytesIO()
+    try:
+        build_story(buf)
+    except LayoutError:
+        # Nếu vẫn LayoutError (ảnh/bảng quá dị), sinh file PDF tối giản
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buf,
+            pagesize=A4,
+            leftMargin=left_margin,
+            rightMargin=right_margin,
+            topMargin=top_margin,
+            bottomMargin=bottom_margin,
         )
-    )
-    story.append(tbl)
-    story.append(Spacer(1, 8 * mm))
+        styles = getSampleStyleSheet()
+        for s in styles.byName:
+            styles[s].fontName = FONT_NAME
+        normal = styles["Normal"]
+        title_style = styles["Title"]
 
-    # ===== Footer =====
-    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    story.append(
-        Paragraph(
-            f"BKAI © {datetime.datetime.now().year} – Report generated at {now_str}",
-            normal,
+        story = []
+        story.append(Paragraph("BKAI - Báo cáo rút gọn", title_style))
+        story.append(Spacer(1, 10 * mm))
+        story.append(
+            Paragraph(
+                "Nội dung chi tiết (ảnh hoặc bảng) quá lớn so với khổ giấy nên không thể hiển thị đầy đủ trong PDF. "
+                "Vui lòng xem chi tiết trực tiếp trên giao diện web BKAI.",
+                normal,
+            )
         )
-    )
+        doc.build(story)
 
-    # Build PDF
-    doc.build(story)
     buf.seek(0)
     return buf
+
 
 
 # =========================================================
@@ -579,7 +624,7 @@ with col_logo:
         st.image(LOGO_PATH, width=80)
 with col_title:
     st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT")
-    st.caption("Phân biệt ảnh nứt / không nứt và xuất báo cáo chi tiết (Stage 1).")
+    st.caption("Phân biệt ảnh nứt / không nứt (Stage 1).")
 
 st.write("---")
 
@@ -850,6 +895,7 @@ if analyze_btn:
 
         with tab_stage2:
             show_stage2_demo()
+
 
 
 
