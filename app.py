@@ -360,13 +360,23 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
 # =========================================================
 
 
-def show_stage2_demo():
+def show_stage2_demo(key_prefix="stage2"):
     """Stage 2 demo: phân loại vết nứt & gợi ý nguyên nhân / biện pháp."""
     st.subheader("Stage 2 (demo) – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
 
-    # =========================================================
-    # 1. BẢNG DEMO CƠ BẢN (GIỮ NGUYÊN NHƯ BẠN ĐANG DÙNG)
-    # =========================================================
+    options = [
+        "Vết nứt dọc (Longitudinal Crack)",
+        "Vết nứt ngang (Transverse Crack)",
+        "Vết nứt mạng (Map Crack)",
+    ]
+
+    # THÊM key để tránh trùng ID
+    selected_label = st.selectbox(
+        "Chọn loại vết nứt:",
+        options,
+        key=f"{key_prefix}_selectbox",
+    )
+
     demo_data = pd.DataFrame(
         [
             {
@@ -388,7 +398,8 @@ def show_stage2_demo():
     )
 
     st.table(demo_data)
-    st.caption("Stage 2 hiện tại chỉ là demo – bảng kiến thức cơ bản về một số dạng vết nứt.")
+    st.caption("Stage 2 hiện tại chỉ là demo – bảng kiến thức cơ bản về các dạng vết nứt.")
+
 
     # =========================================================
     # 2. BẢNG KIẾN THỨC CHI TIẾT TỪ LUẬN VĂN CỦA BẠN
@@ -728,7 +739,7 @@ if analyze_btn:
         tab_stage1, tab_stage2 = st.tabs(
             [
                 "Stage 1 – Báo cáo chi tiết",
-                "Stage 2 – Phân loại vết nứt (demo)",
+                "Stage 2 – Phân loại vết nứt",
             ]
         )
 
@@ -894,6 +905,7 @@ if analyze_btn:
 
         with tab_stage2:
             show_stage2_demo()
+
 
 
 
