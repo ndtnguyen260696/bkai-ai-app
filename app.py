@@ -7,6 +7,7 @@ import datetime
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import json
 
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -781,5 +782,6 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
