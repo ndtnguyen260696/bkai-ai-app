@@ -735,10 +735,10 @@ def show_auth_page():
         if st.button("Đăng nhập"):
             users = st.session_state.users
             if login_user in users and users[login_user] == login_pass:
-                st.session_state.authenticated = True
-                st.session_state.username = login_user
-                st.success("Đăng nhập thành công!")
-                st.experimental_rerun()
+               st.session_state.authenticated = True
+               st.session_state.username = login_user
+               st.success("Đăng nhập thành công!")
+               st.rerun()
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu.")
 
@@ -776,9 +776,10 @@ if st.session_state.authenticated:
         if st.button("Đăng xuất"):
             st.session_state.authenticated = False
             st.session_state.username = ""
-            st.experimental_rerun()
+            st.rerun()
 
     run_main_app()
 else:
     show_auth_page()
+
 
