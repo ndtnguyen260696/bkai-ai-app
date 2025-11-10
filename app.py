@@ -54,7 +54,7 @@ else:
 # =========================================================
 
 st.set_page_config(
-    page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT",
+    page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG",
     layout="wide",
 )
 
@@ -723,7 +723,7 @@ def init_auth_state():
 
 
 def show_auth_page():
-    st.title("BKAI - Concrete Crack Inspection")
+    st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG")
     st.subheader("Vui lòng đăng nhập để sử dụng hệ thống phân tích vết nứt.")
 
     tab_login, tab_register = st.tabs(["🔑 Đăng nhập", "📝 Đăng ký"])
@@ -781,3 +781,4 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
