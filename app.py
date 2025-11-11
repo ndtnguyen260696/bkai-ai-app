@@ -258,11 +258,11 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
             Paragraph("Ý nghĩa / Description", normal),
         ]]
 
-        # Các dòng dữ liệu: dùng Paragraph để tự wrap + RÚT GỌN mô tả
-        for _, row in metrics_df.iterrows():
-        vi_txt = Paragraph(str(row["vi"]), normal)
-        en_txt = Paragraph(str(row["en"]), normal)
-        val_txt = Paragraph(str(row["value"]), normal)
+# Các dòng dữ liệu: dùng Paragraph để tự wrap + RÚT GỌN mô tả
+for _, row in metrics_df.iterrows():
+    vi_txt = Paragraph(str(row["vi"]), normal)
+    en_txt = Paragraph(str(row["en"]), normal)
+    val_txt = Paragraph(str(row["value"]), normal)
 
     # RÚT GỌN MÔ TẢ CHO PDF để mỗi ô không quá cao
     full_desc = str(row["desc"])
@@ -274,6 +274,7 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
     desc_txt = Paragraph(short_desc, normal)
 
     data.append([vi_txt, en_txt, val_txt, desc_txt])
+
     
 
         col_widths = [
@@ -737,6 +738,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
