@@ -274,6 +274,7 @@ for _, row in metrics_df.iterrows():
     desc_txt = Paragraph(short_desc, normal)
 
     data.append([vi_txt, en_txt, val_txt, desc_txt])
+    
 
         col_widths = [
             0.2 * content_width,
@@ -736,5 +737,6 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
