@@ -53,7 +53,7 @@ else:
 
 # --- 0.4. Cấu hình trang Streamlit ---
 st.set_page_config(
-    page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT",
+    page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG",
     layout="wide",
 )
 
@@ -393,7 +393,7 @@ def run_main_app():
         if os.path.exists(LOGO_PATH):
             st.image(LOGO_PATH, width=80)
     with col_title:
-        st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT")
+        st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG")
         user = st.session_state.get("username", "")
         if user:
             st.caption(f"Xin chào **{user}** – Phân biệt ảnh nứt / không nứt & xuất báo cáo.")
@@ -676,7 +676,7 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 def show_auth_page():
-    st.title("BKAI - Mô hình CNN PHÂN TÍCH VẾT NỨT BÊ TÔNG (CONCRETE CRACK INPECTION )")
+    st.title("BKAI - MÔ HÌNH CNN-PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG")
     st.subheader("Vui lòng đăng nhập để sử dụng hệ thống phân tích vết nứt bê tông.")
 
     tab_login, tab_register = st.tabs(["🔑 Đăng nhập", "📝 Đăng ký"])
@@ -729,3 +729,4 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
