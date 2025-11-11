@@ -265,7 +265,7 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
            val_txt = Paragraph(str(row["value"]), normal)
 
         # RÚT GỌN MÔ TẢ CHO PDF để mỗi ô không quá cao
-         full_desc = str(row["desc"])
+          full_desc = str(row["desc"])
        if len(full_desc) > 180:      # muốn ngắn hơn nữa thì giảm 180
         short_desc = full_desc[:180] + "..."
        else:
@@ -737,6 +737,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
