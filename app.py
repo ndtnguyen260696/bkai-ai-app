@@ -5,9 +5,9 @@ import io
 import time
 import datetime
 import os
+import json
 import pandas as pd
 import matplotlib.pyplot as plt
-import json
 
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -32,13 +32,14 @@ from reportlab.platypus.doctemplate import LayoutError
 # --- 0.1. Roboflow URL (BẮT BUỘC: sửa cho đúng model & API key của bạn) ---
 ROBOFLOW_FULL_URL = (
     "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
+    # TODO: nếu bạn đổi model hoặc API key, sửa URL này
 )
 
 # --- 0.2. Logo BKAI (ảnh PNG đặt cạnh file app.py) ---
-LOGO_PATH = "BKAI_Logo.png"
+LOGO_PATH = "BKAI_Logo.png"  # TODO: đảm bảo file này tồn tại cùng thư mục app.py
 
 # --- 0.3. Font Unicode cho PDF ---
-FONT_PATH = "times.ttf"  # nếu bạn có file Times New Roman -> đặt tên này
+FONT_PATH = "times.ttf"   # nếu bạn có file Times New Roman -> đặt tên này
 FONT_NAME = "TimesVN"
 
 if os.path.exists(FONT_PATH):
@@ -50,19 +51,15 @@ else:
         TTFont(FONT_NAME, "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
     )
 
-# =========================================================
-# 0.4. CẤU HÌNH STREAMLIT
-# =========================================================
-
+# --- 0.4. Cấu hình trang Streamlit ---
 st.set_page_config(
-    page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG",
+    page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT",
     layout="wide",
 )
 
 # =========================================================
 # 1. HÀM XỬ LÝ ẢNH
 # =========================================================
-
 
 def extract_poly_points(points_field):
     """Chuyển 'points' trong JSON thành list [(x,y), ...]."""
@@ -162,7 +159,6 @@ def estimate_severity(p, img_w, img_h):
 # =========================================================
 # 2. HÀM XUẤT PDF
 # =========================================================
-
 
 def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf"):
     """Tạo file PDF báo cáo, đã hạn chế LayoutError."""
@@ -346,21 +342,19 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
 # 3. STAGE 2 – DEMO KIẾN THỨC NỨT BÊ TÔNG
 # =========================================================
 
-
 def show_stage2_demo(key_prefix="stage2"):
     """Stage 2 demo: phân loại vết nứt & gợi ý nguyên nhân / biện pháp."""
     st.subheader("Stage 2 – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
 
-    # --- 1. Bảng demo ngắn ---
-    options_summary = [
+    # Demo tóm tắt 3 loại chính
+    options = [
         "Vết nứt dọc (Longitudinal Crack)",
         "Vết nứt ngang (Transverse Crack)",
         "Vết nứt mạng (Map Crack)",
     ]
-
     st.selectbox(
         "Chọn loại vết nứt (tóm tắt):",
-        options_summary,
+        options,
         key=f"{key_prefix}_summary_selectbox",
     )
 
@@ -385,63 +379,15 @@ def show_stage2_demo(key_prefix="stage2"):
     )
 
     st.table(demo_data)
-    st.caption("Stage 2 (demo ngắn). Bên dưới là bảng kiến thức chi tiết hơn.")
-
-    # --- 2. Bảng kiến thức chi tiết (trích từ luận văn của bạn) ---
-    st.markdown("### 📚 Bảng kiến thức chi tiết về các dạng vết nứt bê tông")
-
-    detailed_cracks = [
-        # (GIỮ NGUYÊN KHỐI DỮ LIỆU detailed_cracks NHƯ BẠN ĐANG CÓ)
-        # --------------- CẮT BỚT Ở ĐÂY CHO GỌN TRONG TRẢ LỜI ----------------
-        # Vì rất dài, mình không sửa nội dung, bạn giữ nguyên như trong code hiện tại.
-    ]
-
-    # Nếu bạn muốn giữ nguyên toàn bộ detailed_cracks,
-    # hãy copy lại list detailed_cracks từ code cũ vào đây.
-
-    if detailed_cracks:
-        df_detail = pd.DataFrame(detailed_cracks)
-        st.dataframe(df_detail, use_container_width=True, height=500)
-
-        # --- 3. Tra cứu chi tiết ---
-        st.markdown("### 🔍 Tra cứu chi tiết từng loại vết nứt")
-
-        options_detail = [
-            f"{row['Nhóm']} – {row['Loại vết nứt']}"
-            for row in detailed_cracks
-        ]
-        selected_label = st.selectbox(
-            "Chọn loại vết nứt (chi tiết):",
-            options_detail,
-            key=f"{key_prefix}_detail_selectbox",
-        )
-
-        selected_idx = options_detail.index(selected_label)
-        selected = detailed_cracks[selected_idx]
-
-        with st.expander("Chi tiết loại vết nứt đã chọn", expanded=True):
-            st.markdown(f"**Nhóm:** {selected['Nhóm']}")
-            st.markdown(f"**Loại vết nứt:** {selected['Loại vết nứt']}")
-            st.markdown("**Nguyên nhân hình thành:**")
-            st.markdown(selected["Nguyên nhân hình thành"])
-            st.markdown("**Đặc trưng hình dạng / hình học:**")
-            st.markdown(selected["Đặc trưng hình dạng / hình học"])
-            st.markdown(
-                f"**Thời gian xuất hiện (điển hình):** {selected['Thời gian xuất hiện']}"
-            )
-            st.markdown("**Cách kiểm soát / phòng ngừa:**")
-            st.markdown(selected["Cách kiểm soát / phòng ngừa"])
-    else:
-        st.info("Bảng kiến thức chi tiết đang được rút gọn trong bản demo.")
+    st.caption("Stage 2 hiện tại là demo – bảng kiến thức cơ bản về các dạng vết nứt.")
 
 
 # =========================================================
-# 4. HÀM CHÍNH CHO STAGE 1 + STAGE 2 (CHỈ CHẠY SAU KHI LOGIN)
+# 4. GIAO DIỆN CHÍNH (SAU KHI ĐĂNG NHẬP)
 # =========================================================
-
 
 def run_main_app():
-    # Header với logo
+    # Header với logo + tên user
     col_logo, col_title = st.columns([1, 5])
     with col_logo:
         if os.path.exists(LOGO_PATH):
@@ -450,9 +396,9 @@ def run_main_app():
         st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT")
         user = st.session_state.get("username", "")
         if user:
-            st.caption(f"Xin chào **{user}** – Phân biệt ảnh nứt / không nứt (Stage 1).")
+            st.caption(f"Xin chào **{user}** – Phân biệt ảnh nứt / không nứt & xuất báo cáo.")
         else:
-            st.caption("Phân biệt ảnh nứt / không nứt (Stage 1).")
+            st.caption("Phân biệt ảnh nứt / không nứt & xuất báo cáo.")
 
     st.write("---")
 
@@ -473,7 +419,6 @@ def run_main_app():
     )
     analyze_btn = st.button("🔍 Phân tích ảnh")
 
-    # ----------------- XỬ LÝ ẢNH – STAGE 1 -----------------
     if analyze_btn:
         if not uploaded_files:
             st.warning("Vui lòng chọn ít nhất một ảnh trước khi bấm **Phân tích**.")
@@ -537,7 +482,7 @@ def run_main_app():
             if len(preds_conf) == 0 or analyzed_img is None:
                 continue
 
-            # ----- Tabs Stage 1 & Stage 2 -----
+            # Tabs Stage 1 & Stage 2
             st.write("---")
             tab_stage1, tab_stage2 = st.tabs(
                 [
@@ -546,7 +491,7 @@ def run_main_app():
                 ]
             )
 
-            # ====== TAB STAGE 1 ======
+            # ===== STAGE 1 =====
             with tab_stage1:
                 st.subheader("Bảng thông tin vết nứt")
 
@@ -703,56 +648,59 @@ def run_main_app():
                     key=f"pdf_btn_{idx}_{uploaded_file.name}",
                 )
 
-            # ====== TAB STAGE 2 ======
+            # ===== STAGE 2 =====
             with tab_stage2:
                 show_stage2_demo(key_prefix=f"stage2_{idx}")
 
 
 # =========================================================
-# 5. ĐĂNG KÝ / ĐĂNG NHẬP (AUTH UI)
+# 5. ĐĂNG KÝ / ĐĂNG NHẬP – LƯU FILE users.json
 # =========================================================
 
+USERS_FILE = "users.json"
 
-def init_auth_state():
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
-    if "username" not in st.session_state:
-        st.session_state.username = ""
-    if "users" not in st.session_state:
-        # demo: lưu user trong bộ nhớ; reset mỗi lần restart app
-        st.session_state.users = {}  # {"admin": "123456"}
+# Đọc danh sách tài khoản từ file (nếu có)
+if os.path.exists(USERS_FILE):
+    with open(USERS_FILE, "r", encoding="utf-8") as f:
+        try:
+            users = json.load(f)
+        except Exception:
+            users = {}
+else:
+    users = {}
 
+# Trạng thái đăng nhập
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
 
 def show_auth_page():
-    st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG")
-    st.subheader("Vui lòng đăng nhập để sử dụng hệ thống phân tích vết nứt.")
+    st.title("BKAI - Mô hình CNN PHÂN TÍCH VẾT NỨT BÊ TÔNG (CONCRETE CRACK INPECTION )")
+    st.subheader("Vui lòng đăng nhập để sử dụng hệ thống phân tích vết nứt bê tông.")
 
     tab_login, tab_register = st.tabs(["🔑 Đăng nhập", "📝 Đăng ký"])
 
-    # ----- Tab Đăng nhập -----
+    # --- Tab Đăng nhập ---
     with tab_login:
         login_user = st.text_input("Tên đăng nhập", key="login_user")
         login_pass = st.text_input("Mật khẩu", type="password", key="login_pass")
         if st.button("Đăng nhập"):
-            users = st.session_state.users
             if login_user in users and users[login_user] == login_pass:
-               st.session_state.authenticated = True
-               st.session_state.username = login_user
-               st.success("Đăng nhập thành công!")
-               st.rerun()
+                st.session_state.authenticated = True
+                st.session_state.username = login_user
+                st.success(f"Đăng nhập thành công! Xin chào, {login_user} 👋")
+                st.rerun()
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu.")
 
-    # ----- Tab Đăng ký -----
+    # --- Tab Đăng ký ---
     with tab_register:
         reg_user = st.text_input("Tên đăng nhập mới", key="reg_user")
         reg_pass = st.text_input("Mật khẩu mới", type="password", key="reg_pass")
-        reg_pass2 = st.text_input(
-            "Nhập lại mật khẩu", type="password", key="reg_pass2"
-        )
+        reg_pass2 = st.text_input("Nhập lại mật khẩu", type="password", key="reg_pass2")
 
         if st.button("Tạo tài khoản"):
-            users = st.session_state.users
             if not reg_user or not reg_pass:
                 st.warning("Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.")
             elif reg_user in users:
@@ -761,15 +709,14 @@ def show_auth_page():
                 st.error("Mật khẩu nhập lại không khớp.")
             else:
                 users[reg_user] = reg_pass
-                st.session_state.users = users
+                with open(USERS_FILE, "w", encoding="utf-8") as f:
+                    json.dump(users, f, ensure_ascii=False, indent=2)
                 st.success("Tạo tài khoản thành công! Bạn có thể quay lại tab Đăng nhập.")
 
 
 # =========================================================
 # 6. MAIN ENTRY
 # =========================================================
-
-init_auth_state()
 
 if st.session_state.authenticated:
     with st.sidebar:
@@ -782,6 +729,3 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
-
-
-
