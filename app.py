@@ -277,7 +277,7 @@ for _, row in metrics_df.iterrows():
 
     
 
-        col_widths = [
+col_widths = [
             0.2 * content_width,
             0.2 * content_width,
             0.2 * content_width,
@@ -738,6 +738,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
