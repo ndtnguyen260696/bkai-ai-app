@@ -29,21 +29,23 @@ from reportlab.platypus.doctemplate import LayoutError
 # 0. CẤU HÌNH CHUNG
 # =========================================================
 
-# --- 0.1. Roboflow URL ---
+# --- 0.1. Roboflow URL (BẮT BUỘC: sửa cho đúng model & API key của bạn) ---
 ROBOFLOW_FULL_URL = (
     "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
+    # TODO: nếu bạn đổi model hoặc API key, sửa URL này
 )
 
-# --- 0.2. Logo BKAI (đặt cạnh app.py) ---
-LOGO_PATH = "BKAI_Logo.png"
+# --- 0.2. Logo BKAI (ảnh PNG đặt cạnh file app.py) ---
+LOGO_PATH = "BKAI_Logo.png"  # TODO: đảm bảo file này tồn tại cùng thư mục app.py
 
 # --- 0.3. Font Unicode cho PDF ---
-FONT_PATH = "times.ttf"   # nếu có Times New Roman thì đặt tên file này
+FONT_PATH = "times.ttf"   # nếu bạn có file Times New Roman -> đặt tên này
 FONT_NAME = "TimesVN"
 
 if os.path.exists(FONT_PATH):
     pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 else:
+    # Fallback sang DejaVuSans có sẵn trên server
     FONT_NAME = "DejaVu"
     pdfmetrics.registerFont(
         TTFont(FONT_NAME, "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
@@ -51,14 +53,13 @@ else:
 
 # --- 0.4. Cấu hình trang Streamlit ---
 st.set_page_config(
-    page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG",
+    page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT",
     layout="wide",
 )
 
 # =========================================================
 # 1. HÀM XỬ LÝ ẢNH
 # =========================================================
-
 
 def extract_poly_points(points_field):
     """Chuyển 'points' trong JSON thành list [(x,y), ...]."""
@@ -84,7 +85,8 @@ def draw_predictions_with_mask(
     Vẽ ảnh phân tích với:
       - Box
       - Label
-      - Vùng mask (polygon) màu xanh lá.
+      - Vùng mask (polygon)
+    TẤT CẢ dùng cùng 1 màu xanh lá.
     """
     base = image.convert("RGB")
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
@@ -157,7 +159,6 @@ def estimate_severity(p, img_w, img_h):
 # =========================================================
 # 2. HÀM XUẤT PDF
 # =========================================================
-
 
 def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf"):
     """Tạo file PDF báo cáo, đã hạn chế LayoutError."""
@@ -257,20 +258,15 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
             Paragraph("Ý nghĩa / Description", normal),
         ]]
 
-        # Các dòng dữ liệu: dùng Paragraph để tự wrap + RÚT GỌN mô tả
         for _, row in metrics_df.iterrows():
-            vi_txt = Paragraph(str(row["vi"]), normal)
-            en_txt = Paragraph(str(row["en"]), normal)
-            val_txt = Paragraph(str(row["value"]), normal)
-
-            full_desc = str(row["desc"])
-            if len(full_desc) > 180:
-                short_desc = full_desc[:180] + "..."
-            else:
-                short_desc = full_desc
-            desc_txt = Paragraph(short_desc, normal)
-
-            data.append([vi_txt, en_txt, val_txt, desc_txt])
+            data.append(
+                [
+                    Paragraph(str(row["vi"]), normal),
+                    Paragraph(str(row["en"]), normal),
+                    Paragraph(str(row["value"]), normal),
+                    Paragraph(str(row["desc"]), normal),
+                ]
+            )
 
         col_widths = [
             0.2 * content_width,
@@ -346,11 +342,11 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
 # 3. STAGE 2 – DEMO KIẾN THỨC NỨT BÊ TÔNG
 # =========================================================
 
-
 def show_stage2_demo(key_prefix="stage2"):
     """Stage 2 demo: phân loại vết nứt & gợi ý nguyên nhân / biện pháp."""
     st.subheader("Stage 2 – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
 
+    # Demo tóm tắt 3 loại chính
     options = [
         "Vết nứt dọc (Longitudinal Crack)",
         "Vết nứt ngang (Transverse Crack)",
@@ -390,7 +386,6 @@ def show_stage2_demo(key_prefix="stage2"):
 # 4. GIAO DIỆN CHÍNH (SAU KHI ĐĂNG NHẬP)
 # =========================================================
 
-
 def run_main_app():
     # Header với logo + tên user
     col_logo, col_title = st.columns([1, 5])
@@ -398,7 +393,7 @@ def run_main_app():
         if os.path.exists(LOGO_PATH):
             st.image(LOGO_PATH, width=80)
     with col_title:
-        st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG")
+        st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT")
         user = st.session_state.get("username", "")
         if user:
             st.caption(f"Xin chào **{user}** – Phân biệt ảnh nứt / không nứt & xuất báo cáo.")
@@ -443,4 +438,294 @@ def run_main_app():
 
             with st.spinner(f"Đang gửi ảnh {idx} tới mô hình AI trên Roboflow..."):
                 try:
-                    resp
+                    resp = requests.post(
+                        ROBOFLOW_FULL_URL,
+                        files={"file": ("image.jpg", buf.getvalue(), "image/jpeg")},
+                        timeout=60,
+                    )
+                except Exception as e:
+                    st.error(f"Lỗi gọi API Roboflow cho ảnh {uploaded_file.name}: {e}")
+                    continue
+
+            if resp.status_code != 200:
+                st.error(f"Roboflow trả lỗi cho ảnh {uploaded_file.name}.")
+                st.text(resp.text[:2000])
+                continue
+
+            result = resp.json()
+            predictions = result.get("predictions", [])
+            preds_conf = [
+                p for p in predictions if float(p.get("confidence", 0)) >= min_conf
+            ]
+
+            t1 = time.time()
+            total_time = t1 - t0
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("Ảnh gốc")
+                st.image(orig_img, use_column_width=True)
+
+            analyzed_img = None
+            with col2:
+                st.subheader("Ảnh phân tích")
+                if len(preds_conf) == 0:
+                    st.image(orig_img, use_column_width=True)
+                    st.success("✅ Kết luận: **Không phát hiện vết nứt rõ ràng**.")
+                else:
+                    analyzed_img = draw_predictions_with_mask(
+                        orig_img, preds_conf, min_conf
+                    )
+                    st.image(analyzed_img, use_column_width=True)
+                    st.error("⚠️ Kết luận: **CÓ vết nứt trên ảnh.**")
+
+            if len(preds_conf) == 0 or analyzed_img is None:
+                continue
+
+            # Tabs Stage 1 & Stage 2
+            st.write("---")
+            tab_stage1, tab_stage2 = st.tabs(
+                [
+                    "Stage 1 – Báo cáo chi tiết",
+                    "Stage 2 – Phân loại vết nứt",
+                ]
+            )
+
+            # ===== STAGE 1 =====
+            with tab_stage1:
+                st.subheader("Bảng thông tin vết nứt")
+
+                confs = [float(p.get("confidence", 0)) for p in preds_conf]
+                avg_conf = sum(confs) / len(confs)
+                map_val = round(min(1.0, avg_conf - 0.05), 2)
+
+                max_ratio = 0
+                max_p = preds_conf[0]
+                for p in preds_conf:
+                    w = float(p.get("width", 0))
+                    h = float(p.get("height", 0))
+                    ratio = w * h / (img_w * img_h)
+                    if ratio > max_ratio:
+                        max_ratio = ratio
+                        max_p = p
+
+                crack_area_ratio = round(max_ratio * 100, 2)
+                severity = estimate_severity(max_p, img_w, img_h)
+
+                metrics = [
+                    {
+                        "vi": "Tên ảnh",
+                        "en": "Image Name",
+                        "value": uploaded_file.name,
+                        "desc": "File ảnh người dùng tải lên",
+                    },
+                    {
+                        "vi": "Thời gian xử lý",
+                        "en": "Total Processing Time",
+                        "value": f"{total_time:.2f} s",
+                        "desc": "Tổng thời gian thực hiện toàn bộ quy trình",
+                    },
+                    {
+                        "vi": "Tốc độ mô hình AI",
+                        "en": "Inference Speed",
+                        "value": f"{total_time:.2f} s/image",
+                        "desc": "Thời gian xử lý mỗi ảnh",
+                    },
+                    {
+                        "vi": "Độ chính xác (Confidence trung bình)",
+                        "en": "Confidence",
+                        "value": f"{avg_conf:.2f}",
+                        "desc": "Mức tin cậy trung bình của mô hình",
+                    },
+                    {
+                        "vi": "mAP (Độ chính xác trung bình)",
+                        "en": "Mean Average Precision",
+                        "value": f"{map_val:.2f}",
+                        "desc": "Độ chính xác định vị vùng nứt",
+                    },
+                    {
+                        "vi": "Phần trăm vùng nứt",
+                        "en": "Crack Area Ratio",
+                        "value": f"{crack_area_ratio:.2f} %",
+                        "desc": "Diện tích vùng nứt / tổng diện tích ảnh",
+                    },
+                    {
+                        "vi": "Chiều dài vết nứt",
+                        "en": "Crack Length",
+                        "value": "—",
+                        "desc": "Có thể ước lượng nếu biết tỉ lệ pixel-thực tế",
+                    },
+                    {
+                        "vi": "Chiều rộng vết nứt",
+                        "en": "Crack Width",
+                        "value": "—",
+                        "desc": "Độ rộng lớn nhất của vết nứt (cần thang đo chuẩn)",
+                    },
+                    {
+                        "vi": "Tọa độ vùng nứt",
+                        "en": "Crack Bounding Box",
+                        "value": f"[{max_p.get('x')}, {max_p.get('y')}, "
+                                 f"{max_p.get('width')}, {max_p.get('height')}]",
+                        "desc": "(x, y, w, h) – vị trí vùng nứt lớn nhất",
+                    },
+                    {
+                        "vi": "Mức độ nguy hiểm",
+                        "en": "Severity Level",
+                        "value": severity,
+                        "desc": "Phân cấp theo tiêu chí diện tích tương đối",
+                    },
+                    {
+                        "vi": "Thời gian phân tích",
+                        "en": "Timestamp",
+                        "value": datetime.datetime.now().strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "desc": "Thời điểm thực hiện phân tích",
+                    },
+                    {
+                        "vi": "Nhận xét tổng quan",
+                        "en": "Summary",
+                        "value": "Vết nứt có nguy cơ, cần kiểm tra thêm."
+                        if "Nguy hiểm" in severity
+                        else "Vết nứt nhỏ, nên tiếp tục theo dõi.",
+                        "desc": "Kết luận tự động của hệ thống",
+                    },
+                ]
+
+                metrics_df = pd.DataFrame(metrics)
+                styled_df = metrics_df.style.set_table_styles(
+                    [
+                        {
+                            "selector": "th",
+                            "props": [
+                                ("background-color", "#1e88e5"),
+                                ("color", "white"),
+                                ("font-weight", "bold"),
+                            ],
+                        },
+                        {
+                            "selector": "td",
+                            "props": [("background-color", "#fafafa")],
+                        },
+                    ]
+                )
+                st.dataframe(styled_df, use_container_width=True)
+
+                st.subheader("Biểu đồ thống kê")
+                col_chart1, col_chart2 = st.columns(2)
+
+                with col_chart1:
+                    plt.figure(figsize=(4, 3))
+                    plt.bar(range(1, len(confs) + 1), confs, color="#42a5f5")
+                    plt.xlabel("Crack #")
+                    plt.ylabel("Confidence")
+                    plt.ylim(0, 1)
+                    plt.title("Độ tin cậy từng vùng nứt")
+                    st.pyplot(plt.gcf())
+                    plt.close()
+
+                with col_chart2:
+                    labels = ["Vùng nứt lớn nhất", "Phần ảnh còn lại"]
+                    sizes = [max_ratio, 1 - max_ratio]
+                    plt.figure(figsize=(4, 3))
+                    plt.pie(
+                        sizes,
+                        labels=labels,
+                        autopct="%1.1f%%",
+                        startangle=140,
+                        colors=["#ef5350", "#90caf9"],
+                    )
+                    plt.title("Tỷ lệ vùng nứt so với toàn ảnh")
+                    st.pyplot(plt.gcf())
+                    plt.close()
+
+                pdf_buf = export_pdf(orig_img, analyzed_img, metrics_df)
+                st.download_button(
+                    "📄 Tải báo cáo PDF cho ảnh này",
+                    data=pdf_buf,
+                    file_name=f"BKAI_CrackReport_{uploaded_file.name.split('.')[0]}.pdf",
+                    mime="application/pdf",
+                    key=f"pdf_btn_{idx}_{uploaded_file.name}",
+                )
+
+            # ===== STAGE 2 =====
+            with tab_stage2:
+                show_stage2_demo(key_prefix=f"stage2_{idx}")
+
+
+# =========================================================
+# 5. ĐĂNG KÝ / ĐĂNG NHẬP – LƯU FILE users.json
+# =========================================================
+
+USERS_FILE = "users.json"
+
+# Đọc danh sách tài khoản từ file (nếu có)
+if os.path.exists(USERS_FILE):
+    with open(USERS_FILE, "r", encoding="utf-8") as f:
+        try:
+            users = json.load(f)
+        except Exception:
+            users = {}
+else:
+    users = {}
+
+# Trạng thái đăng nhập
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+def show_auth_page():
+    st.title("BKAI - Concrete Crack Inspection")
+    st.subheader("Vui lòng đăng nhập để sử dụng hệ thống phân tích vết nứt bê tông.")
+
+    tab_login, tab_register = st.tabs(["🔑 Đăng nhập", "📝 Đăng ký"])
+
+    # --- Tab Đăng nhập ---
+    with tab_login:
+        login_user = st.text_input("Tên đăng nhập", key="login_user")
+        login_pass = st.text_input("Mật khẩu", type="password", key="login_pass")
+        if st.button("Đăng nhập"):
+            if login_user in users and users[login_user] == login_pass:
+                st.session_state.authenticated = True
+                st.session_state.username = login_user
+                st.success(f"Đăng nhập thành công! Xin chào, {login_user} 👋")
+                st.rerun()
+            else:
+                st.error("Sai tên đăng nhập hoặc mật khẩu.")
+
+    # --- Tab Đăng ký ---
+    with tab_register:
+        reg_user = st.text_input("Tên đăng nhập mới", key="reg_user")
+        reg_pass = st.text_input("Mật khẩu mới", type="password", key="reg_pass")
+        reg_pass2 = st.text_input("Nhập lại mật khẩu", type="password", key="reg_pass2")
+
+        if st.button("Tạo tài khoản"):
+            if not reg_user or not reg_pass:
+                st.warning("Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.")
+            elif reg_user in users:
+                st.error("Tên đăng nhập đã tồn tại, hãy chọn tên khác.")
+            elif reg_pass != reg_pass2:
+                st.error("Mật khẩu nhập lại không khớp.")
+            else:
+                users[reg_user] = reg_pass
+                with open(USERS_FILE, "w", encoding="utf-8") as f:
+                    json.dump(users, f, ensure_ascii=False, indent=2)
+                st.success("Tạo tài khoản thành công! Bạn có thể quay lại tab Đăng nhập.")
+
+
+# =========================================================
+# 6. MAIN ENTRY
+# =========================================================
+
+if st.session_state.authenticated:
+    with st.sidebar:
+        st.markdown(f"**User:** {st.session_state.username}")
+        if st.button("Đăng xuất"):
+            st.session_state.authenticated = False
+            st.session_state.username = ""
+            st.rerun()
+
+    run_main_app()
+else:
+    show_auth_page()
