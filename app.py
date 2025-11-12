@@ -163,6 +163,8 @@ def estimate_severity(p, img_w, img_h):
 def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf"):
     """Tạo file PDF báo cáo, đã hạn chế LayoutError."""
 
+    from reportlab.platypus.doctemplate import LayoutError
+
     left_margin = 25 * mm
     right_margin = 25 * mm
     top_margin = 20 * mm
@@ -219,7 +221,7 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
                 pil_img = pil_img.convert("RGB")
 
             w, h = pil_img.size
-            max_h = content_height * 0.4
+            max_h = content_height * 0.3   # giảm chiều cao ảnh xuống 30%
             scale = min(content_width / w, max_h / h, 1.0)
 
             img_buf = io.BytesIO()
@@ -258,15 +260,21 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
             Paragraph("Ý nghĩa / Description", normal),
         ]]
 
+        # 🔹 Các dòng dữ liệu: tự wrap + RÚT GỌN mô tả
         for _, row in metrics_df.iterrows():
-            data.append(
-                [
-                    Paragraph(str(row["vi"]), normal),
-                    Paragraph(str(row["en"]), normal),
-                    Paragraph(str(row["value"]), normal),
-                    Paragraph(str(row["desc"]), normal),
-                ]
-            )
+            vi_txt = Paragraph(str(row["vi"]), normal)
+            en_txt = Paragraph(str(row["en"]), normal)
+            val_txt = Paragraph(str(row["value"]), normal)
+
+            # Rút gọn mô tả để PDF không tràn khổ giấy
+            full_desc = str(row["desc"])
+            if len(full_desc) > 180:
+                short_desc = full_desc[:180] + "..."
+            else:
+                short_desc = full_desc
+
+            desc_txt = Paragraph(short_desc, normal)
+            data.append([vi_txt, en_txt, val_txt, desc_txt])
 
         col_widths = [
             0.2 * content_width,
@@ -303,39 +311,30 @@ def export_pdf(original_img, analyzed_img, metrics_df, filename="bkai_report.pdf
 
         doc.build(story)
 
+    # ===== Xử lý lỗi bố cục =====
     buf = io.BytesIO()
     try:
         build_story(buf)
     except LayoutError:
-        # Bản rút gọn nếu vẫn lỗi layout
         buf = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buf,
-            pagesize=A4,
-            leftMargin=left_margin,
-            rightMargin=right_margin,
-            topMargin=top_margin,
-            bottomMargin=bottom_margin,
-        )
+        doc = SimpleDocTemplate(buf, pagesize=A4)
         styles = getSampleStyleSheet()
-        for s in styles.byName:
-            styles[s].fontName = FONT_NAME
         normal = styles["Normal"]
         title_style = styles["Title"]
-        story = []
-        story.append(Paragraph("BKAI - Báo cáo rút gọn", title_style))
-        story.append(Spacer(1, 10 * mm))
-        story.append(
+        story = [
+            Paragraph("BKAI - Báo cáo rút gọn", title_style),
+            Spacer(1, 10 * mm),
             Paragraph(
                 "Nội dung chi tiết (ảnh hoặc bảng) quá lớn so với khổ giấy nên không thể hiển thị đầy đủ trong PDF. "
                 "Vui lòng xem chi tiết trực tiếp trên giao diện web BKAI.",
                 normal,
-            )
-        )
+            ),
+        ]
         doc.build(story)
 
     buf.seek(0)
     return buf
+
 
 
 # =========================================================
@@ -729,3 +728,4 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
