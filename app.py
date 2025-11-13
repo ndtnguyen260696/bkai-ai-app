@@ -16,6 +16,7 @@ from reportlab.platypus import (
     Image as RLImage,
     Table,
     TableStyle,
+    PageBreak,          # dùng để ngắt trang
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import A4
@@ -24,13 +25,13 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus.doctemplate import LayoutError
-from reportlab.platypus.doctemplate import LayoutError
-from reportlab.platypus import PageBreak  # thêm cho ngắt trang PDF
 
+# =========================================================
 # Helper: lưu matplotlib Figure thành PNG bytes để nhúng vào PDF
+# =========================================================
 def fig_to_png(fig) -> io.BytesIO:
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+    fig.savefig(buf, format="PNG", dpi=200, bbox_inches="tight")
     buf.seek(0)
     return buf
 
@@ -38,29 +39,23 @@ def fig_to_png(fig) -> io.BytesIO:
 # 0. CẤU HÌNH CHUNG
 # =========================================================
 
-# --- 0.1. Roboflow URL (BẮT BUỘC: sửa cho đúng model & API key của bạn) ---
 ROBOFLOW_FULL_URL = (
     "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
-    # TODO: nếu bạn đổi model hoặc API key, sửa URL này
 )
 
-# --- 0.2. Logo BKAI (ảnh PNG đặt cạnh file app.py) ---
-LOGO_PATH = "BKAI_Logo.png"  # TODO: đảm bảo file này tồn tại cùng thư mục app.py
+LOGO_PATH = "BKAI_Logo.png"
 
-# --- 0.3. Font Unicode cho PDF ---
-FONT_PATH = "times.ttf"   # nếu bạn có file Times New Roman -> đặt tên này
+FONT_PATH = "times.ttf"
 FONT_NAME = "TimesVN"
 
 if os.path.exists(FONT_PATH):
     pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 else:
-    # Fallback sang DejaVuSans có sẵn trên server
     FONT_NAME = "DejaVu"
     pdfmetrics.registerFont(
         TTFont(FONT_NAME, "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
     )
 
-# --- 0.4. Cấu hình trang Streamlit ---
 st.set_page_config(
     page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT",
     layout="wide",
@@ -71,7 +66,6 @@ st.set_page_config(
 # =========================================================
 
 def extract_poly_points(points_field):
-    """Chuyển 'points' trong JSON thành list [(x,y), ...]."""
     flat = []
     if isinstance(points_field, dict):
         for k in sorted(points_field.keys()):
@@ -90,13 +84,6 @@ def extract_poly_points(points_field):
 def draw_predictions_with_mask(
     image: Image.Image, predictions, min_conf: float = 0.0
 ) -> Image.Image:
-    """
-    Vẽ ảnh phân tích với:
-      - Box
-      - Label
-      - Vùng mask (polygon)
-    TẤT CẢ dùng cùng 1 màu xanh lá.
-    """
     base = image.convert("RGB")
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
@@ -121,16 +108,13 @@ def draw_predictions_with_mask(
         x1 = x + w / 2
         y1 = y + h / 2
 
-        # Box xanh lá
         draw.rectangle([x0, y0, x1, y1], outline=green_solid, width=3)
 
-        # Nhãn trên mép box
         cls = p.get("class", "crack")
         label = f"{cls} {conf:.2f}"
         text_pos = (x0 + 3, y0 + 3)
         draw.text(text_pos, label, fill=green_solid)
 
-        # Polyline + mask cùng màu xanh
         pts_raw = p.get("points")
         flat_pts = extract_poly_points(pts_raw) if pts_raw is not None else []
         if len(flat_pts) >= 3:
@@ -142,12 +126,6 @@ def draw_predictions_with_mask(
 
 
 def estimate_severity(p, img_w, img_h):
-    """
-    Ước lượng "mức độ nghiêm trọng" dựa trên diện tích box so với ảnh:
-      - < 1%  : Nhỏ
-      - 1–5%  : Trung bình
-      - > 5%  : Nguy hiểm
-    """
     w = float(p.get("width", 0))
     h = float(p.get("height", 0))
     if img_w <= 0 or img_h <= 0:
@@ -164,9 +142,8 @@ def estimate_severity(p, img_w, img_h):
     else:
         return "Nguy hiểm (Severe)"
 
-
 # =========================================================
-# 2. HÀM XUẤT PDF
+# 2. HÀM XUẤT PDF 2 TRANG
 # =========================================================
 
 def export_pdf(
@@ -177,10 +154,6 @@ def export_pdf(
     chart_pie_png: io.BytesIO = None,
     filename="bkai_report.pdf",
 ):
-    """Xuất PDF 2 trang:
-       - Trang 1: Ảnh gốc, Ảnh phân tích, 2 biểu đồ
-       - Trang 2: Bảng thông tin vết nứt
-    """
     left_margin = 25 * mm
     right_margin = 25 * mm
     top_margin = 20 * mm
@@ -219,8 +192,8 @@ def export_pdf(
 
         story = []
 
-        # -------- tiện ích chèn ảnh PIL có scale hợp lý --------
         from PIL import Image as PILImage
+
         def add_pil_image(pil, caption, max_h_ratio=0.28):
             if pil is None:
                 return
@@ -233,35 +206,40 @@ def export_pdf(
             pil.save(buf_img, format="PNG")
             buf_img.seek(0)
             story.append(Paragraph(caption, h2))
-            story.append(RLImage(buf_img, width=w*scale, height=h*scale))
-            story.append(Spacer(1, 4*mm))
+            story.append(RLImage(buf_img, width=w * scale, height=h * scale))
+            story.append(Spacer(1, 4 * mm))
 
-        # ================= TRANG 1 =================
+        # =============== TRANG 1 =================
         if os.path.exists(LOGO_PATH):
-            story.append(RLImage(LOGO_PATH, width=38*mm))
-            story.append(Spacer(1, 4*mm))
+            story.append(RLImage(LOGO_PATH, width=38 * mm))
+            story.append(Spacer(1, 4 * mm))
         story.append(Paragraph("BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG", title))
         story.append(Paragraph("Concrete Crack Inspection Report", normal))
-        story.append(Spacer(1, 6*mm))
+        story.append(Spacer(1, 6 * mm))
 
         add_pil_image(original_img, "Ảnh gốc / Original Image", max_h_ratio=0.26)
         add_pil_image(analyzed_img, "Ảnh phân tích / Result Image", max_h_ratio=0.26)
 
-        # Hai biểu đồ (nếu có) – mỗi cái ~22% chiều cao trang
         if chart_bar_png is not None:
             story.append(Paragraph("Biểu đồ: Độ tin cậy từng vùng nứt", h2))
-            story.append(RLImage(chart_bar_png, width=content_w, height=content_h*0.22))
-            story.append(Spacer(1, 3*mm))
+            story.append(
+                RLImage(chart_bar_png, width=content_w, height=content_h * 0.22)
+            )
+            story.append(Spacer(1, 3 * mm))
+
         if chart_pie_png is not None:
             story.append(Paragraph("Biểu đồ: Tỷ lệ vùng nứt / toàn ảnh", h2))
-            story.append(RLImage(chart_pie_png, width=content_w, height=content_h*0.22))
-            story.append(Spacer(1, 3*mm))
+            story.append(
+                RLImage(chart_pie_png, width=content_w, height=content_h * 0.22)
+            )
+            story.append(Spacer(1, 3 * mm))
 
-        # Sang TRANG 2
+        # Sang trang 2
         story.append(PageBreak())
 
-        # ================= TRANG 2 (Bảng) =================
+        # =============== TRANG 2 – BẢNG THÔNG TIN ===============
         story.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2))
+
         data = [[
             Paragraph("Chỉ số (VI)", normal),
             Paragraph("Metric (EN)", normal),
@@ -269,7 +247,6 @@ def export_pdf(
             Paragraph("Ý nghĩa / Description", normal),
         ]]
 
-        # rút gọn mô tả để ô không quá cao
         for _, r in metrics_df.iterrows():
             vi_txt = Paragraph(str(r["vi"]), normal)
             en_txt = Paragraph(str(r["en"]), normal)
@@ -279,56 +256,67 @@ def export_pdf(
             desc_txt = Paragraph(short_desc, normal)
             data.append([vi_txt, en_txt, val_txt, desc_txt])
 
-        col_widths = [0.2*content_w, 0.2*content_w, 0.2*content_w, 0.4*content_w]
+        col_widths = [
+            0.2 * content_w,
+            0.2 * content_w,
+            0.2 * content_w,
+            0.4 * content_w,
+        ]
         tbl = Table(data, colWidths=col_widths, repeatRows=1)
-        tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#1e88e5")),
-            ("TEXTCOLOR", (0,0), (-1,0), colors.white),
-            ("FONTNAME", (0,0), (-1,-1), FONT_NAME),
-            ("FONTSIZE", (0,0), (-1,-1), 9),
-            ("GRID", (0,0), (-1,-1), 0.25, colors.grey),
-            ("BACKGROUND", (0,1), (-1,-1), colors.whitesmoke),
-            ("VALIGN", (0,0), (-1,-1), "TOP"),
-            ("ALIGN", (0,0), (-1,-1), "LEFT"),
-        ]))
+        tbl.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e88e5")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, -1), FONT_NAME),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                    ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ]
+            )
+        )
         story.append(tbl)
-        story.append(Spacer(1, 6*mm))
+        story.append(Spacer(1, 6 * mm))
 
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        story.append(Paragraph(f"BKAI © {datetime.datetime.now().year} – Report generated at {now}", normal))
+        story.append(
+            Paragraph(
+                f"BKAI © {datetime.datetime.now().year} – Report generated at {now}",
+                normal,
+            )
+        )
 
         doc.build(story)
 
     buf = io.BytesIO()
     try:
         _build(buf)
-    except Exception:
-        # fallback ngắn gọn
+    except LayoutError:
         buf = io.BytesIO()
         doc = SimpleDocTemplate(buf, pagesize=A4)
         styles = getSampleStyleSheet()
         story = [
             Paragraph("BKAI - Báo cáo rút gọn", styles["Title"]),
-            Spacer(1, 8*mm),
-            Paragraph("Nội dung quá dài. Vui lòng xem chi tiết trên web BKAI.", styles["Normal"]),
+            Spacer(1, 8 * mm),
+            Paragraph(
+                "Nội dung quá dài. Vui lòng xem chi tiết trên web BKAI.",
+                styles["Normal"],
+            ),
         ]
         doc.build(story)
 
     buf.seek(0)
     return buf
 
-
-
-
 # =========================================================
-# 3. STAGE 2 – DEMO KIẾN THỨC NỨT BÊ TÔNG
+# 3. STAGE 2 – DEMO KIẾN THỨC
 # =========================================================
 
 def show_stage2_demo(key_prefix="stage2"):
-    """Stage 2 demo: phân loại vết nứt & gợi ý nguyên nhân / biện pháp."""
     st.subheader("Stage 2 – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
 
-    # Demo tóm tắt 3 loại chính
     options = [
         "Vết nứt dọc (Longitudinal Crack)",
         "Vết nứt ngang (Transverse Crack)",
@@ -363,13 +351,11 @@ def show_stage2_demo(key_prefix="stage2"):
     st.table(demo_data)
     st.caption("Stage 2 hiện tại là demo – bảng kiến thức cơ bản về các dạng vết nứt.")
 
-
 # =========================================================
-# 4. GIAO DIỆN CHÍNH (SAU KHI ĐĂNG NHẬP)
+# 4. GIAO DIỆN CHÍNH
 # =========================================================
 
 def run_main_app():
-    # Header với logo + tên user
     col_logo, col_title = st.columns([1, 5])
     with col_logo:
         if os.path.exists(LOGO_PATH):
@@ -378,7 +364,9 @@ def run_main_app():
         st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT")
         user = st.session_state.get("username", "")
         if user:
-            st.caption(f"Xin chào **{user}** – Phân biệt ảnh nứt / không nứt & xuất báo cáo.")
+            st.caption(
+                f"Xin chào **{user}** – Phân biệt ảnh nứt / không nứt & xuất báo cáo."
+            )
         else:
             st.caption("Phân biệt ảnh nứt / không nứt & xuất báo cáo.")
 
@@ -386,11 +374,7 @@ def run_main_app():
 
     st.sidebar.header("Cấu hình phân tích")
     min_conf = st.sidebar.slider(
-        "Ngưỡng confidence tối thiểu",
-        0.0,
-        1.0,
-        0.3,
-        0.05,
+        "Ngưỡng confidence tối thiểu", 0.0, 1.0, 0.3, 0.05
     )
     st.sidebar.caption("Chỉ hiển thị những vết nứt có độ tin cậy ≥ ngưỡng này.")
 
@@ -464,168 +448,167 @@ def run_main_app():
             if len(preds_conf) == 0 or analyzed_img is None:
                 continue
 
-            # Tabs Stage 1 & Stage 2
             st.write("---")
             tab_stage1, tab_stage2 = st.tabs(
-                [
-                    "Stage 1 – Báo cáo chi tiết",
-                    "Stage 2 – Phân loại vết nứt",
-                ]
+                ["Stage 1 – Báo cáo chi tiết", "Stage 2 – Phân loại vết nứt"]
             )
 
-          # ===== STAGE 1 – BÁO CÁO CHI TIẾT =====
-st.subheader("Bảng thông tin vết nứt")
+            # ================== STAGE 1 ==================
+            with tab_stage1:
+                st.subheader("Bảng thông tin vết nứt")
 
-# 1) TÍNH TOÁN CHỈ SỐ
-confs = [float(p.get("confidence", 0)) for p in preds_conf]
-avg_conf = sum(confs) / len(confs)
-map_val = round(min(1.0, avg_conf - 0.05), 2)
+                confs = [float(p.get("confidence", 0)) for p in preds_conf]
+                avg_conf = sum(confs) / len(confs)
+                map_val = round(min(1.0, avg_conf - 0.05), 2)
 
-max_ratio = 0.0
-max_p = preds_conf[0]
-for p in preds_conf:
-    w = float(p.get("width", 0))
-    h = float(p.get("height", 0))
-    ratio = (w * h) / (img_w * img_h)
-    if ratio > max_ratio:
-        max_ratio = ratio
-        max_p = p
+                max_ratio = 0.0
+                max_p = preds_conf[0]
+                for p in preds_conf:
+                    w = float(p.get("width", 0))
+                    h = float(p.get("height", 0))
+                    ratio = (w * h) / (img_w * img_h)
+                    if ratio > max_ratio:
+                        max_ratio = ratio
+                        max_p = p
 
-crack_area_ratio = round(max_ratio * 100, 2)
-severity = estimate_severity(max_p, img_w, img_h)
+                crack_area_ratio = round(max_ratio * 100, 2)
+                severity = estimate_severity(max_p, img_w, img_h)
 
-metrics = [
-    {"vi": "Tên ảnh", "en": "Image Name", "value": uploaded_file.name,
-     "desc": "File ảnh người dùng tải lên"},
-    {"vi": "Thời gian xử lý", "en": "Total Processing Time",
-     "value": f"{total_time:.2f} s",
-     "desc": "Tổng thời gian thực hiện toàn bộ quy trình"},
-    {"vi": "Tốc độ mô hình AI", "en": "Inference Speed",
-     "value": f"{total_time:.2f} s/image",
-     "desc": "Thời gian xử lý mỗi ảnh"},
-    {"vi": "Độ chính xác (Confidence trung bình)", "en": "Confidence",
-     "value": f"{avg_conf:.2f}",
-     "desc": "Mức tin cậy trung bình của mô hình"},
-    {"vi": "mAP (Độ chính xác trung bình)", "en": "Mean Average Precision",
-     "value": f"{map_val:.2f}",
-     "desc": "Độ chính xác định vị vùng nứt"},
-    {"vi": "Phần trăm vùng nứt", "en": "Crack Area Ratio",
-     "value": f"{crack_area_ratio:.2f} %",
-     "desc": "Diện tích vùng nứt / tổng diện tích ảnh"},
-    {"vi": "Chiều dài vết nứt", "en": "Crack Length",
-     "value": "—", "desc": "Có thể ước lượng nếu biết tỉ lệ pixel-thực tế"},
-    {"vi": "Chiều rộng vết nứt", "en": "Crack Width",
-     "value": "—", "desc": "Độ rộng lớn nhất của vết nứt (cần thang đo chuẩn)"},
-    {"vi": "Tọa độ vùng nứt", "en": "Crack Bounding Box",
-     "value": f"[{max_p.get('x')}, {max_p.get('y')}, {max_p.get('width')}, {max_p.get('height')}]",
-     "desc": "(x, y, w, h) – vị trí vùng nứt lớn nhất"},
-    {"vi": "Mức độ nguy hiểm", "en": "Severity Level",
-     "value": severity, "desc": "Phân cấp theo tiêu chí diện tích tương đối"},
-    {"vi": "Thời gian phân tích", "en": "Timestamp",
-     "value": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-     "desc": "Thời điểm thực hiện phân tích"},
-    {"vi": "Nhận xét tổng quan", "en": "Summary",
-     "value": ("Vết nứt có nguy cơ, cần kiểm tra thêm." if "Nguy hiểm" in severity
-               else "Vết nứt nhỏ, nên tiếp tục theo dõi."),
-     "desc": "Kết luận tự động của hệ thống"},
-]
-metrics_df = pd.DataFrame(metrics)
+                metrics = [
+                    {
+                        "vi": "Tên ảnh",
+                        "en": "Image Name",
+                        "value": uploaded_file.name,
+                        "desc": "File ảnh người dùng tải lên",
+                    },
+                    {
+                        "vi": "Thời gian xử lý",
+                        "en": "Total Processing Time",
+                        "value": f"{total_time:.2f} s",
+                        "desc": "Tổng thời gian thực hiện toàn bộ quy trình",
+                    },
+                    {
+                        "vi": "Tốc độ mô hình AI",
+                        "en": "Inference Speed",
+                        "value": f"{total_time:.2f} s/image",
+                        "desc": "Thời gian xử lý mỗi ảnh",
+                    },
+                    {
+                        "vi": "Độ chính xác (Confidence trung bình)",
+                        "en": "Confidence",
+                        "value": f"{avg_conf:.2f}",
+                        "desc": "Mức tin cậy trung bình của mô hình",
+                    },
+                    {
+                        "vi": "mAP (Độ chính xác trung bình)",
+                        "en": "Mean Average Precision",
+                        "value": f"{map_val:.2f}",
+                        "desc": "Độ chính xác định vị vùng nứt",
+                    },
+                    {
+                        "vi": "Phần trăm vùng nứt",
+                        "en": "Crack Area Ratio",
+                        "value": f"{crack_area_ratio:.2f} %",
+                        "desc": "Diện tích vùng nứt / tổng diện tích ảnh",
+                    },
+                    {
+                        "vi": "Chiều dài vết nứt",
+                        "en": "Crack Length",
+                        "value": "—",
+                        "desc": "Có thể ước lượng nếu biết tỉ lệ pixel-thực tế",
+                    },
+                    {
+                        "vi": "Chiều rộng vết nứt",
+                        "en": "Crack Width",
+                        "value": "—",
+                        "desc": "Độ rộng lớn nhất của vết nứt (cần thang đo chuẩn)",
+                    },
+                    {
+                        "vi": "Tọa độ vùng nứt",
+                        "en": "Crack Bounding Box",
+                        "value": f"[{max_p.get('x')}, {max_p.get('y')}, "
+                        f"{max_p.get('width')}, {max_p.get('height')}]",
+                        "desc": "(x, y, w, h) – vị trí vùng nứt lớn nhất",
+                    },
+                    {
+                        "vi": "Mức độ nguy hiểm",
+                        "en": "Severity Level",
+                        "value": severity,
+                        "desc": "Phân cấp theo tiêu chí diện tích tương đối",
+                    },
+                    {
+                        "vi": "Thời gian phân tích",
+                        "en": "Timestamp",
+                        "value": datetime.datetime.now().strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "desc": "Thời điểm thực hiện phân tích",
+                    },
+                    {
+                        "vi": "Nhận xét tổng quan",
+                        "en": "Summary",
+                        "value": (
+                            "Vết nứt có nguy cơ, cần kiểm tra thêm."
+                            if "Nguy hiểm" in severity
+                            else "Vết nứt nhỏ, nên tiếp tục theo dõi."
+                        ),
+                        "desc": "Kết luận tự động của hệ thống",
+                    },
+                ]
 
-styled_df = metrics_df.style.set_table_styles(
-    [
-        {"selector": "th",
-         "props": [("background-color", "#1e88e5"),
-                   ("color", "white"),
-                   ("font-weight", "bold")]},
-        {"selector": "td",
-         "props": [("background-color", "#fafafa")]}
-    ]
-)
-st.dataframe(styled_df, use_container_width=True)
+                metrics_df = pd.DataFrame(metrics)
+                styled_df = metrics_df.style.set_table_styles(
+                    [
+                        {
+                            "selector": "th",
+                            "props": [
+                                ("background-color", "#1e88e5"),
+                                ("color", "white"),
+                                ("font-weight", "bold"),
+                            ],
+                        },
+                        {
+                            "selector": "td",
+                            "props": [("background-color", "#fafafa")],
+                        },
+                    ]
+                )
+                st.dataframe(styled_df, use_container_width=True)
 
-# 2) VẼ & LƯU 2 BIỂU ĐỒ (để nhúng vào PDF)
-st.subheader("Biểu đồ thống kê")
-col_chart1, col_chart2 = st.columns(2)
-
-def fig_to_png(fig):
-    buf = io.BytesIO()
-    fig.savefig(buf, format="PNG", dpi=200, bbox_inches="tight")
-    buf.seek(0)
-    return buf
-
-# Biểu đồ 1: BAR – độ tin cậy từng vùng nứt
-with col_chart1:
-    fig1 = plt.figure(figsize=(4, 3))
-    plt.bar(range(1, len(confs) + 1), confs)
-    plt.xlabel("Crack #")
-    plt.ylabel("Confidence")
-    plt.ylim(0, 1)
-    plt.title("Độ tin cậy từng vùng nứt")
-    st.pyplot(fig1)
-    bar_png = fig_to_png(fig1)
-    plt.close(fig1)
-
-# Biểu đồ 2: PIE – tỷ lệ vùng nứt
-with col_chart2:
-    labels = ["Vùng nứt lớn nhất", "Phần ảnh còn lại"]
-    sizes = [max_ratio, 1 - max_ratio]
-    fig2 = plt.figure(figsize=(4, 3))
-    plt.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=140)
-    plt.title("Tỷ lệ vùng nứt so với toàn ảnh")
-    st.pyplot(fig2)
-    pie_png = fig_to_png(fig2)
-    plt.close(fig2)
-# 3) XUẤT PDF – TRANG 1 (ảnh + biểu đồ), TRANG 2 (bảng)
-pdf_buf = export_pdf(
-    original_img=orig_img,
-    analyzed_img=analyzed_img,
-    metrics_df=metrics_df,
-    charts={"bar": bar_png, "pie": pie_png},
- )
-
-# ---------- NÚT TẢI PDF ----------
-pdf_buf = export_pdf(
-    orig_img,
-    analyzed_img,
-    metrics_df,
-    chart_bar_png=bar_png,
-    chart_pie_png=pie_png,
-)
-st.download_button(
-    "📄 Tải báo cáo PDF cho ảnh này",
-    data=pdf_buf,
-    file_name=f"BKAI_CrackReport_{uploaded_file.name.split('.')[0]}.pdf",
-    mime="application/pdf",
-    key=f"pdf_btn_{idx}_{uploaded_file.name}",
-)
-
+                # -------- BIỂU ĐỒ & LƯU PNG --------
+                st.subheader("Biểu đồ thống kê")
+                col_chart1, col_chart2 = st.columns(2)
 
                 with col_chart1:
-                    plt.figure(figsize=(4, 3))
-                    plt.bar(range(1, len(confs) + 1), confs, color="#42a5f5")
+                    fig1 = plt.figure(figsize=(4, 3))
+                    plt.bar(range(1, len(confs) + 1), confs)
                     plt.xlabel("Crack #")
                     plt.ylabel("Confidence")
                     plt.ylim(0, 1)
                     plt.title("Độ tin cậy từng vùng nứt")
-                    st.pyplot(plt.gcf())
-                    plt.close()
+                    st.pyplot(fig1)
+                    bar_png = fig_to_png(fig1)
+                    plt.close(fig1)
 
                 with col_chart2:
                     labels = ["Vùng nứt lớn nhất", "Phần ảnh còn lại"]
                     sizes = [max_ratio, 1 - max_ratio]
-                    plt.figure(figsize=(4, 3))
-                    plt.pie(
-                        sizes,
-                        labels=labels,
-                        autopct="%1.1f%%",
-                        startangle=140,
-                        colors=["#ef5350", "#90caf9"],
-                    )
+                    fig2 = plt.figure(figsize=(4, 3))
+                    plt.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=140)
                     plt.title("Tỷ lệ vùng nứt so với toàn ảnh")
-                    st.pyplot(plt.gcf())
-                    plt.close()
+                    st.pyplot(fig2)
+                    pie_png = fig_to_png(fig2)
+                    plt.close(fig2)
 
-                pdf_buf = export_pdf(orig_img, analyzed_img, metrics_df)
+                # -------- XUẤT PDF 2 TRANG --------
+                pdf_buf = export_pdf(
+                    original_img=orig_img,
+                    analyzed_img=analyzed_img,
+                    metrics_df=metrics_df,
+                    chart_bar_png=bar_png,
+                    chart_pie_png=pie_png,
+                )
+
                 st.download_button(
                     "📄 Tải báo cáo PDF cho ảnh này",
                     data=pdf_buf,
@@ -634,18 +617,16 @@ st.download_button(
                     key=f"pdf_btn_{idx}_{uploaded_file.name}",
                 )
 
-            # ===== STAGE 2 =====
+            # ================== STAGE 2 ==================
             with tab_stage2:
                 show_stage2_demo(key_prefix=f"stage2_{idx}")
 
-
 # =========================================================
-# 5. ĐĂNG KÝ / ĐĂNG NHẬP – LƯU FILE users.json
+# 5. ĐĂNG KÝ / ĐĂNG NHẬP
 # =========================================================
 
 USERS_FILE = "users.json"
 
-# Đọc danh sách tài khoản từ file (nếu có)
 if os.path.exists(USERS_FILE):
     with open(USERS_FILE, "r", encoding="utf-8") as f:
         try:
@@ -655,7 +636,6 @@ if os.path.exists(USERS_FILE):
 else:
     users = {}
 
-# Trạng thái đăng nhập
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
@@ -667,7 +647,6 @@ def show_auth_page():
 
     tab_login, tab_register = st.tabs(["🔑 Đăng nhập", "📝 Đăng ký"])
 
-    # --- Tab Đăng nhập ---
     with tab_login:
         login_user = st.text_input("Tên đăng nhập", key="login_user")
         login_pass = st.text_input("Mật khẩu", type="password", key="login_pass")
@@ -680,7 +659,6 @@ def show_auth_page():
             else:
                 st.error("Sai tên đăng nhập hoặc mật khẩu.")
 
-    # --- Tab Đăng ký ---
     with tab_register:
         reg_user = st.text_input("Tên đăng nhập mới", key="reg_user")
         reg_pass = st.text_input("Mật khẩu mới", type="password", key="reg_pass")
@@ -699,7 +677,6 @@ def show_auth_page():
                     json.dump(users, f, ensure_ascii=False, indent=2)
                 st.success("Tạo tài khoản thành công! Bạn có thể quay lại tab Đăng nhập.")
 
-
 # =========================================================
 # 6. MAIN ENTRY
 # =========================================================
@@ -711,12 +688,6 @@ if st.session_state.authenticated:
             st.session_state.authenticated = False
             st.session_state.username = ""
             st.rerun()
-
     run_main_app()
 else:
     show_auth_page()
-
-
-
-
-
