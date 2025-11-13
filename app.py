@@ -317,11 +317,23 @@ def export_pdf(
 def show_stage2_demo(key_prefix="stage2"):
     st.subheader("Stage 2 – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
 
+    # =========================
+    # 1) Bảng 1: Phân loại theo cơ chế nứt (đã làm trước)
+    # =========================
     options = [
-        "Vết nứt dọc (Longitudinal Crack)",
-        "Vết nứt ngang (Transverse Crack)",
-        "Vết nứt mạng (Map Crack)",
+        "I.1 Nứt co ngót dẻo (Plastic Shrinkage Crack)",
+        "I.2 Nứt lún dẻo / lắng dẻo (Plastic Settlement Crack)",
+        "II.1 Nứt do co ngót khô (Drying Shrinkage Crack)",
+        "II.2 Nứt do đóng băng – băng tan (Freeze–Thaw Crack)",
+        "II.3 Nứt do nhiệt (Thermal Crack)",
+        "II.4a Nứt do hoá chất – sunfat tấn công (Sulfate Attack)",
+        "II.4b Nứt do hoá chất – kiềm cốt liệu (Alkali–Aggregate Reaction)",
+        "II.5 Nứt do ăn mòn cốt thép (Corrosion–Induced Crack)",
+        "II.6a Nứt do tải trọng – nứt uốn (Flexural Crack)",
+        "II.6b Nứt do tải trọng – nứt cắt/nén/xoắn (Shear/Compression/Torsion Cracks)",
+        "II.7 Nứt do lún (Settlement Crack)",
     ]
+
     st.selectbox(
         "Chọn loại vết nứt (tóm tắt):",
         options,
@@ -331,25 +343,469 @@ def show_stage2_demo(key_prefix="stage2"):
     demo_data = pd.DataFrame(
         [
             {
-                "Loại vết nứt": "Vết nứt dọc (Longitudinal Crack)",
-                "Nguyên nhân": "Co ngót, tải trọng trục bánh xe, bê tông chưa đủ cường độ.",
-                "Biện pháp": "Kiểm tra khả năng chịu lực, gia cường hoặc trám vá bằng vật liệu phù hợp.",
+                "Loại vết nứt": "I.1 Nứt co ngót dẻo",
+                "Nguyên nhân": (
+                    "Bề mặt bê tông mất nước quá nhanh do nhiệt độ cao, độ ẩm thấp, gió lớn, "
+                    "bảo dưỡng chậm khi bê tông còn dẻo → co ngót bề mặt vượt quá cường độ kéo sớm."
+                ),
+                "Biện pháp": (
+                    "Làm ẩm nền/ván khuôn; che nắng, chắn gió; bảo dưỡng ẩm sớm; phun sương, phủ màng bảo dưỡng; "
+                    "thiết kế cấp phối w/c thấp, hạn chế bleeding."
+                ),
             },
             {
-                "Loại vết nứt": "Vết nứt ngang (Transverse Crack)",
-                "Nguyên nhân": "Giãn nở nhiệt, không có khe co giãn, liên kết yếu.",
-                "Biện pháp": "Tạo hoặc mở rộng khe co giãn, xử lý lại kết cấu nếu cần.",
+                "Loại vết nứt": "I.2 Nứt lún dẻo / lắng dẻo",
+                "Nguyên nhân": (
+                    "Bê tông lún xuống dưới tác dụng trọng lực nhưng bị cản trở bởi cốt thép, "
+                    "vùng thay đổi tiết diện, ván khuôn hẹp → tạo khe nứt trên đỉnh cốt thép hoặc tại chỗ thay đổi mặt cắt."
+                ),
+                "Biện pháp": (
+                    "Dùng bê tông độ sụt vừa phải, bleeding thấp; tăng hạt mịn; "
+                    "bố trí cốt thép hợp lý; đầm chặt đều; kiểm tra độ kín và độ cứng ván khuôn."
+                ),
             },
             {
-                "Loại vết nứt": "Vết nứt mạng (Map Crack)",
-                "Nguyên nhân": "Co ngót bề mặt, bê tông chất lượng thấp, bảo dưỡng kém.",
-                "Biện pháp": "Loại bỏ lớp bề mặt yếu, phủ lớp vữa/bê tông mới có cường độ tốt hơn.",
+                "Loại vết nứt": "II.1 Nứt do co ngót khô",
+                "Nguyên nhân": (
+                    "Sau khi đông cứng, nước trong mao quản bay hơi trong môi trường khô/nóng "
+                    "→ hồ xi măng co lại, bị hạn chế bởi cốt thép/kết cấu khác → nứt."
+                ),
+                "Biện pháp": (
+                    "Thiết kế w/c thấp, tăng cốt liệu chắc; dùng phụ gia, sợi; "
+                    "bảo dưỡng ẩm; tránh thi công trong điều kiện nắng nóng, gió mạnh; "
+                    "bố trí khe co giãn hợp lý."
+                ),
+            },
+            {
+                "Loại vết nứt": "II.2 Nứt do đóng băng – băng tan",
+                "Nguyên nhân": (
+                    "Nước trong lỗ rỗng đóng băng gây giãn nở thể tích, áp suất thủy lực; "
+                    "nhiều chu kỳ đóng băng–tan băng phá hoại hồ và cốt liệu, tạo nứt và bong tróc."
+                ),
+                "Biện pháp": (
+                    "Dùng bê tông chống băng giá (phụ gia cuốn khí, w/c thấp); "
+                    "thiết kế hỗn hợp đặc chắc; phủ lớp bảo vệ; hạn chế nước đọng và muối khử băng."
+                ),
+            },
+            {
+                "Loại vết nứt": "II.3 Nứt do nhiệt",
+                "Nguyên nhân": (
+                    "Chênh lệch nhiệt độ lớn giữa trong–ngoài khối bê tông hoặc giữa các vùng khác nhau "
+                    "→ giãn nở/co lại không đều, bị kìm hãm → ứng suất nhiệt vượt cường độ kéo."
+                ),
+                "Biện pháp": (
+                    "Kiểm soát nhiệt độ khi đổ (nước lạnh, đổ ban đêm); dùng xi măng LH, phụ gia làm chậm; "
+                    "ống làm lạnh, đổ theo giai đoạn; tăng cường cốt thép phân tán; bảo dưỡng, che phủ cách nhiệt."
+                ),
+            },
+            {
+                "Loại vết nứt": "II.4a Nứt do hoá chất – sunfat tấn công",
+                "Nguyên nhân": (
+                    "Ion sunfat thấm vào bê tông, phản ứng với hồ xi măng tạo sản phẩm giãn nở (ettringite, gypsum) "
+                    "→ ứng suất kéo lớn, nứt và phân hủy bê tông, thường từ ngoài vào trong."
+                ),
+                "Biện pháp": (
+                    "Dùng xi măng chống sunfat (C₃A thấp), tro bay/xỉ; giữ w/c thấp; "
+                    "chọn cốt liệu sạch; thiết kế bê tông đặc chắc, chống thấm; "
+                    "hạn chế tiếp xúc trực tiếp môi trường sunfat."
+                ),
+            },
+            {
+                "Loại vết nứt": "II.4b Nứt do hoá chất – phản ứng kiềm cốt liệu (AAR)",
+                "Nguyên nhân": (
+                    "Kiềm trong xi măng/phụ gia phản ứng với cốt liệu phản ứng tạo gel AAR; "
+                    "gel hút ẩm trương nở → áp suất nội lớn, nứt vi mô lan rộng, trương nở thể tích."
+                ),
+                "Biện pháp": (
+                    "Dùng xi măng kiềm thấp, cốt liệu không phản ứng; "
+                    "dùng tro bay, xỉ, silica fume; giữ w/c thấp; "
+                    "hạn chế cung cấp ẩm liên tục; kiểm tra AAR khi thiết kế vật liệu."
+                ),
+            },
+            {
+                "Loại vết nứt": "II.5 Nứt do ăn mòn cốt thép",
+                "Nguyên nhân": (
+                    "Cốt thép bị ăn mòn (ion Cl⁻, CO₂, môi trường xâm thực), sản phẩm rỉ thép "
+                    "giãn nở 2–6 lần → ép lên lớp bê tông bảo vệ, gây nứt dọc theo thanh thép, bong lớp bảo vệ."
+                ),
+                "Biện pháp": (
+                    "Đảm bảo chiều dày và chất lượng lớp bảo vệ; dùng bê tông đặc chắc, chống thấm; "
+                    "cốt thép chống ăn mòn hoặc phủ; phụ gia ức chế ăn mòn; "
+                    "lớp phủ bảo vệ bề mặt trong môi trường xâm thực."
+                ),
+            },
+            {
+                "Loại vết nứt": "II.6a Nứt do tải trọng – nứt uốn",
+                "Nguyên nhân": (
+                    "Tải trọng làm ứng suất kéo do uốn vượt cường độ kéo của bê tông ở vùng chịu kéo."
+                ),
+                "Biện pháp": (
+                    "Thiết kế đủ cốt thép chịu uốn; kiểm soát tải trọng sử dụng; "
+                    "gia cường bằng thép/bê tông/FRP; tiêm epoxy phục hồi liên kết khi cần."
+                ),
+            },
+            {
+                "Loại vết nứt": "II.6b Nứt do tải trọng – nứt cắt/nén/xoắn",
+                "Nguyên nhân": (
+                    "Ứng suất cắt, nén, xoắn vượt khả năng chịu lực (tải tập trung lớn, tải lặp, "
+                    "thay đổi sơ đồ chịu lực…) → xuất hiện nứt cắt, nứt nén, nứt xoắn."
+                ),
+                "Biện pháp": (
+                    "Tăng cường cốt đai, cốt xiên, cốt xoắn; kiểm soát tải trọng; "
+                    "gia cường cục bộ vùng chịu lực lớn; kiểm tra, bảo dưỡng định kỳ."
+                ),
+            },
+            {
+                "Loại vết nứt": "II.7 Nứt do lún",
+                "Nguyên nhân": (
+                    "Nền/lớp đệm bị lún, rửa trôi, lún lệch → biến dạng không đều, "
+                    "sinh ứng suất kéo lớn tại dầm, sàn, móng vùng chênh lệch lún."
+                ),
+                "Biện pháp": (
+                    "Khảo sát và xử lý nền tốt (gia cố, thay đất yếu); "
+                    "thiết kế đủ độ cứng, khe lún/khe nhiệt hợp lý; "
+                    "kiểm soát tải; khi đã nứt: tiêm epoxy, gia cường và xử lý nền."
+                ),
             },
         ]
     )
 
     st.table(demo_data)
-    st.caption("Stage 2 hiện tại là demo – bảng kiến thức cơ bản về các dạng vết nứt.")
+    st.caption("Bảng 1 – Tổng hợp các dạng nứt theo cơ chế hình thành và biện pháp kiểm soát.")
+
+    # =========================
+    # 2) Bảng 2: Phân loại theo cấu kiện (Dầm, Cột, Sàn, Tường)
+    # =========================
+    st.subheader("Phân loại các vết nứt bê tông thường xảy ra cho từng loại cấu kiện")
+
+    component_crack_data = pd.DataFrame(
+        [
+            # --- DẦM ---
+            {
+                "Cấu kiện": "Dầm",
+                "Loại vết nứt": "Vết nứt uốn",
+                "Nguyên nhân": (
+                    "Mô men uốn vượt khả năng chịu uốn; tiết diện hoặc cốt thép chịu uốn không đủ."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt thường chéo hoặc hơi cong, phát triển ở vùng giữa nhịp; "
+                    "rộng nhất ở vùng chịu kéo (dưới đáy hoặc trên đỉnh dầm tùy sơ đồ nội lực)."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Dầm",
+                "Loại vết nứt": "Vết nứt cắt",
+                "Nguyên nhân": (
+                    "Lực cắt lớn tại gối hoặc gần điểm uốn; khả năng chịu cắt của bê tông/cốt đai không đủ; thiết kế không đúng."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt xiên, nghiêng khoảng 45° so với trục dầm; "
+                    "có thể đơn lẻ hoặc thành nhóm; rộng nhất gần vùng trục trung hòa hoặc đáy dầm."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Dầm",
+                "Loại vết nứt": "Vết nứt xoắn",
+                "Nguyên nhân": (
+                    "Độ bền xoắn không đủ; thiếu cốt thép chịu xoắn; tiết diện dầm không phù hợp với mô-men xoắn."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt chéo, dạng xoắn ốc hoặc ziczac quanh dầm; thường rộng hơn ở phần trên, "
+                    "bề rộng tương đối đồng đều dọc theo vết nứt."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Dầm",
+                "Loại vết nứt": "Vết nứt trượt",
+                "Nguyên nhân": (
+                    "Bê tông bị xáo trộn khi cường độ chưa đạt; cốp pha/gối đỡ bị dịch chuyển khi bê tông chưa đủ cứng."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt gần mép gối đỡ, chạy gần phương thẳng đứng; "
+                    "độ rộng lớn nhất tại đáy dầm."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Dầm",
+                "Loại vết nứt": "Vết nứt kéo",
+                "Nguyên nhân": (
+                    "Cốt thép chịu kéo không đủ, dầm quá tải, biến dạng không đều, tải trọng phân bố không đồng đều."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt gần vuông góc với trục dầm, vuông góc với phương ứng suất kéo; "
+                    "phía dưới rộng, phía trên nhỏ; thường song song và phân bố khá đều."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Dầm",
+                "Loại vết nứt": "Vết nứt ăn mòn cốt thép",
+                "Nguyên nhân": (
+                    "Liên kết bê tông–cốt thép kém, lớp bảo vệ mỏng, cốt thép bị gỉ làm tăng thể tích, "
+                    "tạo áp lực giãn nở lên bê tông."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt thường chạy dọc theo đường cốt thép; có thể xiên/chéo gần 45° tùy sơ đồ; "
+                    "thường kèm vết gỉ, đổi màu bề mặt."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Dầm",
+                "Loại vết nứt": "Vết nứt co ngót",
+                "Nguyên nhân": (
+                    "Bê tông dầm co ngót do mất nước, bị kiềm chế bởi cốt thép/kết cấu lân cận."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt nhỏ, có thể phân bố tương đối đều, thường gần vuông góc trục dầm hoặc tạo thành mạng nhỏ."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+
+            # --- CỘT ---
+            {
+                "Cấu kiện": "Cột",
+                "Loại vết nứt": "Vết nứt ngang",
+                "Nguyên nhân": (
+                    "Thiếu mô-men kiềm chế, diện tích cốt thép nhỏ hoặc bố trí không hợp lý; "
+                    "chịu lực cắt, tải trọng trực tiếp hoặc uốn đơn trục lớn."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt ngang quanh cột, thường thấy tại vùng nối dầm–cột hoặc chỗ có ứng suất kéo lớn."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Cột",
+                "Loại vết nứt": "Vết nứt chéo",
+                "Nguyên nhân": (
+                    "Thiết kế không đúng, cột không đủ khả năng chịu tải dọc và uốn; "
+                    "cường độ bê tông hoặc cốt thép không đủ."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt chạy xiên trên bề mặt cột, xuất hiện khi cột chịu tải lớn gần/ vượt khả năng chịu lực."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Cột",
+                "Loại vết nứt": "Vết nứt tách (dọc)",
+                "Nguyên nhân": (
+                    "Cốt thép dọc không đủ, bê tông cường độ thấp; khi tải trọng đạt gần khả năng chịu tải tối đa "
+                    "gây phân tách bê tông theo phương dọc."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Các vết nứt dọc ngắn, song song, độ rộng khác nhau, thường xuất hiện vùng giữa chiều cao cột."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Cột",
+                "Loại vết nứt": "Vết nứt do ăn mòn",
+                "Nguyên nhân": (
+                    "Cốt thép trong cột bị gỉ; sản phẩm ăn mòn giãn nở, gây nứt lớp bê tông bảo vệ."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt chạy theo đường bố trí cốt thép; thường kèm vết gỉ, bong tróc lớp bảo vệ."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Cột",
+                "Loại vết nứt": "Vết nứt co ngót",
+                "Nguyên nhân": (
+                    "Bê tông cột co ngót bị kiềm chế bởi cốt thép và kết cấu liên kết (dầm, sàn)."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt dọc mảnh, song song, phân bố tương đối đều trên bề mặt cột."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+
+            # --- SÀN ---
+            {
+                "Cấu kiện": "Sàn",
+                "Loại vết nứt": "Vết nứt co ngót dẻo",
+                "Nguyên nhân": (
+                    "Nhiệt độ cao, độ ẩm thấp, gió mạnh làm bốc hơi nước nhanh trước khi bê tông nắm chắc."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt nông, nhỏ (micro-cracks), chiều dài không lớn; hình dạng ngẫu nhiên, đa giác, "
+                    "bắt chéo hoặc song song nhau trên bề mặt."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Sàn",
+                "Loại vết nứt": "Vết nứt co ngót khô",
+                "Nguyên nhân": (
+                    "Bê tông sàn đông cứng trong môi trường khô, nóng → nước bay hơi, hồ xi măng co lại."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt rõ, tạo mạng lưới (map cracking) hoặc đường thẳng ngang/trục trên mặt sàn."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Sàn",
+                "Loại vết nứt": "Vết nứt do nhiệt",
+                "Nguyên nhân": (
+                    "Nhiệt thủy hóa tăng trong khối sàn, bên trong giãn nở trong khi bề mặt mát hơn, bị co "
+                    "→ chênh lệch biến dạng nhiệt lớn."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt bề mặt, đóng vảy, xuống cấp lớp bê tông bề mặt; thường gần song song bề mặt, "
+                    "có thể kết hợp bong tróc."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Sàn",
+                "Loại vết nứt": "Vết nứt uốn",
+                "Nguyên nhân": (
+                    "Mô men uốn vượt khả năng chịu uốn; tiết diện/cốt thép chịu uốn không đủ."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt chéo hoặc hơi cong, rộng nhất ở mặt chịu kéo của sàn (thường là mặt dưới giữa nhịp)."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Sàn",
+                "Loại vết nứt": "Vết nứt cắt",
+                "Nguyên nhân": (
+                    "Lực cắt lớn gần gối hoặc vùng chịu tải tập trung; thiếu cốt đai/cốt thép chịu cắt."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt xiên ~45° so với trục sàn; có thể đơn lẻ hoặc nhóm."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Sàn",
+                "Loại vết nứt": "Vết nứt xoắn",
+                "Nguyên nhân": (
+                    "Sàn làm việc như bản chịu xoắn (vùng góc, bản console…), độ bền xoắn không đủ."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt chéo, dạng xoắn ốc tương tự dầm, rộng tương đối đồng đều."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Sàn",
+                "Loại vết nứt": "Vết nứt ăn mòn cốt thép",
+                "Nguyên nhân": (
+                    "Ion Cl⁻, nước biển, muối khử băng xâm nhập; lớp bảo vệ mỏng; cốt thép bị gỉ và giãn nở."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt chạy dọc theo hướng bố trí cốt thép; thường kèm vết gỉ và bong lớp bảo vệ."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Sàn",
+                "Loại vết nứt": "Vết nứt do tải trọng – lực tập trung",
+                "Nguyên nhân": (
+                    "Bản sàn bị quá tải tại một điểm; thiếu cốt thép chịu uốn cục bộ; bố trí thép không đúng."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt vuông góc phương ứng suất kéo, dạng chữ thập hoặc tỏa ra từ điểm chịu tải."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Sàn",
+                "Loại vết nứt": "Vết nứt do tải trọng – lực phân bố",
+                "Nguyên nhân": (
+                    "Tải trọng phân bố nhưng vượt khả năng làm việc lâu dài; độ cứng sàn không đủ."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt dạng chữ thập, mạng lưới hoặc xiên, tỏa từ giữa sàn ra các cạnh."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+
+            # --- TƯỜNG BÊ TÔNG ---
+            {
+                "Cấu kiện": "Tường bê tông",
+                "Loại vết nứt": "Vết nứt co ngót",
+                "Nguyên nhân": (
+                    "Bề mặt tường nóng, bốc hơi nước nhanh; ứng suất co ngót vượt khả năng chịu kéo của bê tông tường."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt bề mặt, phạm vi rộng, ngẫu nhiên, đa giác, bắt chéo hoặc song song."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Tường bê tông",
+                "Loại vết nứt": "Vết nứt do nhiệt",
+                "Nguyên nhân": (
+                    "Ứng suất và chuyển vị do chênh lệch nhiệt độ trong tường bê tông."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Thường là vết nứt thẳng đứng, mở rộng nhiều ở phía dưới hoặc ở vùng chịu kéo do nhiệt."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Tường bê tông",
+                "Loại vết nứt": "Vết nứt ngang do tải trọng",
+                "Nguyên nhân": (
+                    "Tường chịu tải trọng vượt mức; phân phối tải không đều; hiệu ứng xoay, trượt ở chân tường."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt ngang chia tường thành hai phần; phần trên có thể nghiêng, phần giữa có xu hướng cong/lõm."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Tường bê tông",
+                "Loại vết nứt": "Vết nứt dọc do tải trọng",
+                "Nguyên nhân": (
+                    "Tải trọng thẳng đứng lớn, lún cục bộ, hoặc thiếu cốt thép dọc."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt tách dọc chia tường thành hai mảng song song."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Tường bê tông",
+                "Loại vết nứt": "Vết nứt chéo do tải trọng",
+                "Nguyên nhân": (
+                    "Kết hợp tác dụng của tải đứng và ngang; tường vừa chịu nén vừa chịu cắt/uốn."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt chéo, bề rộng lớn nhất gần phía trên; thể hiện sự làm việc kém ổn định của tường."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+            {
+                "Cấu kiện": "Tường bê tông",
+                "Loại vết nứt": "Vết nứt ăn mòn cốt thép",
+                "Nguyên nhân": (
+                    "Cốt thép tường bị gỉ; sản phẩm ăn mòn giãn nở gây nứt lớp bảo vệ bê tông."
+                ),
+                "Đặc trưng hình dạng": (
+                    "Vết nứt chạy theo vị trí thanh thép; thường kèm bong tróc, hoen gỉ trên bề mặt."
+                ),
+                "Hình ảnh minh họa": "—",
+            },
+        ]
+    )
+
+    st.table(component_crack_data)
+    st.caption(
+        "Bảng 2 – Phân loại các vết nứt bê tông thường gặp theo từng loại cấu kiện "
+        "(dầm, cột, sàn, tường) – dùng cho phần kiến thức nền và phân tích kết quả mô hình."
+    )
+
 
 # =========================================================
 # 4. GIAO DIỆN CHÍNH
@@ -691,3 +1147,4 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
