@@ -581,6 +581,7 @@ pdf_buf = export_pdf(
     analyzed_img=analyzed_img,
     metrics_df=metrics_df,
     charts={"bar": bar_png, "pie": pie_png},
+)
 
 # ---------- NÚT TẢI PDF ----------
 pdf_buf = export_pdf(
@@ -714,6 +715,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
