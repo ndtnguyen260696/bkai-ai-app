@@ -1063,14 +1063,7 @@ def run_main_app():
                         "en": "Crack Width",
                         "value": "—",
                         "desc": "Độ rộng lớn nhất của vết nứt (cần thang đo chuẩn)",
-                    },
-                    {
-                        "vi": "Tọa độ vùng nứt",
-                        "en": "Crack Bounding Box",
-                        "value": f"[{max_p.get('x')}, {max_p.get('y')}, "
-                        f"{max_p.get('width')}, {max_p.get('height')}]",
-                        "desc": "(x, y, w, h) – vị trí vùng nứt lớn nhất",
-                    },
+                                    },
                     {
                         "vi": "Mức độ nguy hiểm",
                         "en": "Severity Level",
@@ -1232,4 +1225,5 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
