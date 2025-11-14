@@ -844,9 +844,11 @@ def run_main_app():
     st.write("---")
 
     # ------------ FORM THÔNG TIN NGƯỜI DÙNG (BẮT BUỘC) ------------
+    # Nếu chưa có cờ profile_filled thì mặc định là False
     if "profile_filled" not in st.session_state:
         st.session_state.profile_filled = False
 
+    # Nếu chưa điền, luôn hiển thị form
     if not st.session_state.profile_filled:
         st.subheader("Thông tin người sử dụng (bắt buộc trước khi phân tích)")
 
@@ -874,7 +876,7 @@ def run_main_app():
             elif "@" not in email or "." not in email:
                 st.warning("Email không hợp lệ, vui lòng kiểm tra lại.")
             else:
-                # Lưu vào session_state để dùng cho lần chạy hiện tại
+                # Lưu vào session_state
                 st.session_state.profile_filled = True
                 st.session_state.user_full_name = full_name
                 st.session_state.user_occupation = occupation
@@ -897,7 +899,7 @@ def run_main_app():
 
                 st.success("Đã lưu thông tin. Bạn có thể tải ảnh lên để phân tích.")
 
-        # Nếu chưa fill form đúng, dừng tại đây, chưa cho upload ảnh
+        # Nếu chưa fill form đúng -> dừng, KHÔNG cho upload ảnh
         if not st.session_state.profile_filled:
             return
 
@@ -977,6 +979,15 @@ def run_main_app():
 
             if len(preds_conf) == 0 or analyzed_img is None:
                 continue
+
+            st.write("---")
+            tab_stage1, tab_stage2 = st.tabs(
+                ["Stage 1 – Báo cáo chi tiết", "Stage 2 – Phân loại vết nứt"]
+            )
+
+            # (giữ nguyên phần STAGE 1 & STAGE 2 như code trước đó)
+            # ...
+
 
             st.write("---")
             tab_stage1, tab_stage2 = st.tabs(
@@ -1221,3 +1232,4 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
