@@ -155,22 +155,29 @@ def export_pdf(
     original_img,
     analyzed_img,
     metrics_df,
-    chart_bar_png: io.BytesIO = None,   # giữ cho tương thích với chỗ gọi
+    chart_bar_png: io.BytesIO = None,
     chart_pie_png: io.BytesIO = None,
     filename="bkai_report.pdf",
 ):
     """
-    Xuất báo cáo STAGE 1 trên 1 trang A4:
-    - Logo BKAI
-    - Tiêu đề VN + EN
-    - Ảnh gốc
-    - Ảnh đã phân tích
-    - Bảng thông tin vết nứt (metrics_df)
-    Không dùng biểu đồ trong PDF (biểu đồ xem trực tiếp trên web).
+    PDF 2 trang:
+
+    - Trang 1:
+        + Logo BKAI
+        + Tiêu đề VN + EN
+        + Ảnh gốc
+        + Ảnh đã phân tích
+
+    - Trang 2:
+        + Logo BKAI (nhỏ)
+        + Tiêu đề ngắn
+        + Biểu đồ bar (độ tin cậy)
+        + Biểu đồ pie (tỷ lệ vùng nứt)
+        + Bảng thông tin vết nứt (metrics_df)
     """
     from PIL import Image as PILImage
 
-    # Lề trang
+    # ----------------- LỀ TRANG -----------------
     left_margin = 25 * mm
     right_margin = 25 * mm
     top_margin = 20 * mm
@@ -180,7 +187,7 @@ def export_pdf(
     content_w = page_w - left_margin - right_margin
     content_h = page_h - top_margin - bottom_margin
 
-    # ---------- STYLE ----------
+    # ----------------- STYLE -----------------
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle(
@@ -195,7 +202,7 @@ def export_pdf(
         "SubVN",
         parent=styles["Normal"],
         fontName=FONT_NAME,
-        alignment=0,
+        alignment=1,
         fontSize=9,
         leading=11,
     )
@@ -215,21 +222,32 @@ def export_pdf(
         fontSize=8,
         leading=10,
     )
+    small_style = ParagraphStyle(
+        "SmallVN",
+        parent=styles["Normal"],
+        fontName=FONT_NAME,
+        fontSize=7,
+        leading=9,
+    )
 
     story = []
 
-    # ---------- LOGO ----------
+    # =====================================================
+    # TRANG 1: LOGO + TIÊU ĐỀ + ẢNH GỐC + ẢNH PHÂN TÍCH
+    # =====================================================
+
+    # Logo BKAI
     if os.path.exists(LOGO_PATH):
         story.append(RLImage(LOGO_PATH, width=32 * mm))
         story.append(Spacer(1, 3 * mm))
 
-    # ---------- TIÊU ĐỀ ----------
+    # Tiêu đề lớn
     story.append(Paragraph("BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG", title_style))
-    story.append(Paragraph("Concrete Crack Inspection Report", normal_style))
-    story.append(Spacer(1, 4 * mm))
+    story.append(Paragraph("Concrete Crack Inspection Report", subtitle_style))
+    story.append(Spacer(1, 5 * mm))
 
-    # ---------- ẢNH GỐC & ẢNH PHÂN TÍCH ----------
-    def pil_to_rl(pil_img, max_h_ratio=0.18):
+    def pil_to_rl(pil_img, max_h_ratio=0.30):
+        """Chuyển PIL → RLImage với chiều cao khống chế theo max_h_ratio."""
         if pil_img is None:
             return None
         if not isinstance(pil_img, PILImage.Image):
@@ -243,37 +261,74 @@ def export_pdf(
         buf.seek(0)
         return RLImage(buf, width=w * scale, height=h * scale)
 
+    # Ảnh gốc
     story.append(Paragraph("Ảnh gốc / Original Image", h2_style))
-    rl_orig = pil_to_rl(original_img, max_h_ratio=0.18)
+    rl_orig = pil_to_rl(original_img, max_h_ratio=0.30)
     if rl_orig is not None:
         story.append(rl_orig)
-        story.append(Spacer(1, 3 * mm))
+        story.append(Spacer(1, 4 * mm))
 
+    # Ảnh phân tích
     story.append(Paragraph("Ảnh đã phân tích / Result Image", h2_style))
-    rl_anl = pil_to_rl(analyzed_img, max_h_ratio=0.18)
+    rl_anl = pil_to_rl(analyzed_img, max_h_ratio=0.30)
     if rl_anl is not None:
         story.append(rl_anl)
+        story.append(Spacer(1, 6 * mm))
+
+    # Sang trang 2
+    story.append(PageBreak())
+
+    # =====================================================
+    # TRANG 2: LOGO + TIÊU ĐỀ + BIỂU ĐỒ + BẢNG METRICS
+    # =====================================================
+
+    # Logo nhỏ trên trang 2
+    if os.path.exists(LOGO_PATH):
+        story.append(RLImage(LOGO_PATH, width=25 * mm))
+        story.append(Spacer(1, 2 * mm))
+
+    # Tiêu đề ngắn
+    story.append(Paragraph("BKAI – Thống kê kết quả phát hiện vết nứt", h2_style))
+    story.append(Spacer(1, 3 * mm))
+
+    # ---------- BIỂU ĐỒ ----------
+    # Bar chart
+    if chart_bar_png is not None:
+        story.append(Paragraph("Biểu đồ độ tin cậy từng vùng nứt", small_style))
+        story.append(
+            RLImage(chart_bar_png, width=content_w, height=content_h * 0.23)
+        )
+        story.append(Spacer(1, 3 * mm))
+
+    # Pie chart
+    if chart_pie_png is not None:
+        story.append(Paragraph("Biểu đồ tỷ lệ vùng nứt / toàn ảnh", small_style))
+        story.append(
+            RLImage(chart_pie_png, width=content_w, height=content_h * 0.23)
+        )
         story.append(Spacer(1, 4 * mm))
 
     # ---------- BẢNG METRICS ----------
     story.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2_style))
 
+    # Header bảng
     data = [[
-        Paragraph("Chỉ số (VI)", normal_style),
-        Paragraph("Metric (EN)", normal_style),
-        Paragraph("Giá trị / Value", normal_style),
-        Paragraph("Ý nghĩa / Description", normal_style),
+        Paragraph("Chỉ số (VI)", small_style),
+        Paragraph("Metric (EN)", small_style),
+        Paragraph("Giá trị / Value", small_style),
+        Paragraph("Ý nghĩa / Description", small_style),
     ]]
 
+    # Các dòng dữ liệu
     for _, r in metrics_df.iterrows():
         full_desc = str(r["desc"])
-        short_desc = full_desc if len(full_desc) <= 200 else full_desc[:200] + "..."
+        short_desc = full_desc if len(full_desc) <= 220 else full_desc[:220] + "..."
         data.append(
             [
-                Paragraph(str(r["vi"]), normal_style),
-                Paragraph(str(r["en"]), normal_style),
-                Paragraph(str(r["value"]), normal_style),
-                Paragraph(short_desc, normal_style),
+                Paragraph(str(r["vi"]), small_style),
+                Paragraph(str(r["en"]), small_style),
+                Paragraph(str(r["value"]), small_style),
+                Paragraph(short_desc, small_style),
             ]
         )
 
@@ -284,7 +339,12 @@ def export_pdf(
         0.46 * content_w,
     ]
 
-    tbl = Table(data, colWidths=col_widths, repeatRows=1)
+    tbl = Table(
+        data,
+        colWidths=col_widths,
+        repeatRows=1,
+        splitByRow=1,  # nếu bảng dài, ReportLab tự chia sang trang tiếp theo
+    )
     tbl.setStyle(
         TableStyle(
             [
@@ -301,16 +361,16 @@ def export_pdf(
     )
     story.append(tbl)
 
-    story.append(Spacer(1, 3 * mm))
+    story.append(Spacer(1, 4 * mm))
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     story.append(
         Paragraph(
             f"BKAI © {datetime.datetime.now().year} – Report generated at {now}",
-            normal_style,
+            small_style,
         )
     )
 
-    # ---------- BUILD PDF ----------
+    # ----------------- BUILD PDF -----------------
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -323,6 +383,7 @@ def export_pdf(
     doc.build(story)
     buf.seek(0)
     return buf
+
 
 
 # =========================================================
@@ -1317,4 +1378,5 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
