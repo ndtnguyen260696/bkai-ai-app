@@ -150,44 +150,6 @@ def export_pdf(
     original_img,
     analyzed_img,
     metrics_df,
-    chart_bar_png: io.BytesIO = None,   # giữ tham số cho hợp với chỗ gọi
-    chart_pie_png: io.BytesIO = None,
-    filename="bkai_report.pdf",
-):
-    """
-    Xuất báo cáo STAGE 1 trên **1 trang A4**:
-    - Logo BKAI
-    - Tiêu đề VN + EN
-    - Ảnh gốc + Ảnh phân tích (thu nhỏ)
-    - Bảng thông tin vết nứt (metrics_df)
-    Không xuất biểu đồ trong PDF (biểu đồ xem trên web).
-    """
-    left_margin = 25 * mm
-    right_margin = 25 * mm
-    top_margin = 20 * mm
-    bottom_margin = 20 * mm
-
-    page_w, page_h = A4
-    content_w = page_w - left_margin - right_margin
-    content_h = page_h - top_margin - bottom_margin
-
-    from PIL import Image as PILImage
-
-    def build_story(img_ratio=0.16, font_size=9):
-        styles = getSampleStyleSheet()
-
-        title = ParagraphStyle(
-            "TitleVN",
-            parent=styles["Title"],
-            fontName=FONT_NAME,
-            alignment=1,
-            fontSize=font_size + 7,
-            leading=font_size + 11,
-        )
-        def export_pdf(
-    original_img,
-    analyzed_img,
-    metrics_df,
     chart_bar_png: io.BytesIO = None,   # giữ cho tương thích
     chart_pie_png: io.BytesIO = None,
     filename="bkai_report.pdf",
@@ -455,38 +417,6 @@ def export_pdf(
     buf.seek(0)
     return buf
 
-
-
-    # ============= TIẾN HÀNH BUILD PDF =============
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buf,
-        pagesize=A4,
-        leftMargin=left_margin,
-        rightMargin=right_margin,
-        topMargin=top_margin,
-        bottomMargin=bottom_margin,
-    )
-
-    try:
-        story = _build_full_story()
-        doc.build(story)
-    except LayoutError:
-        # Nếu bị LayoutError, dùng fallback
-        buf = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buf,
-            pagesize=A4,
-            leftMargin=left_margin,
-            rightMargin=right_margin,
-            topMargin=top_margin,
-            bottomMargin=bottom_margin,
-        )
-        story = _build_fallback_story()
-        doc.build(story)
-
-    buf.seek(0)
-    return buf
 
 # =========================================================
 # 3. XUẤT PDF STAGE 2 (KIẾN THỨC)
@@ -1480,9 +1410,3 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
-
-
-
-
-
-
