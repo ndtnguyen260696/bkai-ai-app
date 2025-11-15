@@ -16,7 +16,7 @@ from reportlab.platypus import (
     Image as RLImage,
     Table,
     TableStyle,
-    PageBreak,          # dùng để ngắt trang
+    PageBreak,
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import A4
@@ -27,20 +27,12 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus.doctemplate import LayoutError
 
 # =========================================================
-# Helper: lưu matplotlib Figure thành PNG bytes để nhúng vào PDF
-# =========================================================
-def fig_to_png(fig) -> io.BytesIO:
-    buf = io.BytesIO()
-    fig.savefig(buf, format="PNG", dpi=200, bbox_inches="tight")
-    buf.seek(0)
-    return buf
-
-# =========================================================
 # 0. CẤU HÌNH CHUNG
 # =========================================================
 
 ROBOFLOW_FULL_URL = (
-    "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
+    "https://detect.roboflow.com/crack_segmentation_detection/4"
+    "?api_key=nWA6ayjI5bGNpXkkbsAb"
 )
 
 LOGO_PATH = "BKAI_Logo.png"
@@ -52,9 +44,12 @@ if os.path.exists(FONT_PATH):
     pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 else:
     FONT_NAME = "DejaVu"
-    pdfmetrics.registerFont(
-        TTFont(FONT_NAME, "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
-    )
+    try:
+        pdfmetrics.registerFont(
+            TTFont(FONT_NAME, "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        )
+    except Exception:
+        pass
 
 st.set_page_config(
     page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT",
@@ -62,8 +57,15 @@ st.set_page_config(
 )
 
 # =========================================================
-# 1. HÀM XỬ LÝ ẢNH
+# 1. HÀM HỖ TRỢ CHUNG
 # =========================================================
+
+def fig_to_png(fig) -> io.BytesIO:
+    buf = io.BytesIO()
+    fig.savefig(buf, format="PNG", dpi=200, bbox_inches="tight")
+    buf.seek(0)
+    return buf
+
 
 def extract_poly_points(points_field):
     flat = []
@@ -81,9 +83,7 @@ def extract_poly_points(points_field):
     return flat
 
 
-def draw_predictions_with_mask(
-    image: Image.Image, predictions, min_conf: float = 0.0
-) -> Image.Image:
+def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float = 0.0):
     base = image.convert("RGB")
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
@@ -143,7 +143,7 @@ def estimate_severity(p, img_w, img_h):
         return "Nguy hiểm (Severe)"
 
 # =========================================================
-# 2. HÀM XUẤT PDF 2 TRANG
+# 2. XUẤT PDF STAGE 1
 # =========================================================
 
 def export_pdf(
@@ -152,8 +152,9 @@ def export_pdf(
     metrics_df,
     chart_bar_png: io.BytesIO = None,
     chart_pie_png: io.BytesIO = None,
-    filename="bkai_report.pdf",
 ):
+    filename = "bkai_report.pdf"
+
     left_margin = 25 * mm
     right_margin = 25 * mm
     top_margin = 20 * mm
@@ -209,7 +210,7 @@ def export_pdf(
             story.append(RLImage(buf_img, width=w * scale, height=h * scale))
             story.append(Spacer(1, 4 * mm))
 
-        # =============== TRANG 1 =================
+        # Trang 1
         if os.path.exists(LOGO_PATH):
             story.append(RLImage(LOGO_PATH, width=38 * mm))
             story.append(Spacer(1, 4 * mm))
@@ -234,10 +235,9 @@ def export_pdf(
             )
             story.append(Spacer(1, 3 * mm))
 
-        # Sang trang 2
         story.append(PageBreak())
 
-        # =============== TRANG 2 – BẢNG THÔNG TIN ===============
+        # Trang 2 – bảng
         story.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2))
 
         data = [[
@@ -311,15 +311,213 @@ def export_pdf(
     return buf
 
 # =========================================================
-# 3. STAGE 2 – DEMO KIẾN THỨC
+# 3. XUẤT PDF STAGE 2 (KIẾN THỨC)
 # =========================================================
+
+def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
+    left_margin = 25 * mm
+    right_margin = 25 * mm
+    top_margin = 20 * mm
+    bottom_margin = 20 * mm
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=left_margin,
+        rightMargin=right_margin,
+        topMargin=top_margin,
+        bottomMargin=bottom_margin,
+    )
+
+    styles = getSampleStyleSheet()
+    for s in styles.byName:
+        styles[s].fontName = FONT_NAME
+
+    title = ParagraphStyle(
+        "TitleStage2",
+        parent=styles["Title"],
+        fontName=FONT_NAME,
+        alignment=1,
+        fontSize=18,
+        leading=22,
+    )
+    h2 = ParagraphStyle(
+        "H2Stage2",
+        parent=styles["Heading2"],
+        fontName=FONT_NAME,
+        spaceBefore=8,
+        spaceAfter=4,
+    )
+    normal = ParagraphStyle(
+        "NormalStage2",
+        parent=styles["Normal"],
+        fontName=FONT_NAME,
+        leading=12,
+    )
+
+    story = []
+    story.append(Paragraph("BKAI – BÁO CÁO KIẾN THỨC VẾT NỨT (STAGE 2)", title))
+    story.append(Spacer(1, 6 * mm))
+    story.append(
+        Paragraph(
+            "Bảng phân loại các vết nứt bê tông thường gặp theo từng loại cấu kiện (dầm, cột, sàn, tường).",
+            normal,
+        )
+    )
+    story.append(Spacer(1, 6 * mm))
+
+    data = [
+        [
+            Paragraph("Cấu kiện", normal),
+            Paragraph("Loại vết nứt", normal),
+            Paragraph("Nguyên nhân", normal),
+            Paragraph("Đặc trưng hình dạng", normal),
+        ]
+    ]
+
+    for _, row in component_df.iterrows():
+        data.append(
+            [
+                Paragraph(str(row["Cấu kiện"]), normal),
+                Paragraph(str(row["Loại vết nứt"]), normal),
+                Paragraph(str(row["Nguyên nhân"]), normal),
+                Paragraph(str(row["Đặc trưng hình dạng"]), normal),
+            ]
+        )
+
+    tbl = Table(
+        data,
+        colWidths=[
+            0.12 * A4[0],
+            0.2 * A4[0],
+            0.33 * A4[0],
+            0.35 * A4[0],
+        ],
+        repeatRows=1,
+    )
+    tbl.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e88e5")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, -1), FONT_NAME),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]
+        )
+    )
+    story.append(tbl)
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+# =========================================================
+# 4. STAGE 2 – TABLE ĐẸP + MAPPING ẢNH
+# =========================================================
+
+def render_component_crack_table(component_df: pd.DataFrame):
+    st.markdown("### 2.2. Bảng chi tiết vết nứt theo cấu kiện")
+
+    h1, h2, h3, h4, h5 = st.columns([1, 1.2, 2.2, 2.2, 1.6])
+    header_style = (
+        "background-color:#e3f2fd;padding:6px;border:1px solid #90caf9;"
+        "font-weight:bold;text-align:center;"
+    )
+    h1.markdown(
+        f"<div style='{header_style}'>Cấu kiện</div>", unsafe_allow_html=True
+    )
+    h2.markdown(
+        f"<div style='{header_style}'>Loại vết nứt</div>", unsafe_allow_html=True
+    )
+    h3.markdown(
+        f"<div style='{header_style}'>Nguyên nhân hình thành vết nứt</div>",
+        unsafe_allow_html=True,
+    )
+    h4.markdown(
+        f"<div style='{header_style}'>Đặc trưng về hình dạng vết nứt</div>",
+        unsafe_allow_html=True,
+    )
+    h5.markdown(
+        f"<div style='{header_style}'>Hình ảnh minh họa vết nứt</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("<hr style='margin:2px 0 6px 0;'>", unsafe_allow_html=True)
+
+    for component, subdf in component_df.groupby("Cấu kiện"):
+        st.markdown(
+            f"<div style='background-color:#bbdefb;padding:4px 10px;margin:4px 0;"
+            f"font-weight:bold;border-left:4px solid #1976d2;'>"
+            f"{component.upper()}</div>",
+            unsafe_allow_html=True,
+        )
+
+        first_row = True
+        for _, row in subdf.iterrows():
+            c1, c2, c3, c4, c5 = st.columns([1, 1.2, 2.2, 2.2, 1.6])
+
+            if first_row:
+                c1.markdown(
+                    f"<div style='padding:4px;font-weight:bold;'>{component}</div>",
+                    unsafe_allow_html=True,
+                )
+                first_row = False
+            else:
+                c1.markdown("&nbsp;", unsafe_allow_html=True)
+
+            c2.write(row["Loại vết nứt"])
+            c3.write(row["Nguyên nhân"])
+            c4.write(row["Đặc trưng hình dạng"])
+
+            img_path = row.get("Ảnh (path)", "") or row.get("Hình ảnh minh họa", "")
+            if isinstance(img_path, str) and img_path and os.path.exists(img_path):
+                c5.image(img_path, use_container_width=True)
+            else:
+                c5.write("—")
+
+        st.markdown(
+            "<hr style='margin:6px 0 10px 0;border-top:1px dashed #b0bec5;'>",
+            unsafe_allow_html=True,
+        )
 
 def show_stage2_demo(key_prefix="stage2"):
     st.subheader("Stage 2 – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
 
-    # =========================
-    # 1) Bảng 1: Phân loại theo cơ chế nứt (đã làm trước)
-    # =========================
+    # 0) Hình minh họa tổng quan
+    st.markdown("### 2.0. Sơ đồ & ví dụ vết nứt trên kết cấu")
+
+    col_img1, col_img2 = st.columns([3, 4])
+    with col_img1:
+        tree_path = "images/stage2_crack_tree.png"
+        if os.path.exists(tree_path):
+            st.image(
+                tree_path,
+                caption=(
+                    "Sơ đồ phân loại các loại vết nứt theo thời điểm xuất hiện "
+                    "và mức độ ảnh hưởng"
+                ),
+                use_container_width=True,
+            )
+        else:
+            st.info("Chưa thấy images/stage2_crack_tree.png")
+    with col_img2:
+        example_path = "images/stage2_structural_example.png"
+        if os.path.exists(example_path):
+            st.image(
+                example_path,
+                caption=(
+                    "Ví dụ các loại vết nứt kết cấu bê tông (dầm, cột, tường, sàn)"
+                ),
+                use_container_width=True,
+            )
+        else:
+            st.info("Chưa thấy images/stage2_structural_example.png")
+
+    st.markdown("---")
+
+    # 1) Bảng 1 – theo cơ chế (cho anh giữ nguyên / rút gọn sau)
     options = [
         "I.1 Nứt co ngót dẻo (Plastic Shrinkage Crack)",
         "I.2 Nứt lún dẻo / lắng dẻo (Plastic Settlement Crack)",
@@ -333,486 +531,367 @@ def show_stage2_demo(key_prefix="stage2"):
         "II.6b Nứt do tải trọng – nứt cắt/nén/xoắn (Shear/Compression/Torsion Cracks)",
         "II.7 Nứt do lún (Settlement Crack)",
     ]
-
     st.selectbox(
         "Chọn loại vết nứt (tóm tắt):",
         options,
         key=f"{key_prefix}_summary_selectbox",
     )
 
-    demo_data = pd.DataFrame(
-        [
-            {
-                "Loại vết nứt": "I.1 Nứt co ngót dẻo",
-                "Nguyên nhân": (
-                    "Bề mặt bê tông mất nước quá nhanh do nhiệt độ cao, độ ẩm thấp, gió lớn, "
-                    "bảo dưỡng chậm khi bê tông còn dẻo → co ngót bề mặt vượt quá cường độ kéo sớm."
-                ),
-                "Biện pháp": (
-                    "Làm ẩm nền/ván khuôn; che nắng, chắn gió; bảo dưỡng ẩm sớm; phun sương, phủ màng bảo dưỡng; "
-                    "thiết kế cấp phối w/c thấp, hạn chế bleeding."
-                ),
-            },
-            {
-                "Loại vết nứt": "I.2 Nứt lún dẻo / lắng dẻo",
-                "Nguyên nhân": (
-                    "Bê tông lún xuống dưới tác dụng trọng lực nhưng bị cản trở bởi cốt thép, "
-                    "vùng thay đổi tiết diện, ván khuôn hẹp → tạo khe nứt trên đỉnh cốt thép hoặc tại chỗ thay đổi mặt cắt."
-                ),
-                "Biện pháp": (
-                    "Dùng bê tông độ sụt vừa phải, bleeding thấp; tăng hạt mịn; "
-                    "bố trí cốt thép hợp lý; đầm chặt đều; kiểm tra độ kín và độ cứng ván khuôn."
-                ),
-            },
-            {
-                "Loại vết nứt": "II.1 Nứt do co ngót khô",
-                "Nguyên nhân": (
-                    "Sau khi đông cứng, nước trong mao quản bay hơi trong môi trường khô/nóng "
-                    "→ hồ xi măng co lại, bị hạn chế bởi cốt thép/kết cấu khác → nứt."
-                ),
-                "Biện pháp": (
-                    "Thiết kế w/c thấp, tăng cốt liệu chắc; dùng phụ gia, sợi; "
-                    "bảo dưỡng ẩm; tránh thi công trong điều kiện nắng nóng, gió mạnh; "
-                    "bố trí khe co giãn hợp lý."
-                ),
-            },
-            {
-                "Loại vết nứt": "II.2 Nứt do đóng băng – băng tan",
-                "Nguyên nhân": (
-                    "Nước trong lỗ rỗng đóng băng gây giãn nở thể tích, áp suất thủy lực; "
-                    "nhiều chu kỳ đóng băng–tan băng phá hoại hồ và cốt liệu, tạo nứt và bong tróc."
-                ),
-                "Biện pháp": (
-                    "Dùng bê tông chống băng giá (phụ gia cuốn khí, w/c thấp); "
-                    "thiết kế hỗn hợp đặc chắc; phủ lớp bảo vệ; hạn chế nước đọng và muối khử băng."
-                ),
-            },
-            {
-                "Loại vết nứt": "II.3 Nứt do nhiệt",
-                "Nguyên nhân": (
-                    "Chênh lệch nhiệt độ lớn giữa trong–ngoài khối bê tông hoặc giữa các vùng khác nhau "
-                    "→ giãn nở/co lại không đều, bị kìm hãm → ứng suất nhiệt vượt cường độ kéo."
-                ),
-                "Biện pháp": (
-                    "Kiểm soát nhiệt độ khi đổ (nước lạnh, đổ ban đêm); dùng xi măng LH, phụ gia làm chậm; "
-                    "ống làm lạnh, đổ theo giai đoạn; tăng cường cốt thép phân tán; bảo dưỡng, che phủ cách nhiệt."
-                ),
-            },
-            {
-                "Loại vết nứt": "II.4a Nứt do hoá chất – sunfat tấn công",
-                "Nguyên nhân": (
-                    "Ion sunfat thấm vào bê tông, phản ứng với hồ xi măng tạo sản phẩm giãn nở (ettringite, gypsum) "
-                    "→ ứng suất kéo lớn, nứt và phân hủy bê tông, thường từ ngoài vào trong."
-                ),
-                "Biện pháp": (
-                    "Dùng xi măng chống sunfat (C₃A thấp), tro bay/xỉ; giữ w/c thấp; "
-                    "chọn cốt liệu sạch; thiết kế bê tông đặc chắc, chống thấm; "
-                    "hạn chế tiếp xúc trực tiếp môi trường sunfat."
-                ),
-            },
-            {
-                "Loại vết nứt": "II.4b Nứt do hoá chất – phản ứng kiềm cốt liệu (AAR)",
-                "Nguyên nhân": (
-                    "Kiềm trong xi măng/phụ gia phản ứng với cốt liệu phản ứng tạo gel AAR; "
-                    "gel hút ẩm trương nở → áp suất nội lớn, nứt vi mô lan rộng, trương nở thể tích."
-                ),
-                "Biện pháp": (
-                    "Dùng xi măng kiềm thấp, cốt liệu không phản ứng; "
-                    "dùng tro bay, xỉ, silica fume; giữ w/c thấp; "
-                    "hạn chế cung cấp ẩm liên tục; kiểm tra AAR khi thiết kế vật liệu."
-                ),
-            },
-            {
-                "Loại vết nứt": "II.5 Nứt do ăn mòn cốt thép",
-                "Nguyên nhân": (
-                    "Cốt thép bị ăn mòn (ion Cl⁻, CO₂, môi trường xâm thực), sản phẩm rỉ thép "
-                    "giãn nở 2–6 lần → ép lên lớp bê tông bảo vệ, gây nứt dọc theo thanh thép, bong lớp bảo vệ."
-                ),
-                "Biện pháp": (
-                    "Đảm bảo chiều dày và chất lượng lớp bảo vệ; dùng bê tông đặc chắc, chống thấm; "
-                    "cốt thép chống ăn mòn hoặc phủ; phụ gia ức chế ăn mòn; "
-                    "lớp phủ bảo vệ bề mặt trong môi trường xâm thực."
-                ),
-            },
-            {
-                "Loại vết nứt": "II.6a Nứt do tải trọng – nứt uốn",
-                "Nguyên nhân": (
-                    "Tải trọng làm ứng suất kéo do uốn vượt cường độ kéo của bê tông ở vùng chịu kéo."
-                ),
-                "Biện pháp": (
-                    "Thiết kế đủ cốt thép chịu uốn; kiểm soát tải trọng sử dụng; "
-                    "gia cường bằng thép/bê tông/FRP; tiêm epoxy phục hồi liên kết khi cần."
-                ),
-            },
-            {
-                "Loại vết nứt": "II.6b Nứt do tải trọng – nứt cắt/nén/xoắn",
-                "Nguyên nhân": (
-                    "Ứng suất cắt, nén, xoắn vượt khả năng chịu lực (tải tập trung lớn, tải lặp, "
-                    "thay đổi sơ đồ chịu lực…) → xuất hiện nứt cắt, nứt nén, nứt xoắn."
-                ),
-                "Biện pháp": (
-                    "Tăng cường cốt đai, cốt xiên, cốt xoắn; kiểm soát tải trọng; "
-                    "gia cường cục bộ vùng chịu lực lớn; kiểm tra, bảo dưỡng định kỳ."
-                ),
-            },
-            {
-                "Loại vết nứt": "II.7 Nứt do lún",
-                "Nguyên nhân": (
-                    "Nền/lớp đệm bị lún, rửa trôi, lún lệch → biến dạng không đều, "
-                    "sinh ứng suất kéo lớn tại dầm, sàn, móng vùng chênh lệch lún."
-                ),
-                "Biện pháp": (
-                    "Khảo sát và xử lý nền tốt (gia cố, thay đất yếu); "
-                    "thiết kế đủ độ cứng, khe lún/khe nhiệt hợp lý; "
-                    "kiểm soát tải; khi đã nứt: tiêm epoxy, gia cường và xử lý nền."
-                ),
-            },
-        ]
+    st.caption(
+        "Bảng 1 – Tổng hợp các dạng nứt theo cơ chế hình thành và biện pháp kiểm soát "
+        "(phần này anh có thể giữ như code cũ để làm phụ lục)."
     )
 
-    st.table(demo_data)
-    st.caption("Bảng 1 – Tổng hợp các dạng nứt theo cơ chế hình thành và biện pháp kiểm soát.")
-
-    # =========================
-    # 2) Bảng 2: Phân loại theo cấu kiện (Dầm, Cột, Sàn, Tường)
-    # =========================
+    # 2) Bảng 2 – mapping ảnh đầy đủ
     st.subheader("Phân loại các vết nứt bê tông thường xảy ra cho từng loại cấu kiện")
 
     component_crack_data = pd.DataFrame(
         [
-            # --- DẦM ---
+            # ===== DẦM =====
             {
                 "Cấu kiện": "Dầm",
                 "Loại vết nứt": "Vết nứt uốn",
                 "Nguyên nhân": (
-                    "Mô men uốn vượt khả năng chịu uốn; tiết diện hoặc cốt thép chịu uốn không đủ."
+                    "Do mô men uốn vượt quá giới hạn chịu tải của dầm; "
+                    "tiết diện hoặc cốt thép chịu uốn không đủ."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt thường chéo hoặc hơi cong, phát triển ở vùng giữa nhịp; "
-                    "rộng nhất ở vùng chịu kéo (dưới đáy hoặc trên đỉnh dầm tùy sơ đồ nội lực)."
+                    "Vết nứt thường chéo hoặc hơi cong, xuất hiện nhiều ở giữa nhịp; "
+                    "rộng nhất ở vùng chịu kéo."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/beam_uon.png",
             },
             {
                 "Cấu kiện": "Dầm",
                 "Loại vết nứt": "Vết nứt cắt",
                 "Nguyên nhân": (
-                    "Lực cắt lớn tại gối hoặc gần điểm uốn; khả năng chịu cắt của bê tông/cốt đai không đủ; thiết kế không đúng."
+                    "Lực cắt lớn tại gối hoặc gần điểm uốn; khả năng chịu cắt của bê tông/cốt đai không đủ."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt xiên, nghiêng khoảng 45° so với trục dầm; "
-                    "có thể đơn lẻ hoặc thành nhóm; rộng nhất gần vùng trục trung hòa hoặc đáy dầm."
+                    "Vết nứt xiên khoảng 45° so với trục dầm; có thể đơn lẻ hoặc nhóm."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/beam_cat.png",
             },
             {
                 "Cấu kiện": "Dầm",
                 "Loại vết nứt": "Vết nứt xoắn",
                 "Nguyên nhân": (
-                    "Độ bền xoắn không đủ; thiếu cốt thép chịu xoắn; tiết diện dầm không phù hợp với mô-men xoắn."
+                    "Độ bền xoắn không đủ; thiếu cốt thép chịu xoắn; tiết diện dầm không phù hợp."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt chéo, dạng xoắn ốc hoặc ziczac quanh dầm; thường rộng hơn ở phần trên, "
-                    "bề rộng tương đối đồng đều dọc theo vết nứt."
+                    "Vết nứt chéo, dạng xoắn ốc hoặc ziczac quanh dầm; "
+                    "bề rộng tương đối đồng đều."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/beam_xoan.png",
             },
             {
                 "Cấu kiện": "Dầm",
                 "Loại vết nứt": "Vết nứt trượt",
                 "Nguyên nhân": (
-                    "Bê tông bị xáo trộn khi cường độ chưa đạt; cốp pha/gối đỡ bị dịch chuyển khi bê tông chưa đủ cứng."
+                    "Bê tông bị xáo trộn khi cường độ chưa đạt; gối đỡ/cốp pha dịch chuyển."
                 ),
                 "Đặc trưng hình dạng": (
                     "Vết nứt gần mép gối đỡ, chạy gần phương thẳng đứng; "
-                    "độ rộng lớn nhất tại đáy dầm."
+                    "rộng nhất tại đáy dầm."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/beam_truot.png",
             },
             {
                 "Cấu kiện": "Dầm",
                 "Loại vết nứt": "Vết nứt kéo",
                 "Nguyên nhân": (
-                    "Cốt thép chịu kéo không đủ, dầm quá tải, biến dạng không đều, tải trọng phân bố không đồng đều."
+                    "Cốt thép chịu kéo không đủ, dầm quá tải, biến dạng không đều."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt gần vuông góc với trục dầm, vuông góc với phương ứng suất kéo; "
-                    "phía dưới rộng, phía trên nhỏ; thường song song và phân bố khá đều."
+                    "Vết nứt gần vuông góc với trục dầm; phía dưới rộng hơn phía trên; "
+                    "thường song song."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/beam_keo.png",
             },
             {
                 "Cấu kiện": "Dầm",
                 "Loại vết nứt": "Vết nứt ăn mòn cốt thép",
                 "Nguyên nhân": (
-                    "Liên kết bê tông–cốt thép kém, lớp bảo vệ mỏng, cốt thép bị gỉ làm tăng thể tích, "
-                    "tạo áp lực giãn nở lên bê tông."
+                    "Lớp bảo vệ mỏng, môi trường xâm thực; cốt thép gỉ giãn nở ép vào bê tông."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt thường chạy dọc theo đường cốt thép; có thể xiên/chéo gần 45° tùy sơ đồ; "
-                    "thường kèm vết gỉ, đổi màu bề mặt."
+                    "Vết nứt chạy dọc theo thanh thép; thường kèm hoen gỉ, bong lớp bảo vệ."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/beam_anmon.png",
             },
             {
                 "Cấu kiện": "Dầm",
                 "Loại vết nứt": "Vết nứt co ngót",
                 "Nguyên nhân": (
-                    "Bê tông dầm co ngót do mất nước, bị kiềm chế bởi cốt thép/kết cấu lân cận."
+                    "Bê tông co ngót do mất nước, bị kiềm chế bởi cốt thép/kết cấu lân cận."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt nhỏ, có thể phân bố tương đối đều, thường gần vuông góc trục dầm hoặc tạo thành mạng nhỏ."
+                    "Vết nứt nhỏ, nhiều, có thể vuông góc trục dầm hoặc tạo mạng lưới."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/beam_congot.png",
             },
 
-            # --- CỘT ---
+            # ===== CỘT =====
             {
                 "Cấu kiện": "Cột",
                 "Loại vết nứt": "Vết nứt ngang",
                 "Nguyên nhân": (
-                    "Thiếu mô-men kiềm chế, diện tích cốt thép nhỏ hoặc bố trí không hợp lý; "
-                    "chịu lực cắt, tải trọng trực tiếp hoặc uốn đơn trục lớn."
+                    "Không đủ mô-men kiềm chế, diện tích cốt thép nhỏ; chịu uốn/cắt lớn."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt ngang quanh cột, thường thấy tại vùng nối dầm–cột hoặc chỗ có ứng suất kéo lớn."
+                    "Vết nứt ngang quanh cột, thường tại vùng nối dầm–cột."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/column_ngang.png",
             },
             {
                 "Cấu kiện": "Cột",
                 "Loại vết nứt": "Vết nứt chéo",
                 "Nguyên nhân": (
-                    "Thiết kế không đúng, cột không đủ khả năng chịu tải dọc và uốn; "
-                    "cường độ bê tông hoặc cốt thép không đủ."
+                    "Cột chịu nén – uốn / cắt lớn; thiết kế hoặc cường độ vật liệu không đủ."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt chạy xiên trên bề mặt cột, xuất hiện khi cột chịu tải lớn gần/ vượt khả năng chịu lực."
+                    "Vết nứt xiên trên bề mặt cột, xuất hiện khi tải gần/vượt sức chịu tải."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/column_cheo.png",
             },
             {
                 "Cấu kiện": "Cột",
                 "Loại vết nứt": "Vết nứt tách (dọc)",
                 "Nguyên nhân": (
-                    "Cốt thép dọc không đủ, bê tông cường độ thấp; khi tải trọng đạt gần khả năng chịu tải tối đa "
-                    "gây phân tách bê tông theo phương dọc."
+                    "Cốt thép dọc không đủ; bê tông cường độ thấp; ứng suất nén lớn gây tách dọc."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Các vết nứt dọc ngắn, song song, độ rộng khác nhau, thường xuất hiện vùng giữa chiều cao cột."
+                    "Các vết nứt dọc song song, độ dài và rộng khác nhau."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/column_tach.png",
             },
             {
                 "Cấu kiện": "Cột",
                 "Loại vết nứt": "Vết nứt do ăn mòn",
                 "Nguyên nhân": (
-                    "Cốt thép trong cột bị gỉ; sản phẩm ăn mòn giãn nở, gây nứt lớp bê tông bảo vệ."
+                    "Cốt thép bị gỉ do môi trường xâm thực; sản phẩm ăn mòn giãn nở."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt chạy theo đường bố trí cốt thép; thường kèm vết gỉ, bong tróc lớp bảo vệ."
+                    "Vết nứt dọc theo cốt thép; bong tróc, vết gỉ trên bề mặt."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/column_anmon.png",
             },
             {
                 "Cấu kiện": "Cột",
                 "Loại vết nứt": "Vết nứt co ngót",
                 "Nguyên nhân": (
-                    "Bê tông cột co ngót bị kiềm chế bởi cốt thép và kết cấu liên kết (dầm, sàn)."
+                    "Co ngót bê tông bị kiềm chế bởi cốt thép và cấu kiện liên kết."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt dọc mảnh, song song, phân bố tương đối đều trên bề mặt cột."
+                    "Vết nứt dọc mảnh, nhiều, phân bố tương đối đều."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/column_congot.png",
             },
 
-            # --- SÀN ---
+            # ===== SÀN =====
             {
                 "Cấu kiện": "Sàn",
                 "Loại vết nứt": "Vết nứt co ngót dẻo",
                 "Nguyên nhân": (
-                    "Nhiệt độ cao, độ ẩm thấp, gió mạnh làm bốc hơi nước nhanh trước khi bê tông nắm chắc."
+                    "Nhiệt độ cao, gió, độ ẩm thấp; bốc hơi nước nhanh khi bê tông còn dẻo."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt nông, nhỏ (micro-cracks), chiều dài không lớn; hình dạng ngẫu nhiên, đa giác, "
-                    "bắt chéo hoặc song song nhau trên bề mặt."
+                    "Vết nứt nông, nhỏ; hình dạng ngẫu nhiên, đa giác."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/slab_congot_deo.png",
             },
             {
                 "Cấu kiện": "Sàn",
                 "Loại vết nứt": "Vết nứt co ngót khô",
                 "Nguyên nhân": (
-                    "Bê tông sàn đông cứng trong môi trường khô, nóng → nước bay hơi, hồ xi măng co lại."
+                    "Co ngót do nước bay hơi sau khi bê tông đông cứng trong môi trường khô/nóng."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt rõ, tạo mạng lưới (map cracking) hoặc đường thẳng ngang/trục trên mặt sàn."
+                    "Vết nứt rõ, tạo mạng lưới (map cracking) hoặc đường thẳng."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/slab_congot_kho.png",
             },
             {
                 "Cấu kiện": "Sàn",
                 "Loại vết nứt": "Vết nứt do nhiệt",
                 "Nguyên nhân": (
-                    "Nhiệt thủy hóa tăng trong khối sàn, bên trong giãn nở trong khi bề mặt mát hơn, bị co "
-                    "→ chênh lệch biến dạng nhiệt lớn."
+                    "Chênh lệch nhiệt độ giữa bề mặt và bên trong sàn."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt bề mặt, đóng vảy, xuống cấp lớp bê tông bề mặt; thường gần song song bề mặt, "
-                    "có thể kết hợp bong tróc."
+                    "Vết nứt bề mặt, có thể kết hợp bong tróc lớp bê tông."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/slab_nhiet.png",
             },
             {
                 "Cấu kiện": "Sàn",
                 "Loại vết nứt": "Vết nứt uốn",
                 "Nguyên nhân": (
-                    "Mô men uốn vượt khả năng chịu uốn; tiết diện/cốt thép chịu uốn không đủ."
+                    "Mô men uốn vượt khả năng chịu uốn; thép chịu kéo không đủ."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt chéo hoặc hơi cong, rộng nhất ở mặt chịu kéo của sàn (thường là mặt dưới giữa nhịp)."
+                    "Vết nứt chéo/hơi cong, rộng nhất ở mặt chịu kéo (thường mặt dưới giữa nhịp)."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/slab_uon.png",
             },
             {
                 "Cấu kiện": "Sàn",
                 "Loại vết nứt": "Vết nứt cắt",
                 "Nguyên nhân": (
-                    "Lực cắt lớn gần gối hoặc vùng chịu tải tập trung; thiếu cốt đai/cốt thép chịu cắt."
+                    "Lực cắt lớn gần gối hoặc vùng chịu tải tập trung; thiếu thép chịu cắt."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt xiên ~45° so với trục sàn; có thể đơn lẻ hoặc nhóm."
+                    "Vết nứt xiên ~45° so với trục sàn."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/slab_cat.png",
             },
             {
                 "Cấu kiện": "Sàn",
                 "Loại vết nứt": "Vết nứt xoắn",
                 "Nguyên nhân": (
-                    "Sàn làm việc như bản chịu xoắn (vùng góc, bản console…), độ bền xoắn không đủ."
+                    "Sàn làm việc như bản chịu xoắn (bản console, vùng góc…); độ bền xoắn không đủ."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt chéo, dạng xoắn ốc tương tự dầm, rộng tương đối đồng đều."
+                    "Vết nứt chéo dạng xoắn ốc; bề rộng tương đối đồng đều."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/slab_xoan.png",
             },
             {
                 "Cấu kiện": "Sàn",
                 "Loại vết nứt": "Vết nứt ăn mòn cốt thép",
                 "Nguyên nhân": (
-                    "Ion Cl⁻, nước biển, muối khử băng xâm nhập; lớp bảo vệ mỏng; cốt thép bị gỉ và giãn nở."
+                    "Ion Cl-, nước biển, muối khử băng xâm nhập; lớp bảo vệ mỏng; thép gỉ."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt chạy dọc theo hướng bố trí cốt thép; thường kèm vết gỉ và bong lớp bảo vệ."
+                    "Vết nứt chạy dọc theo thép; kèm hoen gỉ, bong lớp bảo vệ."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/slab_anmon.png",
             },
             {
                 "Cấu kiện": "Sàn",
                 "Loại vết nứt": "Vết nứt do tải trọng – lực tập trung",
                 "Nguyên nhân": (
-                    "Bản sàn bị quá tải tại một điểm; thiếu cốt thép chịu uốn cục bộ; bố trí thép không đúng."
+                    "Quá tải cục bộ; thiếu cốt thép chịu uốn cục bộ."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt vuông góc phương ứng suất kéo, dạng chữ thập hoặc tỏa ra từ điểm chịu tải."
+                    "Vết nứt vuông góc phương ứng suất kéo; dạng chữ thập/tỏa ra từ điểm tải."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/slab_taptrung.png",
             },
             {
                 "Cấu kiện": "Sàn",
                 "Loại vết nứt": "Vết nứt do tải trọng – lực phân bố",
                 "Nguyên nhân": (
-                    "Tải trọng phân bố nhưng vượt khả năng làm việc lâu dài; độ cứng sàn không đủ."
+                    "Tải phân bố vượt khả năng làm việc lâu dài; sàn thiếu độ cứng."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt dạng chữ thập, mạng lưới hoặc xiên, tỏa từ giữa sàn ra các cạnh."
+                    "Vết nứt dạng chữ thập, mạng lưới hoặc xiên từ giữa sàn ra cạnh."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/slab_phanbo.png",
             },
 
-            # --- TƯỜNG BÊ TÔNG ---
+            # ===== TƯỜNG =====
             {
                 "Cấu kiện": "Tường bê tông",
                 "Loại vết nứt": "Vết nứt co ngót",
                 "Nguyên nhân": (
-                    "Bề mặt tường nóng, bốc hơi nước nhanh; ứng suất co ngót vượt khả năng chịu kéo của bê tông tường."
+                    "Bề mặt tường bốc hơi nước nhanh; ứng suất co ngót vượt khả năng chịu kéo."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt bề mặt, phạm vi rộng, ngẫu nhiên, đa giác, bắt chéo hoặc song song."
+                    "Vết nứt bề mặt ngẫu nhiên, đa giác, bắt chéo hoặc song song."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/wall_congot.png",
             },
             {
                 "Cấu kiện": "Tường bê tông",
                 "Loại vết nứt": "Vết nứt do nhiệt",
                 "Nguyên nhân": (
-                    "Ứng suất và chuyển vị do chênh lệch nhiệt độ trong tường bê tông."
+                    "Chênh lệch nhiệt độ trong bề dày tường; giãn nở/co lại không đều."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Thường là vết nứt thẳng đứng, mở rộng nhiều ở phía dưới hoặc ở vùng chịu kéo do nhiệt."
+                    "Thường là vết nứt thẳng đứng; rộng hơn ở vùng chịu kéo do nhiệt."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/wall_nhiet.png",
             },
             {
                 "Cấu kiện": "Tường bê tông",
                 "Loại vết nứt": "Vết nứt ngang do tải trọng",
                 "Nguyên nhân": (
-                    "Tường chịu tải trọng vượt mức; phân phối tải không đều; hiệu ứng xoay, trượt ở chân tường."
+                    "Tường chịu tải vượt mức; phân bố tải không đều; trượt/xoay tại chân tường."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt ngang chia tường thành hai phần; phần trên có thể nghiêng, phần giữa có xu hướng cong/lõm."
+                    "Vết nứt ngang chia tường thành hai phần; phần trên có thể nghiêng."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/wall_ngang_taitrong.png",
             },
             {
                 "Cấu kiện": "Tường bê tông",
                 "Loại vết nứt": "Vết nứt dọc do tải trọng",
                 "Nguyên nhân": (
-                    "Tải trọng thẳng đứng lớn, lún cục bộ, hoặc thiếu cốt thép dọc."
+                    "Tải đứng lớn, lún cục bộ, thiếu thép dọc."
                 ),
                 "Đặc trưng hình dạng": (
                     "Vết nứt tách dọc chia tường thành hai mảng song song."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/wall_doc_taitrong.png",
             },
             {
                 "Cấu kiện": "Tường bê tông",
                 "Loại vết nứt": "Vết nứt chéo do tải trọng",
                 "Nguyên nhân": (
-                    "Kết hợp tác dụng của tải đứng và ngang; tường vừa chịu nén vừa chịu cắt/uốn."
+                    "Tường vừa chịu nén vừa chịu cắt/uốn do tải ngang và đứng."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt chéo, bề rộng lớn nhất gần phía trên; thể hiện sự làm việc kém ổn định của tường."
+                    "Vết nứt chéo; rộng nhất gần vùng chịu lực lớn."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/wall_cheo_taitrong.png",
             },
             {
                 "Cấu kiện": "Tường bê tông",
                 "Loại vết nứt": "Vết nứt ăn mòn cốt thép",
                 "Nguyên nhân": (
-                    "Cốt thép tường bị gỉ; sản phẩm ăn mòn giãn nở gây nứt lớp bảo vệ bê tông."
+                    "Cốt thép tường bị gỉ; sản phẩm ăn mòn giãn nở làm nứt lớp bảo vệ."
                 ),
                 "Đặc trưng hình dạng": (
-                    "Vết nứt chạy theo vị trí thanh thép; thường kèm bong tróc, hoen gỉ trên bề mặt."
+                    "Vết nứt chạy theo vị trí thanh thép; thường kèm bong tróc, hoen gỉ."
                 ),
-                "Hình ảnh minh họa": "—",
+                "Ảnh (path)": "images/stage2/wall_anmon.png",
             },
         ]
     )
 
-    st.table(component_crack_data)
+    render_component_crack_table(component_crack_data)
+
     st.caption(
         "Bảng 2 – Phân loại các vết nứt bê tông thường gặp theo từng loại cấu kiện "
-        "(dầm, cột, sàn, tường) – dùng cho phần kiến thức nền và phân tích kết quả mô hình."
+        "(dầm, cột, sàn, tường) – trình bày dạng bảng Word, có hình minh họa."
+    )
+
+    st.markdown("### 2.3. Xuất báo cáo kiến thức Stage 2")
+
+    csv_bytes = component_crack_data.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        "⬇ Tải bảng Stage 2 (CSV)",
+        data=csv_bytes,
+        file_name="BKAI_Stage2_CrackTable.csv",
+        mime="text/csv",
+        key=f"stage2_csv_{key_prefix}",
+    )
+
+    pdf_buf = export_stage2_pdf(component_crack_data)
+    st.download_button(
+        "📄 Tải báo cáo kiến thức Stage 2 (PDF)",
+        data=pdf_buf,
+        file_name="BKAI_Stage2_Report.pdf",
+        mime="application/pdf",
+        key=f"stage2_pdf_{key_prefix}",
     )
 
 # =========================================================
-# 3.5. LƯU THỐNG KÊ NGƯỜI DÙNG
+# 5. LƯU THỐNG KÊ NGƯỜI DÙNG
 # =========================================================
 
 USER_STATS_FILE = "user_stats.json"
 
-# Đọc danh sách thống kê (nếu có)
 if os.path.exists(USER_STATS_FILE):
     with open(USER_STATS_FILE, "r", encoding="utf-8") as f:
         try:
@@ -823,7 +902,7 @@ else:
     user_stats = []
 
 # =========================================================
-# 4. GIAO DIỆN CHÍNH
+# 6. GIAO DIỆN PHÂN TÍCH CHÍNH
 # =========================================================
 
 def run_main_app():
@@ -843,12 +922,10 @@ def run_main_app():
 
     st.write("---")
 
-    # ------------ FORM THÔNG TIN NGƯỜI DÙNG (BẮT BUỘC) ------------
-    # Nếu chưa có cờ profile_filled thì mặc định là False
+    # Form thông tin người dùng
     if "profile_filled" not in st.session_state:
         st.session_state.profile_filled = False
 
-    # Nếu chưa điền, luôn hiển thị form
     if not st.session_state.profile_filled:
         st.subheader("Thông tin người sử dụng (bắt buộc trước khi phân tích)")
 
@@ -876,13 +953,11 @@ def run_main_app():
             elif "@" not in email or "." not in email:
                 st.warning("Email không hợp lệ, vui lòng kiểm tra lại.")
             else:
-                # Lưu vào session_state
                 st.session_state.profile_filled = True
                 st.session_state.user_full_name = full_name
                 st.session_state.user_occupation = occupation
                 st.session_state.user_email = email
 
-                # Ghi vào file thống kê
                 record = {
                     "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "login_user": st.session_state.get("username", ""),
@@ -899,16 +974,29 @@ def run_main_app():
 
                 st.success("Đã lưu thông tin. Bạn có thể tải ảnh lên để phân tích.")
 
-        # Nếu chưa fill form đúng -> dừng, KHÔNG cho upload ảnh
         if not st.session_state.profile_filled:
             return
 
-    # ------------ SAU KHI ĐÃ ĐIỀN FORM, HIỆN SIDEBAR + UPLOAD ------------
+    # Sidebar
     st.sidebar.header("Cấu hình phân tích")
     min_conf = st.sidebar.slider(
         "Ngưỡng confidence tối thiểu", 0.0, 1.0, 0.3, 0.05
     )
     st.sidebar.caption("Chỉ hiển thị những vết nứt có độ tin cậy ≥ ngưỡng này.")
+
+    with st.sidebar.expander("📊 Quản lý thống kê người dùng"):
+        if user_stats:
+            df_stats = pd.DataFrame(user_stats)
+            st.dataframe(df_stats, use_container_width=True, height=200)
+            stats_csv = df_stats.to_csv(index=False).encode("utf-8-sig")
+            st.download_button(
+                "⬇ Tải thống kê người dùng (CSV)",
+                data=stats_csv,
+                file_name="BKAI_UserStats.csv",
+                mime="text/csv",
+            )
+        else:
+            st.info("Chưa có dữ liệu thống kê người dùng.")
 
     uploaded_files = st.file_uploader(
         "Tải một hoặc nhiều ảnh bê tông (JPG/PNG)",
@@ -985,15 +1073,6 @@ def run_main_app():
                 ["Stage 1 – Báo cáo chi tiết", "Stage 2 – Phân loại vết nứt"]
             )
 
-            # (giữ nguyên phần STAGE 1 & STAGE 2 như code trước đó)
-            # ...
-
-
-            st.write("---")
-            tab_stage1, tab_stage2 = st.tabs(
-                ["Stage 1 – Báo cáo chi tiết", "Stage 2 – Phân loại vết nứt"]
-            )
-
             # ================== STAGE 1 ==================
             with tab_stage1:
                 st.subheader("Bảng thông tin vết nứt")
@@ -1044,31 +1123,31 @@ def run_main_app():
                         "vi": "mAP (Độ chính xác trung bình)",
                         "en": "Mean Average Precision",
                         "value": f"{map_val:.2f}",
-                        "desc": "Độ chính xác định vị vùng nứt",
+                        "desc": "Độ chính xác định vị vùng nứt (ước lượng từ Confidence).",
                     },
                     {
                         "vi": "Phần trăm vùng nứt",
                         "en": "Crack Area Ratio",
                         "value": f"{crack_area_ratio:.2f} %",
-                        "desc": "Diện tích vùng nứt / tổng diện tích ảnh",
+                        "desc": "Diện tích vùng nứt lớn nhất / tổng diện tích ảnh.",
                     },
                     {
                         "vi": "Chiều dài vết nứt",
                         "en": "Crack Length",
                         "value": "—",
-                        "desc": "Có thể ước lượng nếu biết tỉ lệ pixel-thực tế",
+                        "desc": "Có thể ước lượng nếu biết tỉ lệ pixel-thực tế.",
                     },
                     {
                         "vi": "Chiều rộng vết nứt",
                         "en": "Crack Width",
                         "value": "—",
-                        "desc": "Độ rộng lớn nhất của vết nứt (cần thang đo chuẩn)",
-                                    },
+                        "desc": "Độ rộng lớn nhất của vết nứt (cần thang đo chuẩn).",
+                    },
                     {
                         "vi": "Mức độ nguy hiểm",
                         "en": "Severity Level",
                         "value": severity,
-                        "desc": "Phân cấp theo tiêu chí diện tích tương đối",
+                        "desc": "Phân cấp theo diện tích tương đối vùng nứt lớn nhất.",
                     },
                     {
                         "vi": "Thời gian phân tích",
@@ -1076,7 +1155,7 @@ def run_main_app():
                         "value": datetime.datetime.now().strftime(
                             "%Y-%m-%d %H:%M:%S"
                         ),
-                        "desc": "Thời điểm thực hiện phân tích",
+                        "desc": "Thời điểm thực hiện phân tích.",
                     },
                     {
                         "vi": "Nhận xét tổng quan",
@@ -1086,7 +1165,7 @@ def run_main_app():
                             if "Nguy hiểm" in severity
                             else "Vết nứt nhỏ, nên tiếp tục theo dõi."
                         ),
-                        "desc": "Kết luận tự động của hệ thống",
+                        "desc": "Kết luận tự động của hệ thống.",
                     },
                 ]
 
@@ -1109,7 +1188,6 @@ def run_main_app():
                 )
                 st.dataframe(styled_df, use_container_width=True)
 
-                # -------- BIỂU ĐỒ & LƯU PNG --------
                 st.subheader("Biểu đồ thống kê")
                 col_chart1, col_chart2 = st.columns(2)
 
@@ -1134,7 +1212,6 @@ def run_main_app():
                     pie_png = fig_to_png(fig2)
                     plt.close(fig2)
 
-                # -------- XUẤT PDF 2 TRANG --------
                 pdf_buf = export_pdf(
                     original_img=orig_img,
                     analyzed_img=analyzed_img,
@@ -1156,7 +1233,7 @@ def run_main_app():
                 show_stage2_demo(key_prefix=f"stage2_{idx}")
 
 # =========================================================
-# 5. ĐĂNG KÝ / ĐĂNG NHẬP
+# 7. ĐĂNG KÝ / ĐĂNG NHẬP
 # =========================================================
 
 USERS_FILE = "users.json"
@@ -1212,7 +1289,7 @@ def show_auth_page():
                 st.success("Tạo tài khoản thành công! Bạn có thể quay lại tab Đăng nhập.")
 
 # =========================================================
-# 6. MAIN ENTRY
+# 8. MAIN ENTRY
 # =========================================================
 
 if st.session_state.authenticated:
@@ -1225,5 +1302,3 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
-
-
