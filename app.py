@@ -177,6 +177,18 @@ def export_pdf(
             styles[s].fontName = FONT_NAME
             styles[s].fontSize = max(6, int(styles[s].fontSize * font_scale))
             styles[s].leading = max(8, int(styles[s].leading * font_scale))
+        for s in styles.byName:
+            style_obj = styles[s]
+            style_obj.fontName = FONT_NAME
+    
+            # Chỉ chỉnh font nếu style có fontSize
+            if hasattr(style_obj, "fontSize") and isinstance(style_obj.fontSize, (int, float)):
+                style_obj.fontSize = max(6, int(style_obj.fontSize * font_scale))
+    
+            # Chỉ chỉnh leading nếu có
+            if hasattr(style_obj, "leading") and isinstance(style_obj.leading, (int, float)):
+                style_obj.leading = max(8, int(style_obj.leading * font_scale))
+
 
         title = ParagraphStyle(
             "TitleVN",
@@ -1409,4 +1421,5 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
