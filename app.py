@@ -183,7 +183,8 @@ def export_pdf(
             alignment=1,
             fontSize=font_size + 7,
             leading=font_size + 11,
-        )def export_pdf(
+        )
+        def export_pdf(
     original_img,
     analyzed_img,
     metrics_df,
@@ -1479,6 +1480,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
