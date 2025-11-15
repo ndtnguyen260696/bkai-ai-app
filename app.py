@@ -160,7 +160,7 @@ def export_pdf(
     filename="bkai_report.pdf",
 ):
     """
-    PDF 2 trang:
+    PDF 3 trang:
 
     - Trang 1:
         + Logo BKAI
@@ -173,6 +173,10 @@ def export_pdf(
         + Tiêu đề ngắn
         + Biểu đồ bar (độ tin cậy)
         + Biểu đồ pie (tỷ lệ vùng nứt)
+
+    - Trang 3:
+        + Logo nhỏ
+        + Tiêu đề bảng
         + Bảng thông tin vết nứt (metrics_df)
     """
     from PIL import Image as PILImage
@@ -279,37 +283,45 @@ def export_pdf(
     story.append(PageBreak())
 
     # =====================================================
-    # TRANG 2: LOGO + TIÊU ĐỀ + BIỂU ĐỒ + BẢNG METRICS
+    # TRANG 2: LOGO + TIÊU ĐỀ + 2 BIỂU ĐỒ
     # =====================================================
 
-    # Logo nhỏ trên trang 2
     if os.path.exists(LOGO_PATH):
         story.append(RLImage(LOGO_PATH, width=25 * mm))
         story.append(Spacer(1, 2 * mm))
 
-    # Tiêu đề ngắn
     story.append(Paragraph("BKAI – Thống kê kết quả phát hiện vết nứt", h2_style))
     story.append(Spacer(1, 3 * mm))
 
-    # ---------- BIỂU ĐỒ ----------
-    # Bar chart
+    # Biểu đồ bar
     if chart_bar_png is not None:
         story.append(Paragraph("Biểu đồ độ tin cậy từng vùng nứt", small_style))
         story.append(
-            RLImage(chart_bar_png, width=content_w, height=content_h * 0.23)
-        )
-        story.append(Spacer(1, 3 * mm))
-
-    # Pie chart
-    if chart_pie_png is not None:
-        story.append(Paragraph("Biểu đồ tỷ lệ vùng nứt / toàn ảnh", small_style))
-        story.append(
-            RLImage(chart_pie_png, width=content_w, height=content_h * 0.23)
+            RLImage(chart_bar_png, width=content_w, height=content_h * 0.35)
         )
         story.append(Spacer(1, 4 * mm))
 
-    # ---------- BẢNG METRICS ----------
+    # Biểu đồ pie
+    if chart_pie_png is not None:
+        story.append(Paragraph("Biểu đồ tỷ lệ vùng nứt / toàn ảnh", small_style))
+        story.append(
+            RLImage(chart_pie_png, width=content_w, height=content_h * 0.35)
+        )
+        story.append(Spacer(1, 6 * mm))
+
+    # Sang trang 3
+    story.append(PageBreak())
+
+    # =====================================================
+    # TRANG 3: BẢNG METRICS
+    # =====================================================
+
+    if os.path.exists(LOGO_PATH):
+        story.append(RLImage(LOGO_PATH, width=25 * mm))
+        story.append(Spacer(1, 2 * mm))
+
     story.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2_style))
+    story.append(Spacer(1, 3 * mm))
 
     # Header bảng
     data = [[
@@ -343,7 +355,7 @@ def export_pdf(
         data,
         colWidths=col_widths,
         repeatRows=1,
-        splitByRow=1,  # nếu bảng dài, ReportLab tự chia sang trang tiếp theo
+        splitByRow=1,  # bảng dài sẽ tự chia qua trang tiếp theo
     )
     tbl.setStyle(
         TableStyle(
@@ -383,6 +395,7 @@ def export_pdf(
     doc.build(story)
     buf.seek(0)
     return buf
+
 
 
 
@@ -1378,5 +1391,6 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
