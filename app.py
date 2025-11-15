@@ -183,6 +183,47 @@ def export_pdf(
             alignment=1,
             fontSize=font_size + 7,
             leading=font_size + 11,
+        )def export_pdf(
+    original_img,
+    analyzed_img,
+    metrics_df,
+    chart_bar_png: io.BytesIO = None,   # giữ cho tương thích
+    chart_pie_png: io.BytesIO = None,
+    filename="bkai_report.pdf",
+):
+    """
+    Xuất báo cáo STAGE 1 (ưu tiên 1 trang A4):
+    - Logo BKAI
+    - Tiêu đề VN + EN
+    - Ảnh gốc & Ảnh phân tích (đặt cạnh nhau)
+    - Bảng thông tin metrics
+    Nếu layout quá cao gây LayoutError thì tự động thu nhỏ ảnh + font rồi build lại.
+    """
+    from PIL import Image as PILImage
+
+    # Lề trang
+    left_margin = 25 * mm
+    right_margin = 25 * mm
+    top_margin = 20 * mm
+    bottom_margin = 20 * mm
+
+    page_w, page_h = A4
+    content_w = page_w - left_margin - right_margin
+    content_h = page_h - top_margin - bottom_margin
+
+    # ---------------------------------
+    # Hàm dựng nội dung (story)
+    # ---------------------------------
+    def build_story(img_ratio=0.22, font_size=9):
+        styles = getSampleStyleSheet()
+
+        title = ParagraphStyle(
+            "TitleVN",
+            parent=styles["Title"],
+            fontName=FONT_NAME,
+            alignment=1,
+            fontSize=font_size + 7,
+            leading=font_size + 11,
         )
         h2 = ParagraphStyle(
             "H2VN",
@@ -213,33 +254,60 @@ def export_pdf(
         story.append(Paragraph("Concrete Crack Inspection Report", normal))
         story.append(Spacer(1, 4 * mm))
 
-        # ----- Hàm chèn ảnh (thu nhỏ cho vừa 1 trang) -----
-        def add_pil_image(pil, caption):
-            if pil is None:
-                return
-            if not isinstance(pil, PILImage.Image):
-                pil = pil.convert("RGB")
-            w, h = pil.size
-            max_h = content_h * img_ratio
-            max_w = content_w
-            scale = min(max_w / w, max_h / h, 1.0)
-            buf_img = io.BytesIO()
-            pil.save(buf_img, format="PNG")
-            buf_img.seek(0)
-            story.append(Paragraph(caption, h2))
-            story.append(RLImage(buf_img, width=w * scale, height=h * scale))
-            story.append(Spacer(1, 3 * mm))
+        # ----- Ảnh gốc & ảnh phân tích (đặt cạnh nhau) -----
+        if (original_img is not None) and (analyzed_img is not None):
+            # chuyển PIL → buffer
+            def pil_to_rl(pil_img):
+                if not isinstance(pil_img, PILImage.Image):
+                    pil_img = pil_img.convert("RGB")
+                w, h = pil_img.size
+                # chia đôi chiều rộng nội dung cho 2 ảnh
+                max_w_each = (content_w - 5 * mm) / 2.0
+                max_h = content_h * img_ratio
+                scale = min(max_w_each / w, max_h / h, 1.0)
+                buf = io.BytesIO()
+                pil_img.save(buf, format="PNG")
+                buf.seek(0)
+                return RLImage(buf, width=w * scale, height=h * scale)
 
-        # ----- Ảnh gốc + ảnh phân tích -----
-        add_pil_image(original_img, "Ảnh gốc / Original Image")
-        add_pil_image(analyzed_img, "Ảnh đã phân tích / Result Image")
+            img_left = pil_to_rl(original_img)
+            img_right = pil_to_rl(analyzed_img)
 
-        story.append(Spacer(1, 4 * mm))
+            story.append(Paragraph("Ảnh gốc và ảnh đã phân tích", h2))
+            img_table = Table(
+                [[img_left, img_right]],
+                colWidths=[content_w / 2.0, content_w / 2.0],
+            )
+            img_table.setStyle(
+                TableStyle(
+                    [
+                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ]
+                )
+            )
+            story.append(img_table)
+            story.append(Spacer(1, 4 * mm))
+        else:
+            # fallback: nếu 1 trong 2 ảnh None
+            if original_img is not None:
+                story.append(Paragraph("Ảnh gốc / Original Image", h2))
+                buf = io.BytesIO()
+                original_img.save(buf, format="PNG")
+                buf.seek(0)
+                story.append(RLImage(buf, width=content_w * 0.7, height=content_h * 0.25))
+                story.append(Spacer(1, 3 * mm))
+            if analyzed_img is not None:
+                story.append(Paragraph("Ảnh đã phân tích / Result Image", h2))
+                buf = io.BytesIO()
+                analyzed_img.save(buf, format="PNG")
+                buf.seek(0)
+                story.append(RLImage(buf, width=content_w * 0.7, height=content_h * 0.25))
+                story.append(Spacer(1, 3 * mm))
 
-        # ----- Bảng thông tin metrics -----
+        # ----- Bảng metrics -----
         story.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2))
 
-        # Header bảng
         data = [[
             Paragraph("Chỉ số (VI)", normal),
             Paragraph("Metric (EN)", normal),
@@ -247,9 +315,9 @@ def export_pdf(
             Paragraph("Ý nghĩa / Description", normal),
         ]]
 
-        # Nội dung bảng (rút gọn mô tả để tiết kiệm chỗ)
         for _, r in metrics_df.iterrows():
             full_desc = str(r["desc"])
+            # rút gọn mô tả để tiết kiệm chỗ
             short_desc = full_desc if len(full_desc) <= 200 else full_desc[:200] + "..."
             data.append(
                 [
@@ -295,21 +363,20 @@ def export_pdf(
 
         return story
 
-    # ----- Thử build 1 lần, nếu lỡ còn LayoutError thì thu nhỏ thêm -----
+    # ---------------------------------
+    # Thử build với nhiều mức thu nhỏ
+    # ---------------------------------
+    attempts = [
+        (0.22, 9),  # ảnh cao hơn, chữ to
+        (0.18, 9),  # ảnh thấp hơn chút
+        (0.16, 8),  # ảnh thấp + chữ nhỏ
+        (0.14, 8),
+    ]
+
     buf = io.BytesIO()
-    try:
-        doc = SimpleDocTemplate(
-            buf,
-            pagesize=A4,
-            leftMargin=left_margin,
-            rightMargin=right_margin,
-            topMargin=top_margin,
-            bottomMargin=bottom_margin,
-        )
-        story = build_story(img_ratio=0.16, font_size=9)
-        doc.build(story)
-    except LayoutError:
-        # Nếu vẫn quá dài, thu nhỏ ảnh + chữ
+    built = False
+
+    for img_ratio, font_size in attempts:
         buf = io.BytesIO()
         doc = SimpleDocTemplate(
             buf,
@@ -319,11 +386,74 @@ def export_pdf(
             topMargin=top_margin,
             bottomMargin=bottom_margin,
         )
-        story = build_story(img_ratio=0.13, font_size=8)
+        try:
+            story = build_story(img_ratio=img_ratio, font_size=font_size)
+            doc.build(story)
+            built = True
+            break
+        except LayoutError:
+            # thử với layout nhỏ hơn
+            continue
+
+    if not built:
+        # fallback cực đoan: chỉ logo + tiêu đề + bảng
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buf,
+            pagesize=A4,
+            leftMargin=left_margin,
+            rightMargin=right_margin,
+            topMargin=top_margin,
+            bottomMargin=bottom_margin,
+        )
+        styles = getSampleStyleSheet()
+        normal = styles["Normal"]
+        normal.fontName = FONT_NAME
+        normal.fontSize = 9
+        normal.leading = 11
+
+        story = [
+            Paragraph("BKAI - Báo cáo kiểm tra vết nứt (rút gọn)", styles["Title"]),
+            Spacer(1, 4 * mm),
+            Paragraph(
+                "Nội dung đầy đủ vượt quá giới hạn khung trang, hệ thống tự động rút gọn.",
+                normal,
+            ),
+            Spacer(1, 4 * mm),
+        ]
+
+        data = [[
+            Paragraph("Chỉ số (VI)", normal),
+            Paragraph("Metric (EN)", normal),
+            Paragraph("Giá trị / Value", normal),
+            Paragraph("Ý nghĩa / Description", normal),
+        ]]
+        for _, r in metrics_df.iterrows():
+            data.append(
+                [
+                    Paragraph(str(r["vi"]), normal),
+                    Paragraph(str(r["en"]), normal),
+                    Paragraph(str(r["value"]), normal),
+                    Paragraph(str(r["desc"]), normal),
+                ]
+            )
+        tbl = Table(data, repeatRows=1)
+        tbl.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e88e5")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, -1), FONT_NAME),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                ]
+            )
+        )
+        story.append(tbl)
         doc.build(story)
 
     buf.seek(0)
     return buf
+
 
 
     # ============= TIẾN HÀNH BUILD PDF =============
@@ -1349,6 +1479,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
