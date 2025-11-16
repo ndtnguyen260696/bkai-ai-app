@@ -158,7 +158,6 @@ import os
 import datetime
 
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics   # để đo độ rộng chữ
@@ -1569,6 +1568,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
