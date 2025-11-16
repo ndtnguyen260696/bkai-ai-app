@@ -25,9 +25,10 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus.doctemplate import LayoutError
-from reportlab.pdfgen import canvas  
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
 
-# A4 xoay ngang
+# A4 xoay ngang cho Stage 2
 A4_LANDSCAPE = landscape(A4)
 
 # =========================================================
@@ -43,12 +44,8 @@ LOGO_PATH = "BKAI_Logo.png"
 
 FONT_PATH = "times.ttf"
 FONT_NAME = "TimesVN"
-# ==============================
-# CẤU HÌNH FONT PDF
-# ==============================
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 
+# Cấu hình font PDF
 if os.path.exists(FONT_PATH):
     pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
 else:
@@ -152,18 +149,8 @@ def estimate_severity(p, img_w, img_h):
         return "Nguy hiểm (Severe)"
 
 # =========================================================
-# 2. XUẤT PDF STAGE 1 – BẢN PRO (dùng canvas, không Platypus)
+# 2. XUẤT PDF STAGE 1 – BẢN PRO (CÓ VẾT NỨT)
 # =========================================================
-
-import io
-import os
-import datetime
-
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.utils import ImageReader
-from reportlab.pdfbase import pdfmetrics   # để đo độ rộng chữ
-
 
 def export_pdf(
     original_img,
@@ -174,19 +161,19 @@ def export_pdf(
     filename="bkai_report_pro_plus.pdf",
 ):
     """
-    BÁO CÁO BKAI – STAGE 1 (PRO):
+    BÁO CÁO BKAI – STAGE 1 (PRO, CÓ VẾT NỨT):
     - Dùng canvas, không Platypus.
-    - Tự động chia nhiều trang nếu bảng metrics quá dài.
+    - Trang 1: logo + tiêu đề + 2 ảnh + banner kết luận + biểu đồ.
+    - Trang 2+: bảng metrics.
     """
 
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
 
-    # ------------------- CONSTANTS -------------------
     page_w, page_h = A4
     LEFT   = 20 * mm
     RIGHT  = 20 * mm
-    TOP    = 40 * mm      # mép trên
+    TOP    = 20 * mm
     BOTTOM = 20 * mm
     CONTENT_W = page_w - LEFT - RIGHT
 
@@ -205,26 +192,26 @@ def export_pdf(
         """
         y_top = page_h - TOP
 
-        # ===== Logo =====
+        # Logo
+        logo_h = 0
         if os.path.exists(LOGO_PATH):
             try:
                 logo = ImageReader(LOGO_PATH)
                 logo_w = 30 * mm
                 iw, ih = logo.getSize()
                 logo_h = logo_w * ih / iw
-
                 c.drawImage(
                     logo,
                     LEFT,
-                    y_top - logo_h+25*mm,
+                    y_top - logo_h,
                     width=logo_w,
                     height=logo_h,
                     mask="auto",
                 )
             except Exception:
-                pass
+                logo_h = 0
 
-        # ===== Tiêu đề =====
+        # Tiêu đề
         c.setFillColor(colors.black)
         c.setFont(TITLE_FONT, TITLE_SIZE)
         c.drawCentredString(page_w / 2.0, y_top - 6 * mm, page_title)
@@ -233,9 +220,7 @@ def export_pdf(
             c.setFont(BODY_FONT, 11)
             c.drawCentredString(page_w / 2.0, y_top - 13 * mm, subtitle)
 
-        # ❌ Không vẽ đường kẻ ngang nữa
-
-        # ===== Footer =====
+        # Footer
         footer_y = BOTTOM - 6
         c.setFont(BODY_FONT, SMALL_FONT_SIZE)
         c.setFillColor(colors.grey)
@@ -247,12 +232,12 @@ def export_pdf(
         if page_no is not None:
             c.drawRightString(page_w - RIGHT, footer_y, f"Page {page_no}")
 
-        # Vị trí bắt đầu nội dung (ảnh gốc/ảnh phân tích),
-        # dịch xuống dưới header thêm ~25mm
-        return y_top - 25 * mm
+        # Nội dung bắt đầu cách logo khoảng 20mm
+        content_start_y = y_top - max(logo_h, 15 * mm) - 20 * mm
+        return content_start_y
 
     # =================================================
-    # HELPER: PIL -> IMAGE trên canvas
+    # HELPER: VẼ ẢNH
     # =================================================
     def draw_pil_image(pil_img, x_left, top_y, max_w, max_h):
         if pil_img is None:
@@ -273,6 +258,7 @@ def export_pdf(
         words = str(text).split()
         if not words:
             return [""]
+
         lines = []
         current = words[0]
         for w in words[1:]:
@@ -329,8 +315,8 @@ def export_pdf(
     page_no = 1
     content_top_y = draw_header("BÁO CÁO KẾT QUẢ PHÂN TÍCH", page_no=page_no)
 
-    # Hạ ảnh gốc & ảnh phân tích xuống thêm ~10mm
-    content_top_y -= 10 * mm
+    # Hạ ảnh gốc & ảnh phân tích xuống thêm ~5mm
+    content_top_y -= 5 * mm
 
     gap_x = 10 * mm
     slot_w = (CONTENT_W - gap_x) / 2.0
@@ -448,7 +434,6 @@ def export_pdf(
     x0 = LEFT
     x1 = x0 + col1_w
     x2 = x1 + col2_w
-    x3 = x2 + col3_w  # (giữ cho dễ đọc, tuy không dùng x3)
 
     def draw_table_header(top_y):
         c.setFillColor(colors.HexColor("#1e88e5"))
@@ -499,52 +484,62 @@ def export_pdf(
 # PDF CHO TRƯỜNG HỢP KHÔNG CÓ VẾT NỨT
 # =========================================================
 
-def export_pdf_no_crack(original_img, filename="bkai_report_no_crack.pdf"):
+def export_pdf_no_crack(original_img):
+    """
+    Báo cáo 1 trang khi KHÔNG phát hiện vết nứt:
+    - Logo + tiêu đề
+    - Ảnh gốc + Ảnh phân tích (cùng là ảnh gốc)
+    - Dòng kết luận bên dưới
+    """
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
 
     page_w, page_h = A4
-    LEFT = 20 * mm
-    RIGHT = 20 * mm
-    TOP = 20 * mm
+    LEFT   = 20 * mm
+    RIGHT  = 20 * mm
+    TOP    = 20 * mm
     BOTTOM = 20 * mm
     CONTENT_W = page_w - LEFT - RIGHT
 
     TITLE_FONT = FONT_NAME
-    BODY_FONT = FONT_NAME
+    BODY_FONT  = FONT_NAME
 
-    # ===== HEADER =====
     def draw_header_no_crack():
         y_top = page_h - TOP
 
-        # Logo
+        logo_h = 0
         if os.path.exists(LOGO_PATH):
             try:
                 logo = ImageReader(LOGO_PATH)
                 logo_w = 30 * mm
                 iw, ih = logo.getSize()
                 logo_h = logo_w * ih / iw
-
                 c.drawImage(
                     logo,
-                    LEFT, 
+                    LEFT,
                     y_top - logo_h,
                     width=logo_w,
                     height=logo_h,
                     mask="auto",
                 )
-            except:
-                pass
+            except Exception:
+                logo_h = 0
 
-        # Title
         c.setFont(TITLE_FONT, 18)
-        c.drawCentredString(page_w / 2, y_top - 10 * mm, "BÁO CÁO KẾT QUẢ PHÂN TÍCH")
+        c.drawCentredString(page_w / 2, y_top - 6 * mm, "BÁO CÁO KẾT QUẢ PHÂN TÍCH")
+        c.setFont(BODY_FONT, 11)
+        c.drawCentredString(
+            page_w / 2,
+            y_top - 14 * mm,
+            "Trường hợp: Không phát hiện vết nứt rõ ràng",
+        )
 
-        return y_top - 25 * mm
+        content_top = y_top - max(logo_h, 15 * mm) - 20 * mm
+        return content_top
 
     content_top_y = draw_header_no_crack()
 
-    # ===== ẢNH GỐC & ẢNH PHÂN TÍCH =====
+    # Ảnh gốc & Ảnh phân tích
     max_img_h = 90 * mm
     gap_x = 10 * mm
     slot_w = (CONTENT_W - gap_x) / 2
@@ -552,24 +547,22 @@ def export_pdf_no_crack(original_img, filename="bkai_report_no_crack.pdf"):
     def draw_pil(img, x, top):
         ir = ImageReader(img)
         iw, ih = ir.getSize()
-        scale = min(slot_w / iw, max_img_h / ih)
+        scale = min(slot_w / iw, max_img_h / ih, 1.0)
         w = iw * scale
         h = ih * scale
         bottom = top - h
         c.drawImage(ir, x, bottom, width=w, height=h, mask="auto")
         return bottom
-   
-    # Tiêu đề ảnh
+
     c.setFont(BODY_FONT, 11)
     c.drawString(LEFT, content_top_y + 4 * mm, "Ảnh gốc")
     c.drawString(LEFT + slot_w + gap_x, content_top_y + 4 * mm, "Ảnh phân tích")
 
-    # Vẽ ảnh
-    bottom_y = draw_pil(original_img, LEFT, content_top_y)
-    _ = draw_pil(original_img, LEFT + slot_w + gap_x, content_top_y)
+    left_bottom = draw_pil(original_img, LEFT, content_top_y)
+    _           = draw_pil(original_img, LEFT + slot_w + gap_x, content_top_y)
 
-    # ===== KẾT LUẬN =====
-    banner_y = bottom_y - 10 * mm
+    # Kết luận
+    banner_y = left_bottom - 12 * mm
     banner_h = 16 * mm
 
     c.setFillColor(colors.HexColor("#e8f5e9"))
@@ -579,28 +572,36 @@ def export_pdf_no_crack(original_img, filename="bkai_report_no_crack.pdf"):
     c.setFont(BODY_FONT, 11)
     c.drawString(
         LEFT + 4 * mm,
-        banner_y + banner_h/2 - 4,
-        "Không phát hiện vết nứt rõ ràng trong ảnh."
+        banner_y + banner_h / 2 - 4,
+        "Không phát hiện vết nứt rõ ràng trong ảnh theo ngưỡng của mô hình.",
     )
 
-    # Kết thúc
+    # Footer đơn giản
+    footer_y = BOTTOM - 6
+    c.setFont(BODY_FONT, 8)
+    c.setFillColor(colors.grey)
+    c.drawString(
+        LEFT,
+        footer_y,
+        f"BKAI – Concrete Crack Inspection | Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}",
+    )
+    c.drawRightString(page_w - RIGHT, footer_y, "Page 1")
+
     c.showPage()
     c.save()
     buf.seek(0)
     return buf
 
-
-
 # =========================================================
-# 3. XUẤT PDF STAGE 2 (KIẾN THỨC)
+# 3. XUẤT PDF STAGE 2 (KIẾN THỨC, LANDSCAPE)
 # =========================================================
 
 def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     """
     Xuất PDF KIẾN THỨC STAGE 2:
-    - Có logo BKAI + tiêu đề giống Stage 1.
-    - Bảng 5 cột, cột cuối là hình minh hoạ (thumbnail).
-    - Trang xoay ngang (A4 landscape) để bảng không tràn.
+    - Logo BKAI + tiêu đề giống Stage 1.
+    - Bảng 5 cột có hình minh hoạ.
+    - A4 xoay ngang để bảng không tràn.
     """
 
     left_margin   = 20 * mm
@@ -611,7 +612,7 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
-        pagesize=A4_LANDSCAPE,   # <--- xoay ngang
+        pagesize=A4_LANDSCAPE,
         leftMargin=left_margin,
         rightMargin=right_margin,
         topMargin=top_margin,
@@ -648,15 +649,14 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
         "NormalStage2",
         parent=styles["Normal"],
         fontName=FONT_NAME,
-        fontSize=8,     # ↓ thu nhỏ 1 chút
+        fontSize=8,
         leading=10,
     )
 
     elements = []
 
-    # ---------- HEADER: logo + title ----------
+    # Header: logo + title
     header_row = []
-
     if os.path.exists(LOGO_PATH):
         logo_flow = RLImage(LOGO_PATH, width=28 * mm, height=28 * mm)
         header_row.append(logo_flow)
@@ -693,7 +693,7 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
         )
     )
 
-    # ---------- CHUẨN BỊ DỮ LIỆU BẢNG ----------
+    # Chuẩn bị dữ liệu bảng
     data = [
         [
             Paragraph("Cấu kiện", normal),
@@ -706,7 +706,6 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
 
     def make_thumb(path: str):
         if isinstance(path, str) and path and os.path.exists(path):
-            # Thumbnail khoảng 25x25 mm để vừa trang
             return RLImage(path, width=25 * mm, height=25 * mm)
         else:
             return Paragraph("—", normal)
@@ -723,7 +722,6 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
             ]
         )
 
-    # ---------- TẠO BẢNG 5 CỘT ----------
     table = Table(
         data,
         colWidths=[
@@ -740,7 +738,6 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     table.setStyle(
         TableStyle(
             [
-                # Header
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e88e5")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("ALIGN", (0, 0), (-1, 0), "CENTER"),
@@ -748,14 +745,12 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
                 ("FONTNAME", (0, 0), (-1, 0), FONT_NAME),
                 ("FONTSIZE", (0, 0), (-1, 0), 9),
 
-                # Body
                 ("FONTNAME", (0, 1), (-2, -1), FONT_NAME),
                 ("FONTSIZE", (0, 1), (-2, -1), 8),
                 ("VALIGN", (0, 1), (-1, -1), "TOP"),
                 ("ALIGN", (0, 1), (-2, -1), "LEFT"),
                 ("ALIGN", (-1, 1), (-1, -1), "CENTER"),
 
-                # Padding nhỏ để "bóp" bảng lại
                 ("LEFTPADDING", (0, 0), (-1, -1), 3),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 3),
                 ("TOPPADDING", (0, 0), (-1, -1), 3),
@@ -772,10 +767,8 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     buf.seek(0)
     return buf
 
-
-
 # =========================================================
-# 4. STAGE 2 – TABLE ĐẸP + MAPPING ẢNH
+# 4. STAGE 2 – TABLE ĐẸP + MAPPING ẢNH (STREAMLIT)
 # =========================================================
 
 def render_component_crack_table(component_df: pd.DataFrame):
@@ -786,12 +779,8 @@ def render_component_crack_table(component_df: pd.DataFrame):
         "background-color:#e3f2fd;padding:6px;border:1px solid #90caf9;"
         "font-weight:bold;text-align:center;"
     )
-    h1.markdown(
-        f"<div style='{header_style}'>Cấu kiện</div>", unsafe_allow_html=True
-    )
-    h2.markdown(
-        f"<div style='{header_style}'>Loại vết nứt</div>", unsafe_allow_html=True
-    )
+    h1.markdown(f"<div style='{header_style}'>Cấu kiện</div>", unsafe_allow_html=True)
+    h2.markdown(f"<div style='{header_style}'>Loại vết nứt</div>", unsafe_allow_html=True)
     h3.markdown(
         f"<div style='{header_style}'>Nguyên nhân hình thành vết nứt</div>",
         unsafe_allow_html=True,
@@ -846,9 +835,8 @@ def render_component_crack_table(component_df: pd.DataFrame):
 def show_stage2_demo(key_prefix="stage2"):
     st.subheader("Stage 2 – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
 
-    # 0) Hình minh họa tổng quan
+    # 2.0 Hình minh hoạ
     st.markdown("### 2.0. Sơ đồ & ví dụ vết nứt trên kết cấu")
-
     col_img1, col_img2 = st.columns([3, 4])
     with col_img1:
         tree_path = "images/stage2_crack_tree.png"
@@ -868,9 +856,7 @@ def show_stage2_demo(key_prefix="stage2"):
         if os.path.exists(example_path):
             st.image(
                 example_path,
-                caption=(
-                    "Ví dụ các loại vết nứt kết cấu bê tông (dầm, cột, tường, sàn)"
-                ),
+                caption="Ví dụ các loại vết nứt kết cấu bê tông (dầm, cột, tường, sàn)",
                 use_container_width=True,
             )
         else:
@@ -878,7 +864,7 @@ def show_stage2_demo(key_prefix="stage2"):
 
     st.markdown("---")
 
-    # 1) Bảng 1 – theo cơ chế (cho anh giữ nguyên / rút gọn sau)
+    # 2.1 Bảng tổng hợp theo cơ chế (giữ cho phụ lục)
     options = [
         "I.1 Nứt co ngót dẻo (Plastic Shrinkage Crack)",
         "I.2 Nứt lún dẻo / lắng dẻo (Plastic Settlement Crack)",
@@ -900,10 +886,10 @@ def show_stage2_demo(key_prefix="stage2"):
 
     st.caption(
         "Bảng 1 – Tổng hợp các dạng nứt theo cơ chế hình thành và biện pháp kiểm soát "
-        "(phần này anh có thể giữ như code cũ để làm phụ lục)."
+        "(có thể dùng làm phụ lục trong luận văn)."
     )
 
-    # 2) Bảng 2 – mapping ảnh đầy đủ
+    # 2.2 Bảng 2 – mapping ảnh đầy đủ
     st.subheader("Phân loại các vết nứt bê tông thường xảy ra cho từng loại cấu kiện")
 
     component_crack_data = pd.DataFrame(
@@ -1075,9 +1061,7 @@ def show_stage2_demo(key_prefix="stage2"):
             {
                 "Cấu kiện": "Sàn",
                 "Loại vết nứt": "Vết nứt do nhiệt",
-                "Nguyên nhân": (
-                    "Chênh lệch nhiệt độ giữa bề mặt và bên trong sàn."
-                ),
+                "Nguyên nhân": "Chênh lệch nhiệt độ giữa bề mặt và bên trong sàn.",
                 "Đặc trưng hình dạng": (
                     "Vết nứt bề mặt, có thể kết hợp bong tróc lớp bê tông."
                 ),
@@ -1100,9 +1084,7 @@ def show_stage2_demo(key_prefix="stage2"):
                 "Nguyên nhân": (
                     "Lực cắt lớn gần gối hoặc vùng chịu tải tập trung; thiếu thép chịu cắt."
                 ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt xiên ~45° so với trục sàn."
-                ),
+                "Đặc trưng hình dạng": "Vết nứt xiên ~45° so với trục sàn.",
                 "Ảnh (path)": "images/stage2/slab_cat.png",
             },
             {
@@ -1130,9 +1112,7 @@ def show_stage2_demo(key_prefix="stage2"):
             {
                 "Cấu kiện": "Sàn",
                 "Loại vết nứt": "Vết nứt do tải trọng – lực tập trung",
-                "Nguyên nhân": (
-                    "Quá tải cục bộ; thiếu cốt thép chịu uốn cục bộ."
-                ),
+                "Nguyên nhân": "Quá tải cục bộ; thiếu cốt thép chịu uốn cục bộ.",
                 "Đặc trưng hình dạng": (
                     "Vết nứt vuông góc phương ứng suất kéo; dạng chữ thập/tỏa ra từ điểm tải."
                 ),
@@ -1187,9 +1167,7 @@ def show_stage2_demo(key_prefix="stage2"):
             {
                 "Cấu kiện": "Tường bê tông",
                 "Loại vết nứt": "Vết nứt dọc do tải trọng",
-                "Nguyên nhân": (
-                    "Tải đứng lớn, lún cục bộ, thiếu thép dọc."
-                ),
+                "Nguyên nhân": "Tải đứng lớn, lún cục bộ, thiếu thép dọc.",
                 "Đặc trưng hình dạng": (
                     "Vết nứt tách dọc chia tường thành hai mảng song song."
                 ),
@@ -1224,7 +1202,7 @@ def show_stage2_demo(key_prefix="stage2"):
 
     st.caption(
         "Bảng 2 – Phân loại các vết nứt bê tông thường gặp theo từng loại cấu kiện "
-        "(dầm, cột, sàn, tường) – trình bày dạng bảng Word, có hình minh họa."
+        "(dầm, cột, sàn, tường) – có thể in ra phụ lục kèm hình minh họa."
     )
 
     st.markdown("### 2.3. Xuất báo cáo kiến thức Stage 2")
@@ -1417,33 +1395,31 @@ def run_main_app():
             with col2:
                 st.subheader("Ảnh phân tích")
                 if len(preds_conf) == 0:
+                    # Trường hợp KHÔNG có vết nứt
                     st.image(orig_img, use_column_width=True)
                     st.success("✅ Kết luận: **Không phát hiện vết nứt rõ ràng**.")
+
+                    pdf_no_crack = export_pdf_no_crack(orig_img)
+                    st.download_button(
+                        "📄 Tải báo cáo PDF (Không có vết nứt)",
+                        data=pdf_no_crack.getvalue(),
+                        file_name=f"BKAI_NoCrack_{uploaded_file.name.split('.')[0]}.pdf",
+                        mime="application/pdf",
+                        key=f"pdf_no_crack_{idx}",
+                    )
+
+                    # Không cần Stage 1 & Stage 2 cho ảnh này
+                    continue
+
                 else:
+                    # Có vết nứt
                     analyzed_img = draw_predictions_with_mask(
                         orig_img, preds_conf, min_conf
                     )
                     st.image(analyzed_img, use_column_width=True)
                     st.error("⚠️ Kết luận: **CÓ vết nứt trên ảnh.**")
 
-            if len(preds_conf) == 0 or analyzed_img is None:
-                continue
-            if len(preds_conf) == 0:
-                st.success("Ảnh không có vết nứt.")
-
-                pdf_buf = export_pdf_no_crack(orig_img)
-
-                st.download_button(
-                    "📄 Tải báo cáo PDF (Không có vết nứt)",
-                    data=pdf_buf,
-                    file_name=f"BKAI_NoCrack_{uploaded_file.name.split('.')[0]}.pdf",
-                    mime="application/pdf",
-                    key=f"pdf_no_crack_{idx}",
-                )
-
-                continue
-
-
+            # Nếu tới đây thì CHỈ có trường hợp có vết nứt
             st.write("---")
             tab_stage1, tab_stage2 = st.tabs(
                 ["Stage 1 – Báo cáo chi tiết", "Stage 2 – Phân loại vết nứt"]
@@ -1629,7 +1605,7 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 def show_auth_page():
-    st.title("BKAI -MÔ HÌNH CNN PHÁT HIỆN VẾT VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG ")
+    st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG")
     st.subheader("Vui lòng đăng nhập để sử dụng model phân tích vết nứt bê tông.")
 
     tab_login, tab_register = st.tabs(["🔑 Đăng nhập", "📝 Đăng ký"])
@@ -1678,35 +1654,3 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
