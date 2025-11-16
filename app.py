@@ -25,6 +25,8 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus.doctemplate import LayoutError
+from reportlab.pdfgen.canvas import Canvas as RLCanvas
+
 
 # =========================================================
 # 0. CẤU HÌNH CHUNG
@@ -1539,6 +1541,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
