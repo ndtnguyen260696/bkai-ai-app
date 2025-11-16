@@ -677,6 +677,7 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     buf.seek(0)
     return buf
 
+
 # =========================================================
 # 4. STAGE 2 – TABLE ĐẸP + MAPPING ẢNH
 # =========================================================
@@ -1566,6 +1567,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
