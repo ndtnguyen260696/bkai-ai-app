@@ -167,7 +167,7 @@ def export_pdf(
     - Trang 3: Logo nhỏ + tiêu đề + bảng metrics
 
     Nếu build bị LayoutError (nội dung quá lớn),
-    sẽ tự động dùng bản fallback 2 trang: Trang 1 hình, Trang 2 bảng (không có biểu đồ).
+    sẽ tự động dùng bản fallback 1 trang (logo + tiêu đề + bảng metrics rút gọn).
     """
     from PIL import Image as PILImage
 
@@ -239,13 +239,13 @@ def export_pdf(
         buf.seek(0)
         return RLImage(buf, width=w * scale, height=h * scale)
 
-    # Helper: tạo bảng metrics (dùng lại cho cả bản chuẩn và fallback)
-    def build_metrics_table():
+    # Helper: tạo bảng metrics dùng chung
+    def build_metrics_table(style_desc):
         data = [[
-            Paragraph("Chỉ số (VI)", small_style),
-            Paragraph("Metric (EN)", small_style),
-            Paragraph("Giá trị / Value", small_style),
-            Paragraph("Ý nghĩa / Description", small_style),
+            Paragraph("Chỉ số (VI)", style_desc),
+            Paragraph("Metric (EN)", style_desc),
+            Paragraph("Giá trị / Value", style_desc),
+            Paragraph("Ý nghĩa / Description", style_desc),
         ]]
 
         for _, r in metrics_df.iterrows():
@@ -253,10 +253,10 @@ def export_pdf(
             short_desc = full_desc if len(full_desc) <= 220 else full_desc[:220] + "..."
             data.append(
                 [
-                    Paragraph(str(r["vi"]), small_style),
-                    Paragraph(str(r["en"]), small_style),
-                    Paragraph(str(r["value"]), small_style),
-                    Paragraph(short_desc, small_style),
+                    Paragraph(str(r["vi"]), style_desc),
+                    Paragraph(str(r["en"]), style_desc),
+                    Paragraph(str(r["value"]), style_desc),
+                    Paragraph(short_desc, style_desc),
                 ]
             )
 
@@ -271,7 +271,7 @@ def export_pdf(
             data,
             colWidths=col_widths,
             repeatRows=1,
-            splitByRow=1,  # cho phép bảng tự chia qua trang
+            splitByRow=1,  # cho phép bảng tự chia qua trang (nếu nhiều)
         )
         tbl.setStyle(
             TableStyle(
@@ -289,7 +289,7 @@ def export_pdf(
         )
         return tbl
 
-    # Helper: build thật sự
+    # Helper: build doc từ story
     def build_doc(story_list):
         buf = io.BytesIO()
         doc = SimpleDocTemplate(
@@ -309,7 +309,7 @@ def export_pdf(
     # =====================================================
     story = []
 
-    # ---- TRANG 1 ----
+    # ---- TRANG 1: logo + tiêu đề + 2 ảnh ----
     if os.path.exists(LOGO_PATH):
         story.append(RLImage(LOGO_PATH, width=32 * mm))
         story.append(Spacer(1, 3 * mm))
@@ -332,7 +332,7 @@ def export_pdf(
 
     story.append(PageBreak())
 
-    # ---- TRANG 2: BIỂU ĐỒ ----
+    # ---- TRANG 2: logo nhỏ + 2 biểu đồ ----
     if os.path.exists(LOGO_PATH):
         story.append(RLImage(LOGO_PATH, width=25 * mm))
         story.append(Spacer(1, 2 * mm))
@@ -356,7 +356,7 @@ def export_pdf(
 
     story.append(PageBreak())
 
-    # ---- TRANG 3: BẢNG METRICS ----
+    # ---- TRANG 3: logo nhỏ + bảng metrics ----
     if os.path.exists(LOGO_PATH):
         story.append(RLImage(LOGO_PATH, width=25 * mm))
         story.append(Spacer(1, 2 * mm))
@@ -364,8 +364,8 @@ def export_pdf(
     story.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2_style))
     story.append(Spacer(1, 3 * mm))
 
-    tbl = build_metrics_table()
-    story.append(tbl)
+    tbl_full = build_metrics_table(small_style)
+    story.append(tbl_full)
 
     story.append(Spacer(1, 4 * mm))
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -382,46 +382,29 @@ def export_pdf(
     try:
         return build_doc(story)
     except LayoutError:
-        # ====== BẢN FALLBACK 2 TRANG (an toàn tuyệt đối) ======
+        # ====== BẢN FALLBACK 1 TRANG – CHỈ LOGO + TIÊU ĐỀ + BẢNG ======
         fallback = []
 
-        # Trang 1: giống trên (logo + tiêu đề + 2 ảnh)
         if os.path.exists(LOGO_PATH):
             fallback.append(RLImage(LOGO_PATH, width=32 * mm))
-            fallback.append(Spacer(1, 3 * mm))
-        fallback.append(Paragraph("BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG", title_style))
-        fallback.append(Paragraph("Concrete Crack Inspection Report", subtitle_style))
-        fallback.append(Spacer(1, 5 * mm))
-
-        fallback.append(Paragraph("Ảnh gốc / Original Image", h2_style))
-        rl_orig2 = pil_to_rl(original_img, max_h_ratio=0.35)
-        if rl_orig2 is not None:
-            fallback.append(rl_orig2)
             fallback.append(Spacer(1, 4 * mm))
 
-        fallback.append(Paragraph("Ảnh đã phân tích / Result Image", h2_style))
-        rl_anl2 = pil_to_rl(analyzed_img, max_h_ratio=0.35)
-        if rl_anl2 is not None:
-            fallback.append(rl_anl2)
-            fallback.append(Spacer(1, 6 * mm))
+        fallback.append(Paragraph("BKAI - Báo cáo kiểm tra vết nứt (bản rút gọn)", title_style))
+        fallback.append(
+            Paragraph(
+                "Nội dung chi tiết vượt quá giới hạn khung trang A4, hệ thống tự động rút gọn nhưng vẫn giữ bảng thông tin chính.",
+                normal_style,
+            )
+        )
+        fallback.append(Spacer(1, 6 * mm))
 
-        fallback.append(PageBreak())
-
-        # Trang 2: Logo nhỏ + Bảng metrics (KHÔNG biểu đồ)
-        if os.path.exists(LOGO_PATH):
-            fallback.append(RLImage(LOGO_PATH, width=25 * mm))
-            fallback.append(Spacer(1, 2 * mm))
-
-        fallback.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2_style))
-        fallback.append(Spacer(1, 3 * mm))
-
-        tbl2 = build_metrics_table()
-        fallback.append(tbl2)
+        tbl_simple = build_metrics_table(small_style)
+        fallback.append(tbl_simple)
 
         fallback.append(Spacer(1, 4 * mm))
         fallback.append(
             Paragraph(
-                f"BKAI – Fallback PDF (rút gọn) – {now}",
+                f"BKAI © {datetime.datetime.now().year} – Report generated at {now}",
                 small_style,
             )
         )
@@ -1423,6 +1406,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
