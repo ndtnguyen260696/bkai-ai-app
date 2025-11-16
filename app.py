@@ -186,7 +186,7 @@ def export_pdf(
     page_w, page_h = A4
     LEFT   = 20 * mm
     RIGHT  = 20 * mm
-    TOP    = 15 * mm      # mép trên
+    TOP    = 40 * mm      # mép trên
     BOTTOM = 20 * mm
     CONTENT_W = page_w - LEFT - RIGHT
 
@@ -1570,6 +1570,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
