@@ -174,19 +174,19 @@ def export_pdf(
 ):
     """
     BÁO CÁO BKAI – BẢN PRO++++++:
-    - Dùng reportlab.pdfgen.canvas (canvas.Canvas).
+    - Dùng canvas, không Platypus.
     - Tự động chia nhiều trang nếu bảng metrics quá dài.
     """
 
     buf = io.BytesIO()
-    # ✨ Quan trọng: dùng canvas.Canvas, KHÔNG dùng RLCanvas nữa
-    c = canvas.Canvas(buf, pagesize=A4)
+    c = RLCanvas(buf, pagesize=A4)
 
     # ------------------- CONSTANTS -------------------
     page_w, page_h = A4
     LEFT   = 20 * mm
     RIGHT  = 20 * mm
-    TOP    = 20 * mm
+    # Giảm TOP xuống 15mm để logo “lên sát” mép trên hơn
+    TOP    = 15 * mm
     BOTTOM = 20 * mm
     CONTENT_W = page_w - LEFT - RIGHT
 
@@ -201,7 +201,8 @@ def export_pdf(
     # =================================================
     def draw_header(page_title, subtitle=None, page_no=None):
         """
-        Vẽ logo + tiêu đề + gạch chân, trả về y_bottom của header (tính từ đáy trang).
+        Vẽ logo + tiêu đề + gạch chân, trả về y_bottom của header
+        (tọa độ tính từ đáy trang).
         """
         y_top = page_h - TOP
 
@@ -209,13 +210,14 @@ def export_pdf(
         if os.path.exists(LOGO_PATH):
             try:
                 logo = ImageReader(LOGO_PATH)
-                logo_w = 32 * mm
+                logo_w = 30 * mm          # thu nhỏ nhẹ
                 iw, ih = logo.getSize()
                 logo_h = logo_w * ih / iw
+                # Đẩy logo lên sát hơn mép trên
                 c.drawImage(
                     logo,
                     LEFT,
-                    y_top - logo_h,
+                    y_top - logo_h + 5 * mm,   # +5mm: nhô lên cao hơn chút
                     width=logo_w,
                     height=logo_h,
                     mask="auto",
@@ -226,14 +228,15 @@ def export_pdf(
         # Tiêu đề
         c.setFillColor(colors.black)
         c.setFont(TITLE_FONT, TITLE_SIZE)
-        c.drawCentredString(page_w / 2.0, y_top - 8 * mm, page_title)
+        # Tiêu đề cũng nhích lên một chút
+        c.drawCentredString(page_w / 2.0, y_top - 3 * mm, page_title)
 
         if subtitle:
             c.setFont(BODY_FONT, 11)
-            c.drawCentredString(page_w / 2.0, y_top - 15 * mm, subtitle)
+            c.drawCentredString(page_w / 2.0, y_top - 10 * mm, subtitle)
 
         # Gạch phân cách
-        line_y = y_top - 19 * mm
+        line_y = y_top - 14 * mm
         c.setLineWidth(0.5)
         c.setStrokeColor(colors.black)
         c.line(LEFT, line_y, page_w - RIGHT, line_y)
@@ -242,27 +245,20 @@ def export_pdf(
         footer_y = BOTTOM - 6
         c.setFont(BODY_FONT, SMALL_FONT_SIZE)
         c.setFillColor(colors.grey)
-        footer = (
-            "BKAI – Concrete Crack Inspection | Generated at "
-            f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
-        )
+        footer = f"BKAI – Concrete Crack Inspection | Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
         c.drawString(LEFT, footer_y, footer)
         if page_no is not None:
             c.drawRightString(page_w - RIGHT, footer_y, f"Page {page_no}")
 
-        return line_y - 8 * mm  # y bắt đầu nội dung
+        # Trả về vị trí bắt đầu nội dung, thấp hơn 1 chút để tránh đụng logo
+        return line_y - 10 * mm
 
     # =================================================
     # HELPER: PIL -> IMAGE trên canvas
     # =================================================
     def draw_pil_image(pil_img, x_left, top_y, max_w, max_h):
-        """
-        Vẽ PIL image sao cho không vượt max_w x max_h.
-        Trả về bottom_y.
-        """
         if pil_img is None:
             return top_y
-
         img = ImageReader(pil_img)
         iw, ih = img.getSize()
         scale = min(max_w / iw, max_h / ih, 1.0)
@@ -276,13 +272,9 @@ def export_pdf(
     # HELPER: WRAP TEXT
     # =================================================
     def wrap_text(text, font_name, font_size, max_width):
-        """
-        Cắt text thành nhiều dòng để vừa trong max_width.
-        """
         words = str(text).split()
         if not words:
             return [""]
-
         lines = []
         current = words[0]
         for w in words[1:]:
@@ -296,18 +288,11 @@ def export_pdf(
         lines.append(current)
         return lines
 
-    # =================================================
-    # HELPER: vẽ 1 cell nhiều dòng trong bảng
-    # =================================================
     def draw_wrapped_cell(text, x_left, y_top, col_width, font_name, font_size, leading):
-        """
-        Vẽ text trong một ô, y_top là đỉnh ô (không phải baseline).
-        Trả về tổng chiều cao thật sự đã dùng.
-        """
-        inner_width = col_width - 4  # trừ padding ngang
+        inner_width = col_width - 4
         lines = wrap_text(text, font_name, font_size, inner_width)
         c.setFont(font_name, font_size)
-        text_y = y_top - leading + 2  # padding trên
+        text_y = y_top - leading + 2
         for line in lines:
             c.drawString(x_left + 2, text_y, line)
             text_y -= leading
@@ -315,7 +300,7 @@ def export_pdf(
         return used_height, len(lines)
 
     # =================================================
-    # LẤY KẾT LUẬN & MỨC ĐỘ NGUY HIỂM TỪ metrics_df
+    # LẤY KẾT LUẬN & MỨC ĐỘ NGUY HIỂM
     # =================================================
     severity_val = ""
     summary_val = ""
@@ -330,27 +315,26 @@ def export_pdf(
     if not summary_val:
         summary_val = "Kết luận: Vết nứt có nguy cơ, cần kiểm tra thêm."
 
-    # Chọn màu banner theo severity
     if "Nguy hiểm" in severity_val or "Severe" in severity_val:
-        banner_fill = colors.HexColor("#ffebee")  # hồng nhạt
+        banner_fill = colors.HexColor("#ffebee")
         banner_text = colors.HexColor("#c62828")
     elif "Trung bình" in severity_val:
-        banner_fill = colors.HexColor("#fff3e0")  # cam nhạt
+        banner_fill = colors.HexColor("#fff3e0")
         banner_text = colors.HexColor("#ef6c00")
     else:
-        banner_fill = colors.HexColor("#e8f5e9")  # xanh nhạt
+        banner_fill = colors.HexColor("#e8f5e9")
         banner_text = colors.HexColor("#2e7d32")
 
     # =================================================
-    # =============== PAGE 1: ẢNH + BIỂU ĐỒ ===========
+    # PAGE 1
     # =================================================
     page_no = 1
     content_top_y = draw_header("BÁO CÁO KẾT QUẢ PHÂN TÍCH", page_no=page_no)
 
-    # Ảnh gốc & phân tích
     gap_x = 10 * mm
     slot_w = (CONTENT_W - gap_x) / 2.0
-    max_img_h = 90 * mm  # chiều cao tối đa cho mỗi ảnh
+    # Giảm chiều cao tối đa của ảnh để cách logo xa hơn
+    max_img_h = 80 * mm
 
     c.setFont(BODY_FONT, 11)
     c.setFillColor(colors.black)
@@ -370,19 +354,18 @@ def export_pdf(
         banner_bottom = BOTTOM + 40 * mm
 
     c.setFillColor(banner_fill)
-    c.setStrokeColor(colors.white)  # không cần transparent
+    c.setStrokeColor(colors.transparent)
     c.rect(LEFT, banner_bottom, CONTENT_W, banner_h, stroke=0, fill=1)
 
     c.setFillColor(banner_text)
     c.setFont(BODY_FONT, 11)
     c.drawString(LEFT + 4 * mm, banner_bottom + banner_h / 2.0 - 4, summary_val)
 
-    # Biểu đồ bar & pie
+    # Biểu đồ
     charts_top_y = banner_bottom - 18 * mm
     max_chart_h = 70 * mm
     chart_slot_w = slot_w
 
-    # Bar chart
     if chart_bar_png is not None:
         chart_bar_png.seek(0)
         bar_img = ImageReader(chart_bar_png)
@@ -396,7 +379,6 @@ def export_pdf(
         c.setFillColor(colors.black)
         c.drawString(LEFT, bar_bottom - 10, "Độ tin cậy từng vùng nứt")
 
-    # Pie chart
     if chart_pie_png is not None:
         chart_pie_png.seek(0)
         pie_img = ImageReader(chart_pie_png)
@@ -424,7 +406,7 @@ def export_pdf(
     c.showPage()
 
     # =================================================
-    # =============== PAGE 2+: BẢNG METRICS ==========
+    # PAGE 2+ – BẢNG METRICS (không đổi nhiều so với bản cũ)
     # =================================================
     page_no += 1
     subtitle = "Bảng tóm tắt các chỉ số vết nứt"
@@ -432,7 +414,6 @@ def export_pdf(
         "BÁO CÁO KẾT QUẢ PHÂN TÍCH", subtitle=subtitle, page_no=page_no
     )
 
-    # Chuẩn bị dữ liệu bảng: bỏ Crack Length & Crack Width nếu muốn
     rows = []
     skip_keys = {"Crack Length", "Crack Width"}
     for _, r in metrics_df.iterrows():
@@ -449,29 +430,26 @@ def export_pdf(
         buf.seek(0)
         return buf
 
-    # Cấu hình bảng
     col1_w = 12 * mm
     col2_w = 95 * mm
     col3_w = CONTENT_W - col1_w - col2_w
 
     header_h   = 10 * mm
-    base_lead  = 4.0  # line height bổ sung (sẽ + fontSize)
+    base_lead  = 4.0
     max_body_y = content_top_y - 10 * mm
 
     def start_table_page(page_no):
-        """Vẽ header/footer mới cho trang bảng tiếp theo."""
         c.showPage()
         y0 = draw_header(
             "BÁO CÁO KẾT QUẢ PHÂN TÍCH", subtitle=subtitle, page_no=page_no
         )
         return y0 - 10 * mm
 
-    # Vẽ header bảng cho trang hiện tại
     table_top_y = max_body_y
     x0 = LEFT
     x1 = x0 + col1_w
     x2 = x1 + col2_w
-    x3 = x2 + col3_w  # (x3 không dùng trực tiếp nhưng giữ cho rõ)
+    x3 = x2 + col3_w
 
     def draw_table_header(top_y):
         c.setFillColor(colors.HexColor("#1e88e5"))
@@ -484,61 +462,36 @@ def export_pdf(
         return top_y - header_h
 
     current_y = draw_table_header(table_top_y)
-    row_index = 0
 
     for i, (label, val) in enumerate(rows, start=1):
-        # Ước lượng chiều cao dòng dựa trên wrap_text
         label_lines = wrap_text(label, BODY_FONT, BODY_SIZE, col2_w - 4)
         value_lines = wrap_text(val, BODY_FONT, BODY_SIZE, col3_w - 4)
         n_lines = max(len(label_lines), len(value_lines))
         leading = BODY_SIZE + base_lead
-        row_h = n_lines * leading + 6  # padding dọc
+        row_h = n_lines * leading + 6
 
-        # Nếu không đủ chỗ cho dòng này → sang trang
         if current_y - row_h < BOTTOM + 30 * mm:
             page_no += 1
             current_y = start_table_page(page_no)
             current_y = draw_table_header(current_y)
 
-        # Nền xen kẽ
         if i % 2 == 0:
             c.setFillColor(colors.HexColor("#e3f2fd"))
             c.rect(x0, current_y - row_h, CONTENT_W, row_h, stroke=0, fill=1)
 
-        # Kẻ khung dòng
         c.setStrokeColor(colors.grey)
         c.setLineWidth(0.3)
         c.rect(x0, current_y - row_h, CONTENT_W, row_h, stroke=1, fill=0)
 
-        # Vẽ No.
         c.setFont(BODY_FONT, BODY_SIZE)
         c.setFillColor(colors.black)
         c.drawString(x0 + 2, current_y - leading, str(i))
 
-        # Vẽ text bọc dòng cho 2 cột tiếp theo
-        label_height, _ = draw_wrapped_cell(
-            label,
-            x1,
-            current_y,
-            col2_w,
-            BODY_FONT,
-            BODY_SIZE,
-            leading,
-        )
-        value_height, _ = draw_wrapped_cell(
-            val,
-            x2,
-            current_y,
-            col3_w,
-            BODY_FONT,
-            BODY_SIZE,
-            leading,
-        )
+        draw_wrapped_cell(label, x1, current_y, col2_w, BODY_FONT, BODY_SIZE, leading)
+        draw_wrapped_cell(val,   x2, current_y, col3_w, BODY_FONT, BODY_SIZE, leading)
 
         current_y -= row_h
-        row_index += 1
 
-    # Kết thúc
     c.showPage()
     c.save()
     buf.seek(0)
@@ -551,9 +504,15 @@ def export_pdf(
 # =========================================================
 
 def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
-    left_margin = 25 * mm
-    right_margin = 25 * mm
-    top_margin = 20 * mm
+    """
+    Xuất PDF KIẾN THỨC STAGE 2:
+    - Có logo BKAI + tiêu đề giống Stage 1.
+    - Bảng 5 cột, cột cuối là hình minh hoạ (thumbnail).
+    """
+
+    left_margin   = 20 * mm
+    right_margin  = 20 * mm
+    top_margin    = 20 * mm
     bottom_margin = 20 * mm
 
     buf = io.BytesIO()
@@ -570,82 +529,151 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     for s in styles.byName:
         styles[s].fontName = FONT_NAME
 
-    title = ParagraphStyle(
+    title_style = ParagraphStyle(
         "TitleStage2",
         parent=styles["Title"],
         fontName=FONT_NAME,
         alignment=1,
         fontSize=18,
         leading=22,
+        spaceAfter=6,
     )
-    h2 = ParagraphStyle(
-        "H2Stage2",
-        parent=styles["Heading2"],
+    subtitle_style = ParagraphStyle(
+        "SubTitleStage2",
+        parent=styles["Normal"],
         fontName=FONT_NAME,
-        spaceBefore=8,
-        spaceAfter=4,
+        alignment=1,
+        fontSize=10,
+        leading=12,
+        textColor=colors.grey,
+        spaceAfter=8,
     )
     normal = ParagraphStyle(
         "NormalStage2",
         parent=styles["Normal"],
         fontName=FONT_NAME,
-        leading=12,
+        fontSize=9,
+        leading=11,
     )
 
-    story = []
-    story.append(Paragraph("BKAI – BÁO CÁO KIẾN THỨC VẾT NỨT (STAGE 2)", title))
-    story.append(Spacer(1, 6 * mm))
-    story.append(
+    elements = []
+
+    # ---------- HEADER: logo + title ----------
+    header_row = []
+
+    if os.path.exists(LOGO_PATH):
+        logo_flow = RLImage(LOGO_PATH, width=28 * mm, height=28 * mm)
+        header_row.append(logo_flow)
+        # cột còn lại cho tiêu đề
+        header_row.append(
+            Paragraph("BKAI – BÁO CÁO KIẾN THỨC VẾT NỨT (STAGE 2)", title_style)
+        )
+        header_table = Table(
+            [header_row],
+            colWidths=[30 * mm, doc.width - 30 * mm],
+            hAlign="LEFT",
+        )
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                    ("GRID", (0, 0), (-1, -1), 0, colors.white),
+                ]
+            )
+        )
+        elements.append(header_table)
+    else:
+        elements.append(
+            Paragraph("BKAI – BÁO CÁO KIẾN THỨC VẾT NỨT (STAGE 2)", title_style)
+        )
+
+    elements.append(
         Paragraph(
             "Bảng phân loại các vết nứt bê tông thường gặp theo từng loại cấu kiện (dầm, cột, sàn, tường).",
-            normal,
+            subtitle_style,
         )
     )
-    story.append(Spacer(1, 6 * mm))
 
+    # ---------- CHUẨN BỊ DỮ LIỆU BẢNG ----------
     data = [
         [
             Paragraph("Cấu kiện", normal),
             Paragraph("Loại vết nứt", normal),
-            Paragraph("Nguyên nhân", normal),
-            Paragraph("Đặc trưng hình dạng", normal),
+            Paragraph("Nguyên nhân hình thành vết nứt", normal),
+            Paragraph("Đặc trưng về hình dạng vết nứt", normal),
+            Paragraph("Hình ảnh minh họa vết nứt", normal),
         ]
     ]
 
+    def make_thumb(path: str):
+        if isinstance(path, str) and path and os.path.exists(path):
+            # Thumbnail khoảng 25x25 mm để vừa trang
+            return RLImage(path, width=25 * mm, height=25 * mm)
+        else:
+            return Paragraph("—", normal)
+
     for _, row in component_df.iterrows():
+        img_path = row.get("Ảnh (path)", "") or row.get("Hình ảnh minh họa", "")
         data.append(
             [
                 Paragraph(str(row["Cấu kiện"]), normal),
                 Paragraph(str(row["Loại vết nứt"]), normal),
                 Paragraph(str(row["Nguyên nhân"]), normal),
                 Paragraph(str(row["Đặc trưng hình dạng"]), normal),
+                make_thumb(img_path),
             ]
         )
 
-    tbl = Table(
+    # ---------- TẠO BẢNG 5 CỘT ----------
+    table = Table(
         data,
         colWidths=[
-            0.12 * A4[0],
-            0.2 * A4[0],
-            0.33 * A4[0],
-            0.35 * A4[0],
+            0.10 * A4[0],  # Cấu kiện
+            0.16 * A4[0],  # Loại vết nứt
+            0.27 * A4[0],  # Nguyên nhân
+            0.27 * A4[0],  # Đặc trưng
+            0.20 * A4[0],  # Ảnh
         ],
         repeatRows=1,
+        hAlign="LEFT",
     )
-    tbl.setStyle(
+
+    table.setStyle(
         TableStyle(
             [
+                # Header
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e88e5")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, -1), FONT_NAME),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
+                ("FONTNAME", (0, 0), (-1, 0), FONT_NAME),
+                ("FONTSIZE", (0, 0), (-1, 0), 9),
+
+                # Body
+                ("FONTNAME", (0, 1), (-2, -1), FONT_NAME),
+                ("FONTSIZE", (0, 1), (-2, -1), 8),
+                ("VALIGN", (0, 1), (-1, -1), "TOP"),
+                ("ALIGN", (0, 1), (-2, -1), "LEFT"),
+                ("ALIGN", (-1, 1), (-1, -1), "CENTER"),
+
+                # Padding nhỏ để "bóp" bảng lại
+                ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ]
         )
     )
-    story.append(tbl)
-    doc.build(story)
+
+    elements.append(table)
+
+    doc.build(elements)
     buf.seek(0)
     return buf
 
@@ -1538,6 +1566,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
