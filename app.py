@@ -495,6 +495,99 @@ def export_pdf(
     buf.seek(0)
     return buf
 
+# =========================================================
+# PDF CHO TRƯỜNG HỢP KHÔNG CÓ VẾT NỨT
+# =========================================================
+
+def export_pdf_no_crack(original_img, filename="bkai_report_no_crack.pdf"):
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+
+    page_w, page_h = A4
+    LEFT = 20 * mm
+    RIGHT = 20 * mm
+    TOP = 20 * mm
+    BOTTOM = 20 * mm
+    CONTENT_W = page_w - LEFT - RIGHT
+
+    TITLE_FONT = FONT_NAME
+    BODY_FONT = FONT_NAME
+
+    # ===== HEADER =====
+    def draw_header_no_crack():
+        y_top = page_h - TOP
+
+        # Logo
+        if os.path.exists(LOGO_PATH):
+            try:
+                logo = ImageReader(LOGO_PATH)
+                logo_w = 30 * mm
+                iw, ih = logo.getSize()
+                logo_h = logo_w * ih / iw
+
+                c.drawImage(
+                    logo,
+                    LEFT, 
+                    y_top - logo_h,
+                    width=logo_w,
+                    height=logo_h,
+                    mask="auto",
+                )
+            except:
+                pass
+
+        # Title
+        c.setFont(TITLE_FONT, 18)
+        c.drawCentredString(page_w / 2, y_top - 10 * mm, "BÁO CÁO KẾT QUẢ PHÂN TÍCH")
+
+        return y_top - 25 * mm
+
+    content_top_y = draw_header_no_crack()
+
+    # ===== ẢNH GỐC & ẢNH PHÂN TÍCH =====
+    max_img_h = 90 * mm
+    gap_x = 10 * mm
+    slot_w = (CONTENT_W - gap_x) / 2
+
+    def draw_pil(img, x, top):
+        ir = ImageReader(img)
+        iw, ih = ir.getSize()
+        scale = min(slot_w / iw, max_img_h / ih)
+        w = iw * scale
+        h = ih * scale
+        bottom = top - h
+        c.drawImage(ir, x, bottom, width=w, height=h, mask="auto")
+        return bottom
+   
+    # Tiêu đề ảnh
+    c.setFont(BODY_FONT, 11)
+    c.drawString(LEFT, content_top_y + 4 * mm, "Ảnh gốc")
+    c.drawString(LEFT + slot_w + gap_x, content_top_y + 4 * mm, "Ảnh phân tích")
+
+    # Vẽ ảnh
+    bottom_y = draw_pil(original_img, LEFT, content_top_y)
+    _ = draw_pil(original_img, LEFT + slot_w + gap_x, content_top_y)
+
+    # ===== KẾT LUẬN =====
+    banner_y = bottom_y - 10 * mm
+    banner_h = 16 * mm
+
+    c.setFillColor(colors.HexColor("#e8f5e9"))
+    c.rect(LEFT, banner_y, CONTENT_W, banner_h, stroke=0, fill=1)
+
+    c.setFillColor(colors.HexColor("#2e7d32"))
+    c.setFont(BODY_FONT, 11)
+    c.drawString(
+        LEFT + 4 * mm,
+        banner_y + banner_h/2 - 4,
+        "Không phát hiện vết nứt rõ ràng trong ảnh."
+    )
+
+    # Kết thúc
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    return buf
 
 
 
@@ -1335,6 +1428,21 @@ def run_main_app():
 
             if len(preds_conf) == 0 or analyzed_img is None:
                 continue
+            if len(preds_conf) == 0:
+               st.success("Ảnh không có vết nứt.")
+
+               pdf_buf = export_pdf_no_crack(orig_img)
+
+               st.download_button(
+                    "📄 Tải báo cáo PDF (Không có vết nứt)",
+                    data=pdf_buf,
+                    file_name=f"BKAI_NoCrack_{uploaded_file.name.split('.')[0]}.pdf",
+                    mime="application/pdf",
+                    key=f"pdf_no_crack_{idx}",
+              )
+
+             continue
+
 
             st.write("---")
             tab_stage1, tab_stage2 = st.tabs(
@@ -1570,6 +1678,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
