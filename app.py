@@ -216,7 +216,7 @@ def export_pdf(
                 c.drawImage(
                     logo,
                     LEFT,
-                    y_top - logo_h,
+                    y_top - logo_h+25*mm,
                     width=logo_w,
                     height=logo_h,
                     mask="auto",
@@ -1570,6 +1570,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
