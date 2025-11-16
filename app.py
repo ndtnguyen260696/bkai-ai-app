@@ -6,7 +6,6 @@ import time
 import datetime
 import os
 import json
-import base64
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -772,164 +771,71 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
 # 4. STAGE 2 – TABLE ĐẸP + MAPPING ẢNH (STREAMLIT)
 # =========================================================
 
-# =========================================================
-# 4. STAGE 2 – TABLE ĐẸP + MAPPING ẢNH (STREAMLIT – PRO)
-# =========================================================
-
-def _img_to_base64_html(path: str, max_width_px: int = 90) -> str:
-    """Đổi ảnh file path → <img src='data:image/png;base64,...'> để nhúng vào HTML."""
-    if not (isinstance(path, str) and path and os.path.exists(path)):
-        return "—"
-    try:
-        with open(path, "rb") as f:
-            data = base64.b64encode(f.read()).decode("utf-8")
-        return (
-            f"<img src='data:image/png;base64,{data}' "
-            f"style='max-width:{max_width_px}px;height:auto;border-radius:4px;"
-            f"box-shadow:0 1px 3px rgba(0,0,0,0.25);'/>"
-        )
-    except Exception:
-        return "—"
-
-
 def render_component_crack_table(component_df: pd.DataFrame):
-    """
-    Hiển thị bảng Stage 2 PRO trên giao diện web:
-    - Bảng HTML đẹp, có khung viền, màu header, hover.
-    - Gộp theo Cấu kiện (CỘT / DẦM / SÀN / TƯỜNG).
-    - Cột cuối là hình minh hoạ (thumbnail).
-    """
+    st.markdown("### 2.2. Bảng chi tiết vết nứt theo cấu kiện")
 
-    # CSS cho bảng
-    table_css = """
-    <style>
-    .bkai-stage2-wrapper {
-        border-radius: 8px;
-        border: 1px solid #cfd8dc;
-        padding: 12px 14px 10px 14px;
-        background-color: #ffffff;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-        margin-top: 4px;
-    }
-    .bkai-stage2-title {
-        font-weight: 600;
-        color: #0d47a1;
-        font-size: 16px;
-        margin-bottom: 4px;
-    }
-    .bkai-stage2-subtitle {
-        font-size: 12px;
-        color: #607d8b;
-        margin-bottom: 10px;
-    }
-    .bkai-stage2-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-        table-layout: fixed;
-    }
-    .bkai-stage2-table th,
-    .bkai-stage2-table td {
-        border: 1px solid #b0bec5;
-        padding: 6px 8px;
-        vertical-align: top;
-        word-wrap: break-word;
-    }
-    .bkai-stage2-table thead th {
-        background-color: #e3f2fd;
-        color: #0d47a1;
-        font-weight: 600;
-        text-align: center;
-    }
-    .bkai-stage2-table tbody tr:nth-child(even) {
-        background-color: #fafafa;
-    }
-    .bkai-stage2-table tbody tr:hover {
-        background-color: #fffde7;
-    }
-    .bkai-stage2-group-row {
-        background-color: #bbdefb;
-        font-weight: 600;
-        text-transform: uppercase;
-        color: #0d47a1;
-    }
-    .bkai-stage2-group-row td {
-        padding: 6px 10px;
-        border-left: 4px solid #1976d2;
-    }
-    .bkai-stage2-table td.img-cell {
-        text-align: center;
-    }
-    .bkai-pill {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 999px;
-        font-size: 11px;
-        background: #e3f2fd;
-        color: #0d47a1;
-        margin-bottom: 3px;
-        font-weight: 500;
-    }
-    </style>
-    """
-
-    # Header bảng
-    headers_html = """
-    <thead>
-        <tr>
-            <th style="width:10%;">Cấu kiện</th>
-            <th style="width:18%;">Loại vết nứt</th>
-            <th style="width:30%;">Nguyên nhân hình thành vết nứt</th>
-            <th style="width:28%;">Đặc trưng về hình dạng vết nứt</th>
-            <th style="width:14%;">Hình ảnh minh họa vết nứt</th>
-        </tr>
-    </thead>
-    """
-
-    # Body: nhóm theo Cấu kiện
-    body_rows = []
-    for component, subdf in component_df.groupby("Cấu kiện"):
-        # Hàng group Cấu kiện
-        body_rows.append(
-            f"<tr class='bkai-stage2-group-row'><td colspan='5'>{component.upper()}</td></tr>"
-        )
-
-        for _, row in subdf.iterrows():
-            img_path = row.get("Ảnh (path)", "") or row.get("Hình ảnh minh họa", "")
-            img_html = _img_to_base64_html(img_path)
-
-            body_rows.append(
-                "<tr>"
-                f"<td><span class='bkai-pill'>{row.get('Cấu kiện','')}</span></td>"
-                f"<td>{row.get('Loại vết nứt','')}</td>"
-                f"<td>{row.get('Nguyên nhân','')}</td>"
-                f"<td>{row.get('Đặc trưng hình dạng','')}</td>"
-                f"<td class='img-cell'>{img_html}</td>"
-                "</tr>"
-            )
-
-    table_html = (
-        table_css
-        + "<div class='bkai-stage2-wrapper'>"
-        + "<div class='bkai-stage2-title'>2.2. Bảng chi tiết vết nứt theo cấu kiện</div>"
-        + "<div class='bkai-stage2-subtitle'>"
-        + "Liệt kê các loại vết nứt thường gặp theo từng cấu kiện dầm, cột, sàn, tường – kèm mô tả nguyên nhân, "
-        + "hình dạng và hình ảnh minh họa."
-        + "</div>"
-        + "<table class='bkai-stage2-table'>"
-        + headers_html
-        + "<tbody>"
-        + "\n".join(body_rows)
-        + "</tbody></table></div>"
+    h1, h2, h3, h4, h5 = st.columns([1, 1.2, 2.2, 2.2, 1.6])
+    header_style = (
+        "background-color:#e3f2fd;padding:6px;border:1px solid #90caf9;"
+        "font-weight:bold;text-align:center;"
+    )
+    h1.markdown(f"<div style='{header_style}'>Cấu kiện</div>", unsafe_allow_html=True)
+    h2.markdown(f"<div style='{header_style}'>Loại vết nứt</div>", unsafe_allow_html=True)
+    h3.markdown(
+        f"<div style='{header_style}'>Nguyên nhân hình thành vết nứt</div>",
+        unsafe_allow_html=True,
+    )
+    h4.markdown(
+        f"<div style='{header_style}'>Đặc trưng về hình dạng vết nứt</div>",
+        unsafe_allow_html=True,
+    )
+    h5.markdown(
+        f"<div style='{header_style}'>Hình ảnh minh họa vết nứt</div>",
+        unsafe_allow_html=True,
     )
 
-    st.markdown(table_html, unsafe_allow_html=True)
+    st.markdown("<hr style='margin:2px 0 6px 0;'>", unsafe_allow_html=True)
 
+    for component, subdf in component_df.groupby("Cấu kiện"):
+        st.markdown(
+            f"<div style='background-color:#bbdefb;padding:4px 10px;margin:4px 0;"
+            f"font-weight:bold;border-left:4px solid #1976d2;'>"
+            f"{component.upper()}</div>",
+            unsafe_allow_html=True,
+        )
+
+        first_row = True
+        for _, row in subdf.iterrows():
+            c1, c2, c3, c4, c5 = st.columns([1, 1.2, 2.2, 2.2, 1.6])
+
+            if first_row:
+                c1.markdown(
+                    f"<div style='padding:4px;font-weight:bold;'>{component}</div>",
+                    unsafe_allow_html=True,
+                )
+                first_row = False
+            else:
+                c1.markdown("&nbsp;", unsafe_allow_html=True)
+
+            c2.write(row["Loại vết nứt"])
+            c3.write(row["Nguyên nhân"])
+            c4.write(row["Đặc trưng hình dạng"])
+
+            img_path = row.get("Ảnh (path)", "") or row.get("Hình ảnh minh họa", "")
+            if isinstance(img_path, str) and img_path and os.path.exists(img_path):
+                c5.image(img_path, use_container_width=True)
+            else:
+                c5.write("—")
+
+        st.markdown(
+            "<hr style='margin:6px 0 10px 0;border-top:1px dashed #b0bec5;'>",
+            unsafe_allow_html=True,
+        )
 
 def show_stage2_demo(key_prefix="stage2"):
     st.subheader("Stage 2 – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
 
-    # 2.0 Hình minh hoạ tổng quan
+    # 2.0 Hình minh hoạ
     st.markdown("### 2.0. Sơ đồ & ví dụ vết nứt trên kết cấu")
     col_img1, col_img2 = st.columns([3, 4])
     with col_img1:
@@ -983,7 +889,7 @@ def show_stage2_demo(key_prefix="stage2"):
         "(có thể dùng làm phụ lục trong luận văn)."
     )
 
-    # 2.2 Bảng 2 – mapping ảnh đầy đủ (dữ liệu giống code hiện tại của bạn)
+    # 2.2 Bảng 2 – mapping ảnh đầy đủ
     st.subheader("Phân loại các vết nứt bê tông thường xảy ra cho từng loại cấu kiện")
 
     component_crack_data = pd.DataFrame(
@@ -1292,15 +1198,13 @@ def show_stage2_demo(key_prefix="stage2"):
         ]
     )
 
-    # Bảng PRO
     render_component_crack_table(component_crack_data)
 
     st.caption(
         "Bảng 2 – Phân loại các vết nứt bê tông thường gặp theo từng loại cấu kiện "
-        "(dầm, cột, sàn, tường) – phiên bản PRO trên giao diện web."
+        "(dầm, cột, sàn, tường) – có thể in ra phụ lục kèm hình minh họa."
     )
 
-    # 2.3 – Nút tải CSV + PDF kiến thức
     st.markdown("### 2.3. Xuất báo cáo kiến thức Stage 2")
 
     csv_bytes = component_crack_data.to_csv(index=False).encode("utf-8-sig")
@@ -1320,7 +1224,6 @@ def show_stage2_demo(key_prefix="stage2"):
         mime="application/pdf",
         key=f"stage2_pdf_{key_prefix}",
     )
-
 
 # =========================================================
 # 5. LƯU THỐNG KÊ NGƯỜI DÙNG
@@ -1753,5 +1656,4 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
-
 
