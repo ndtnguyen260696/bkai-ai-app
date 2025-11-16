@@ -1429,19 +1429,19 @@ def run_main_app():
             if len(preds_conf) == 0 or analyzed_img is None:
                 continue
             if len(preds_conf) == 0:
-               st.success("Ảnh không có vết nứt.")
+                st.success("Ảnh không có vết nứt.")
 
-               pdf_buf = export_pdf_no_crack(orig_img)
+                pdf_buf = export_pdf_no_crack(orig_img)
 
-               st.download_button(
+                st.download_button(
                     "📄 Tải báo cáo PDF (Không có vết nứt)",
                     data=pdf_buf,
                     file_name=f"BKAI_NoCrack_{uploaded_file.name.split('.')[0]}.pdf",
                     mime="application/pdf",
                     key=f"pdf_no_crack_{idx}",
-              )
+                )
 
-             continue
+                continue
 
 
             st.write("---")
@@ -1678,6 +1678,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
