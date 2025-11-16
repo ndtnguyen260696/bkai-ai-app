@@ -199,10 +199,9 @@ def export_pdf(
     # =================================================
     # HELPER: HEADER / FOOTER
     # =================================================
-   def draw_header(page_title, subtitle=None, page_no=None):
+def draw_header(page_title, subtitle=None, page_no=None):
     """
-    Vẽ logo + tiêu đề, trả về y_top cho nội dung
-    (tọa độ tính từ đáy trang).
+    Vẽ logo + tiêu đề, trả về y_top cho nội dung.
     """
     y_top = page_h - TOP
 
@@ -210,11 +209,10 @@ def export_pdf(
     if os.path.exists(LOGO_PATH):
         try:
             logo = ImageReader(LOGO_PATH)
-            logo_w = 30 * mm          # logo nhỏ hơn một chút
+            logo_w = 30 * mm
             iw, ih = logo.getSize()
             logo_h = logo_w * ih / iw
 
-            # Cho logo "sát" mép trên hơn
             c.drawImage(
                 logo,
                 LEFT,
@@ -235,13 +233,10 @@ def export_pdf(
         c.setFont(BODY_FONT, 11)
         c.drawCentredString(page_w / 2.0, y_top - 13 * mm, subtitle)
 
-    # ❌ Không vẽ đường kẻ ngang nữa
-    # line_y = y_top - 17 * mm
-    # c.setLineWidth(0.5)
-    # c.setStrokeColor(colors.black)
-    # c.line(LEFT, line_y, page_w - RIGHT, line_y)
+    # ❌ Bỏ đường kẻ ngang
+    # (Đoạn line bị xoá đi)
 
-    # ===== Footer + số trang =====
+    # ===== Footer =====
     footer_y = BOTTOM - 6
     c.setFont(BODY_FONT, SMALL_FONT_SIZE)
     c.setFillColor(colors.grey)
@@ -253,11 +248,9 @@ def export_pdf(
     if page_no is not None:
         c.drawRightString(page_w - RIGHT, footer_y, f"Page {page_no}")
 
-    # Vị trí bắt đầu nội dung:
-    # - cách top 1 khoảng để logo + title
-    # - cộng thêm 10mm nữa để ảnh gốc/ảnh phân tích xuống thấp hơn
-    content_top_y = y_top - 23 * mm  # (tùy, nhưng đã thấp hơn trước ~10mm)
-    return content_top_y
+    # Trả về vị trí bắt đầu nội dung (ảnh gốc/ảnh phân tích)
+    return y_top - 23 * mm
+
 
 
     # =================================================
@@ -1576,6 +1569,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
