@@ -171,6 +171,7 @@ def export_pdf(
     chart_pie_png=None,
     filename="bkai_report_pro_plus.pdf",
 ):
+    global mm  # dùng mm global đã import ở đầu file
     """
     BÁO CÁO BKAI – BẢN PRO++++++:
     - Dùng canvas, không Platypus.
@@ -198,59 +199,66 @@ def export_pdf(
     # =================================================
     # HELPER: HEADER / FOOTER
     # =================================================
-    def draw_header(page_title, subtitle=None, page_no=None):
-        """
-        Vẽ logo + tiêu đề + gạch chân, trả về y_bottom của header
-        (tọa độ tính từ đáy trang).
-        """
-        y_top = page_h - TOP
+   def draw_header(page_title, subtitle=None, page_no=None):
+    """
+    Vẽ logo + tiêu đề, trả về y_top cho nội dung
+    (tọa độ tính từ đáy trang).
+    """
+    y_top = page_h - TOP
 
-        # Logo
-        if os.path.exists(LOGO_PATH):
-            try:
-                logo = ImageReader(LOGO_PATH)
-                logo_w = 30 * mm          # thu nhỏ nhẹ
-                iw, ih = logo.getSize()
-                logo_h = logo_w * ih / iw
-                # Đẩy logo lên sát hơn mép trên
-                c.drawImage(
-                    logo,
-                    LEFT,
-                    y_top - logo_h + 5 * mm,   # +5mm: nhô lên cao hơn chút
-                    width=logo_w,
-                    height=logo_h,
-                    mask="auto",
-                )
-            except Exception:
-                pass
+    # ===== Logo =====
+    if os.path.exists(LOGO_PATH):
+        try:
+            logo = ImageReader(LOGO_PATH)
+            logo_w = 30 * mm          # logo nhỏ hơn một chút
+            iw, ih = logo.getSize()
+            logo_h = logo_w * ih / iw
 
-        # Tiêu đề
-        c.setFillColor(colors.black)
-        c.setFont(TITLE_FONT, TITLE_SIZE)
-        # Tiêu đề cũng nhích lên một chút
-        c.drawCentredString(page_w / 2.0, y_top - 3 * mm, page_title)
+            # Cho logo "sát" mép trên hơn
+            c.drawImage(
+                logo,
+                LEFT,
+                y_top - logo_h,
+                width=logo_w,
+                height=logo_h,
+                mask="auto",
+            )
+        except Exception:
+            pass
 
-        if subtitle:
-            c.setFont(BODY_FONT, 11)
-            c.drawCentredString(page_w / 2.0, y_top - 10 * mm, subtitle)
+    # ===== Tiêu đề =====
+    c.setFillColor(colors.black)
+    c.setFont(TITLE_FONT, TITLE_SIZE)
+    c.drawCentredString(page_w / 2.0, y_top - 6 * mm, page_title)
 
-        # Gạch phân cách
-        line_y = y_top - 20 * mm
-        c.setLineWidth(0.5)
-        c.setStrokeColor(colors.black)
-        c.line(LEFT, line_y, page_w - RIGHT, line_y)
+    if subtitle:
+        c.setFont(BODY_FONT, 11)
+        c.drawCentredString(page_w / 2.0, y_top - 13 * mm, subtitle)
 
-        # Footer + số trang
-        footer_y = BOTTOM - 6
-        c.setFont(BODY_FONT, SMALL_FONT_SIZE)
-        c.setFillColor(colors.grey)
-        footer = f"BKAI – Concrete Crack Inspection | Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
-        c.drawString(LEFT, footer_y, footer)
-        if page_no is not None:
-            c.drawRightString(page_w - RIGHT, footer_y, f"Page {page_no}")
+    # ❌ Không vẽ đường kẻ ngang nữa
+    # line_y = y_top - 17 * mm
+    # c.setLineWidth(0.5)
+    # c.setStrokeColor(colors.black)
+    # c.line(LEFT, line_y, page_w - RIGHT, line_y)
 
-        # Trả về vị trí bắt đầu nội dung, thấp hơn 1 chút để tránh đụng logo
-        return line_y - 10 * mm
+    # ===== Footer + số trang =====
+    footer_y = BOTTOM - 6
+    c.setFont(BODY_FONT, SMALL_FONT_SIZE)
+    c.setFillColor(colors.grey)
+    footer = (
+        f"BKAI – Concrete Crack Inspection | "
+        f"Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
+    )
+    c.drawString(LEFT, footer_y, footer)
+    if page_no is not None:
+        c.drawRightString(page_w - RIGHT, footer_y, f"Page {page_no}")
+
+    # Vị trí bắt đầu nội dung:
+    # - cách top 1 khoảng để logo + title
+    # - cộng thêm 10mm nữa để ảnh gốc/ảnh phân tích xuống thấp hơn
+    content_top_y = y_top - 23 * mm  # (tùy, nhưng đã thấp hơn trước ~10mm)
+    return content_top_y
+
 
     # =================================================
     # HELPER: PIL -> IMAGE trên canvas
@@ -1568,6 +1576,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
