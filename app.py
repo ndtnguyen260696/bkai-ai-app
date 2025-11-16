@@ -1617,18 +1617,18 @@ def show_auth_page():
             st.markdown("### BKAI")
 
     with col_header:
-    st.markdown(
-        "<h2 style='margin:5px 0 5px 0; color:#333;'>"
-        "BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG"
-        "</h2>",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        "<p style='font-size:15px; color:#555;'>"
-        "Vui lòng đăng nhập hoặc đăng ký để sử dụng hệ thống."
-        "</p>",
-        unsafe_allow_html=True,
-    )
+       st.markdown(
+           "<h2 style='margin:5px 0 5px 0; color:#333;'>"
+           "BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG"
+           "</h2>",
+           unsafe_allow_html=True,
+       )
+       st.markdown(
+           "<p style='font-size:15px; color:#555;'>"
+           "Vui lòng đăng nhập hoặc đăng ký để sử dụng hệ thống."
+           "</p>",
+           unsafe_allow_html=True,
+      )
 
     st.write("---")
 
@@ -1683,6 +1683,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
