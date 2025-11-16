@@ -25,7 +25,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus.doctemplate import LayoutError
-from reportlab.pdfgen import canvas  # dùng canvas.Canvas, KHÔNG alias RLCanvas nữa
+from reportlab.pdfgen import canvas  
 
 
 # =========================================================
@@ -179,7 +179,7 @@ def export_pdf(
     """
 
     buf = io.BytesIO()
-    c = RLCanvas(buf, pagesize=A4)
+    c = canvas.Canvas(buf, pagesize=A4)
 
     # ------------------- CONSTANTS -------------------
     page_w, page_h = A4
@@ -1567,6 +1567,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
