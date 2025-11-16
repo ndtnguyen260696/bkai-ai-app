@@ -25,7 +25,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus.doctemplate import LayoutError
-from reportlab.pdfgen.canvas import Canvas as RLCanvas
+from reportlab.pdfgen import canvas  # dùng canvas.Canvas, KHÔNG alias RLCanvas nữa
 
 
 # =========================================================
@@ -150,7 +150,7 @@ def estimate_severity(p, img_w, img_h):
         return "Nguy hiểm (Severe)"
 
 # =========================================================
-# 2. XUẤT PDF STAGE 1
+# 2. XUẤT PDF STAGE 1 – BẢN PRO (dùng canvas, không Platypus)
 # =========================================================
 
 import io
@@ -160,7 +160,6 @@ import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.pdfgen import canvas as RLCanvas
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics   # để đo độ rộng chữ
 
@@ -175,12 +174,13 @@ def export_pdf(
 ):
     """
     BÁO CÁO BKAI – BẢN PRO++++++:
-    - Dùng canvas, không Platypus.
+    - Dùng reportlab.pdfgen.canvas (canvas.Canvas).
     - Tự động chia nhiều trang nếu bảng metrics quá dài.
     """
 
     buf = io.BytesIO()
-    c = RLCanvas(buf, pagesize=A4)
+    # ✨ Quan trọng: dùng canvas.Canvas, KHÔNG dùng RLCanvas nữa
+    c = canvas.Canvas(buf, pagesize=A4)
 
     # ------------------- CONSTANTS -------------------
     page_w, page_h = A4
@@ -201,8 +201,7 @@ def export_pdf(
     # =================================================
     def draw_header(page_title, subtitle=None, page_no=None):
         """
-        Vẽ logo + tiêu đề + gạch chân, trả về y_bottom của header
-        (tọa độ tính từ đáy trang).
+        Vẽ logo + tiêu đề + gạch chân, trả về y_bottom của header (tính từ đáy trang).
         """
         y_top = page_h - TOP
 
@@ -243,7 +242,10 @@ def export_pdf(
         footer_y = BOTTOM - 6
         c.setFont(BODY_FONT, SMALL_FONT_SIZE)
         c.setFillColor(colors.grey)
-        footer = f"BKAI – Concrete Crack Inspection | Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
+        footer = (
+            "BKAI – Concrete Crack Inspection | Generated at "
+            f"{datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
+        )
         c.drawString(LEFT, footer_y, footer)
         if page_no is not None:
             c.drawRightString(page_w - RIGHT, footer_y, f"Page {page_no}")
@@ -359,7 +361,6 @@ def export_pdf(
     right_bottom = draw_pil_image(
         analyzed_img, LEFT + slot_w + gap_x, content_top_y, slot_w, max_img_h
     )
-
     images_bottom_y = min(left_bottom, right_bottom)
 
     # Banner kết luận
@@ -369,7 +370,7 @@ def export_pdf(
         banner_bottom = BOTTOM + 40 * mm
 
     c.setFillColor(banner_fill)
-    c.setStrokeColor(colors.transparent)
+    c.setStrokeColor(colors.white)  # không cần transparent
     c.rect(LEFT, banner_bottom, CONTENT_W, banner_h, stroke=0, fill=1)
 
     c.setFillColor(banner_text)
@@ -433,7 +434,7 @@ def export_pdf(
 
     # Chuẩn bị dữ liệu bảng: bỏ Crack Length & Crack Width nếu muốn
     rows = []
-    skip_keys = {"Crack Length", "Crack Width"}  # anh chỉnh theo ý
+    skip_keys = {"Crack Length", "Crack Width"}
     for _, r in metrics_df.iterrows():
         en_name = str(r.get("en", "")).strip()
         if en_name in skip_keys:
@@ -442,7 +443,6 @@ def export_pdf(
         val = str(r.get("value", ""))
         rows.append((label, val))
 
-    # Nếu không có rows thì thôi
     if not rows:
         c.showPage()
         c.save()
@@ -471,7 +471,7 @@ def export_pdf(
     x0 = LEFT
     x1 = x0 + col1_w
     x2 = x1 + col2_w
-    x3 = x2 + col3_w
+    x3 = x2 + col3_w  # (x3 không dùng trực tiếp nhưng giữ cho rõ)
 
     def draw_table_header(top_y):
         c.setFillColor(colors.HexColor("#1e88e5"))
@@ -494,7 +494,7 @@ def export_pdf(
         leading = BODY_SIZE + base_lead
         row_h = n_lines * leading + 6  # padding dọc
 
-        # Nếu không đủ chỗ cho dòng này + ít nhất 1 dòng nữa -> sang trang
+        # Nếu không đủ chỗ cho dòng này → sang trang
         if current_y - row_h < BOTTOM + 30 * mm:
             page_no += 1
             current_y = start_table_page(page_no)
@@ -543,9 +543,6 @@ def export_pdf(
     c.save()
     buf.seek(0)
     return buf
-
-
-
 
 
 
@@ -1541,6 +1538,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
