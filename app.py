@@ -6,6 +6,7 @@ import time
 import datetime
 import os
 import json
+import base64
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -774,63 +775,102 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
 def render_component_crack_table(component_df: pd.DataFrame):
     st.markdown("### 2.2. Bảng chi tiết vết nứt theo cấu kiện")
 
-    h1, h2, h3, h4, h5 = st.columns([1, 1.2, 2.2, 2.2, 1.6])
-    header_style = (
-        "background-color:#e3f2fd;padding:6px;border:1px solid #90caf9;"
-        "font-weight:bold;text-align:center;"
-    )
-    h1.markdown(f"<div style='{header_style}'>Cấu kiện</div>", unsafe_allow_html=True)
-    h2.markdown(f"<div style='{header_style}'>Loại vết nứt</div>", unsafe_allow_html=True)
-    h3.markdown(
-        f"<div style='{header_style}'>Nguyên nhân hình thành vết nứt</div>",
-        unsafe_allow_html=True,
-    )
-    h4.markdown(
-        f"<div style='{header_style}'>Đặc trưng về hình dạng vết nứt</div>",
-        unsafe_allow_html=True,
-    )
-    h5.markdown(
-        f"<div style='{header_style}'>Hình ảnh minh họa vết nứt</div>",
-        unsafe_allow_html=True,
+    # ===== CSS cho bảng đẹp, có khung viền =====
+    css = """
+    <style>
+    table.bkai-stage2 {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 13px;
+    }
+    table.bkai-stage2 th,
+    table.bkai-stage2 td {
+        border: 1px solid #90caf9;
+        padding: 6px 8px;
+        vertical-align: top;
+    }
+    table.bkai-stage2 thead th {
+        background: #e3f2fd;
+        text-align: center;
+        font-weight: 600;
+    }
+    /* Dòng tiêu đề nhóm CẤU KIỆN */
+    tr.bkai-group-row td {
+        background: #bbdefb;
+        font-weight: 600;
+        border-top: 2px solid #1976d2;
+    }
+    table.bkai-stage2 img {
+        max-width: 70px;
+        height: auto;
+        display: block;
+        margin: 2px auto;
+    }
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+    # ===== Hàm phụ: chuyển ảnh -> base64 để nhúng vào HTML =====
+    def img_to_base64(path: str) -> str:
+        if isinstance(path, str) and path and os.path.exists(path):
+            try:
+                with open(path, "rb") as f:
+                    data = base64.b64encode(f.read()).decode("utf-8")
+                return f"<img src='data:image/png;base64,{data}' />"
+            except Exception:
+                return "—"
+        return "—"
+
+    # ===== Xây HTML bảng =====
+    html = []
+    html.append("<table class='bkai-stage2'>")
+
+    # Header
+    html.append(
+        """
+        <thead>
+          <tr>
+            <th style="width:10%">Cấu kiện</th>
+            <th style="width:15%">Loại vết nứt</th>
+            <th style="width:30%">Nguyên nhân hình thành vết nứt</th>
+            <th style="width:30%">Đặc trưng về hình dạng vết nứt</th>
+            <th style="width:15%">Hình ảnh minh họa vết nứt</th>
+          </tr>
+        </thead>
+        <tbody>
+        """
     )
 
-    st.markdown("<hr style='margin:2px 0 6px 0;'>", unsafe_allow_html=True)
-
+    # Body – nhóm theo "Cấu kiện"
     for component, subdf in component_df.groupby("Cấu kiện"):
-        st.markdown(
-            f"<div style='background-color:#bbdefb;padding:4px 10px;margin:4px 0;"
-            f"font-weight:bold;border-left:4px solid #1976d2;'>"
-            f"{component.upper()}</div>",
-            unsafe_allow_html=True,
+        # Dòng group (CỘT, DẦM, SÀN, TƯỜNG…)
+        html.append(
+            f"""
+            <tr class="bkai-group-row">
+              <td colspan="5">{component.upper()}</td>
+            </tr>
+            """
         )
 
-        first_row = True
+        # Các dòng chi tiết bên dưới
         for _, row in subdf.iterrows():
-            c1, c2, c3, c4, c5 = st.columns([1, 1.2, 2.2, 2.2, 1.6])
+            img_html = img_to_base64(row.get("Ảnh (path)", "") or row.get("Hình ảnh minh họa", ""))
+            html.append(
+                f"""
+                <tr>
+                  <td>{component}</td>
+                  <td>{row['Loại vết nứt']}</td>
+                  <td>{row['Nguyên nhân']}</td>
+                  <td>{row['Đặc trưng hình dạng']}</td>
+                  <td style="text-align:center;">{img_html}</td>
+                </tr>
+                """
+            )
 
-            if first_row:
-                c1.markdown(
-                    f"<div style='padding:4px;font-weight:bold;'>{component}</div>",
-                    unsafe_allow_html=True,
-                )
-                first_row = False
-            else:
-                c1.markdown("&nbsp;", unsafe_allow_html=True)
+    html.append("</tbody></table>")
 
-            c2.write(row["Loại vết nứt"])
-            c3.write(row["Nguyên nhân"])
-            c4.write(row["Đặc trưng hình dạng"])
+    st.markdown("".join(html), unsafe_allow_html=True)
 
-            img_path = row.get("Ảnh (path)", "") or row.get("Hình ảnh minh họa", "")
-            if isinstance(img_path, str) and img_path and os.path.exists(img_path):
-                c5.image(img_path, use_container_width=True)
-            else:
-                c5.write("—")
-
-        st.markdown(
-            "<hr style='margin:6px 0 10px 0;border-top:1px dashed #b0bec5;'>",
-            unsafe_allow_html=True,
-        )
 
 def show_stage2_demo(key_prefix="stage2"):
     st.subheader("Stage 2 – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
@@ -1274,11 +1314,13 @@ def run_main_app():
                 "Nghề nghiệp / Nhóm đối tượng *",
                 [
                     "Sinh viên",
-                    "Kỹ sư xây dựng",
+                    "Học viên cao học/ Nghiên cứu sinh",
+                    "Kỹ sư xây kết cấu",
+                    "Kỹ sư hiện trường (Site Engineer)",
+                    "Đơn vị tư vấn giám sát (TVGS)",
+                    "Nhà thầu thi công xây dựng",
+                    "Chủ đầu tư, Quản Lý Dự án",
                     "Kỹ sư IT",
-                    "Nghiên cứu viên",
-                    "Học viên cao học",
-                    "Giảng viên",
                     "Khác",
                 ],
             )
@@ -1654,3 +1696,4 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
