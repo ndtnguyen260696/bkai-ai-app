@@ -19,7 +19,7 @@ from reportlab.platypus import (
     PageBreak,
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
@@ -171,9 +171,8 @@ def export_pdf(
     chart_pie_png=None,
     filename="bkai_report_pro_plus.pdf",
 ):
-    global mm  # dùng mm global đã import ở đầu file
     """
-    BÁO CÁO BKAI – BẢN PRO++++++:
+    BÁO CÁO BKAI – STAGE 1 (PRO):
     - Dùng canvas, không Platypus.
     - Tự động chia nhiều trang nếu bảng metrics quá dài.
     """
@@ -185,8 +184,7 @@ def export_pdf(
     page_w, page_h = A4
     LEFT   = 20 * mm
     RIGHT  = 20 * mm
-    # Giảm TOP xuống 15mm để logo “lên sát” mép trên hơn
-    TOP    = 15 * mm
+    TOP    = 15 * mm      # mép trên
     BOTTOM = 20 * mm
     CONTENT_W = page_w - LEFT - RIGHT
 
@@ -199,59 +197,57 @@ def export_pdf(
     # =================================================
     # HELPER: HEADER / FOOTER
     # =================================================
-def draw_header(page_title, subtitle=None, page_no=None):
-    """
-    Vẽ logo + tiêu đề, trả về y_top cho nội dung.
-    """
-    y_top = page_h - TOP
+    def draw_header(page_title, subtitle=None, page_no=None):
+        """
+        Vẽ logo + tiêu đề, trả về y_top cho nội dung.
+        """
+        y_top = page_h - TOP
 
-    # ===== Logo =====
-    if os.path.exists(LOGO_PATH):
-        try:
-            logo = ImageReader(LOGO_PATH)
-            logo_w = 30 * mm
-            iw, ih = logo.getSize()
-            logo_h = logo_w * ih / iw
+        # ===== Logo =====
+        if os.path.exists(LOGO_PATH):
+            try:
+                logo = ImageReader(LOGO_PATH)
+                logo_w = 30 * mm
+                iw, ih = logo.getSize()
+                logo_h = logo_w * ih / iw
 
-            c.drawImage(
-                logo,
-                LEFT,
-                y_top - logo_h,
-                width=logo_w,
-                height=logo_h,
-                mask="auto",
-            )
-        except Exception:
-            pass
+                c.drawImage(
+                    logo,
+                    LEFT,
+                    y_top - logo_h,
+                    width=logo_w,
+                    height=logo_h,
+                    mask="auto",
+                )
+            except Exception:
+                pass
 
-    # ===== Tiêu đề =====
-    c.setFillColor(colors.black)
-    c.setFont(TITLE_FONT, TITLE_SIZE)
-    c.drawCentredString(page_w / 2.0, y_top - 6 * mm, page_title)
+        # ===== Tiêu đề =====
+        c.setFillColor(colors.black)
+        c.setFont(TITLE_FONT, TITLE_SIZE)
+        c.drawCentredString(page_w / 2.0, y_top - 6 * mm, page_title)
 
-    if subtitle:
-        c.setFont(BODY_FONT, 11)
-        c.drawCentredString(page_w / 2.0, y_top - 13 * mm, subtitle)
+        if subtitle:
+            c.setFont(BODY_FONT, 11)
+            c.drawCentredString(page_w / 2.0, y_top - 13 * mm, subtitle)
 
-    # ❌ Bỏ đường kẻ ngang
-    # (Đoạn line bị xoá đi)
+        # ❌ Không vẽ đường kẻ ngang nữa
 
-    # ===== Footer =====
-    footer_y = BOTTOM - 6
-    c.setFont(BODY_FONT, SMALL_FONT_SIZE)
-    c.setFillColor(colors.grey)
-    footer = (
-        f"BKAI – Concrete Crack Inspection | "
-        f"Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
-    )
-    c.drawString(LEFT, footer_y, footer)
-    if page_no is not None:
-        c.drawRightString(page_w - RIGHT, footer_y, f"Page {page_no}")
+        # ===== Footer =====
+        footer_y = BOTTOM - 6
+        c.setFont(BODY_FONT, SMALL_FONT_SIZE)
+        c.setFillColor(colors.grey)
+        footer = (
+            f"BKAI – Concrete Crack Inspection | "
+            f"Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
+        )
+        c.drawString(LEFT, footer_y, footer)
+        if page_no is not None:
+            c.drawRightString(page_w - RIGHT, footer_y, f"Page {page_no}")
 
-    # Trả về vị trí bắt đầu nội dung (ảnh gốc/ảnh phân tích)
-    return y_top - 23 * mm
-
-
+        # Vị trí bắt đầu nội dung (ảnh gốc/ảnh phân tích),
+        # dịch xuống dưới header thêm ~25mm
+        return y_top - 25 * mm
 
     # =================================================
     # HELPER: PIL -> IMAGE trên canvas
@@ -326,13 +322,13 @@ def draw_header(page_title, subtitle=None, page_no=None):
         banner_text = colors.HexColor("#2e7d32")
 
     # =================================================
-    # PAGE 1
+    # PAGE 1 – ẢNH + BIỂU ĐỒ
     # =================================================
     page_no = 1
     content_top_y = draw_header("BÁO CÁO KẾT QUẢ PHÂN TÍCH", page_no=page_no)
 
-    from reportlab.lib.units import mm
-    content_top_y -= 30 * mm
+    # Hạ ảnh gốc & ảnh phân tích xuống thêm ~10mm
+    content_top_y -= 10 * mm
 
     gap_x = 10 * mm
     slot_w = (CONTENT_W - gap_x) / 2.0
@@ -408,7 +404,7 @@ def draw_header(page_title, subtitle=None, page_no=None):
     c.showPage()
 
     # =================================================
-    # PAGE 2+ – BẢNG METRICS (không đổi nhiều so với bản cũ)
+    # PAGE 2+ – BẢNG METRICS
     # =================================================
     page_no += 1
     subtitle = "Bảng tóm tắt các chỉ số vết nứt"
@@ -427,7 +423,6 @@ def draw_header(page_title, subtitle=None, page_no=None):
         rows.append((label, val))
 
     if not rows:
-        c.showPage()
         c.save()
         buf.seek(0)
         return buf
@@ -451,7 +446,7 @@ def draw_header(page_title, subtitle=None, page_no=None):
     x0 = LEFT
     x1 = x0 + col1_w
     x2 = x1 + col2_w
-    x3 = x2 + col3_w
+    x3 = x2 + col3_w  # (giữ cho dễ đọc, tuy không dùng x3)
 
     def draw_table_header(top_y):
         c.setFillColor(colors.HexColor("#1e88e5"))
@@ -494,10 +489,10 @@ def draw_header(page_title, subtitle=None, page_no=None):
 
         current_y -= row_h
 
-    c.showPage()
     c.save()
     buf.seek(0)
     return buf
+
 
 
 
@@ -510,6 +505,7 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     Xuất PDF KIẾN THỨC STAGE 2:
     - Có logo BKAI + tiêu đề giống Stage 1.
     - Bảng 5 cột, cột cuối là hình minh hoạ (thumbnail).
+    - Trang xoay ngang (A4 landscape) để bảng không tràn.
     """
 
     left_margin   = 20 * mm
@@ -520,12 +516,15 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
-        pagesize=A4,
+        pagesize=A4_LANDSCAPE,   # <--- xoay ngang
         leftMargin=left_margin,
         rightMargin=right_margin,
         topMargin=top_margin,
         bottomMargin=bottom_margin,
     )
+
+    page_w, page_h = A4_LANDSCAPE
+    usable_width = page_w - left_margin - right_margin
 
     styles = getSampleStyleSheet()
     for s in styles.byName:
@@ -554,8 +553,8 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
         "NormalStage2",
         parent=styles["Normal"],
         fontName=FONT_NAME,
-        fontSize=9,
-        leading=11,
+        fontSize=8,     # ↓ thu nhỏ 1 chút
+        leading=10,
     )
 
     elements = []
@@ -566,7 +565,6 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     if os.path.exists(LOGO_PATH):
         logo_flow = RLImage(LOGO_PATH, width=28 * mm, height=28 * mm)
         header_row.append(logo_flow)
-        # cột còn lại cho tiêu đề
         header_row.append(
             Paragraph("BKAI – BÁO CÁO KIẾN THỨC VẾT NỨT (STAGE 2)", title_style)
         )
@@ -634,11 +632,11 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     table = Table(
         data,
         colWidths=[
-            0.10 * A4[0],  # Cấu kiện
-            0.16 * A4[0],  # Loại vết nứt
-            0.27 * A4[0],  # Nguyên nhân
-            0.27 * A4[0],  # Đặc trưng
-            0.20 * A4[0],  # Ảnh
+            0.12 * usable_width,  # Cấu kiện
+            0.18 * usable_width,  # Loại vết nứt
+            0.30 * usable_width,  # Nguyên nhân
+            0.25 * usable_width,  # Đặc trưng
+            0.15 * usable_width,  # Ảnh
         ],
         repeatRows=1,
         hAlign="LEFT",
@@ -678,6 +676,7 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     doc.build(elements)
     buf.seek(0)
     return buf
+
 
 
 # =========================================================
@@ -1147,7 +1146,7 @@ def show_stage2_demo(key_prefix="stage2"):
     pdf_buf = export_stage2_pdf(component_crack_data)
     st.download_button(
         "📄 Tải báo cáo kiến thức Stage 2 (PDF)",
-        data=pdf_buf,
+        data=pdf_buf.getvalue(),
         file_name="BKAI_Stage2_Report.pdf",
         mime="application/pdf",
         key=f"stage2_pdf_{key_prefix}",
@@ -1489,7 +1488,7 @@ def run_main_app():
 
                 st.download_button(
                     "📄 Tải báo cáo PDF cho ảnh này",
-                    data=pdf_buf,
+                    data=pdf_buf.getvalue(),
                     file_name=f"BKAI_CrackReport_{uploaded_file.name.split('.')[0]}.pdf",
                     mime="application/pdf",
                     key=f"pdf_btn_{idx}_{uploaded_file.name}",
@@ -1569,6 +1568,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
