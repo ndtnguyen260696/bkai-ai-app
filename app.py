@@ -236,7 +236,7 @@ def export_pdf(
             c.drawCentredString(page_w / 2.0, y_top - 10 * mm, subtitle)
 
         # Gạch phân cách
-        line_y = y_top - 14 * mm
+        line_y = y_top - 20 * mm
         c.setLineWidth(0.5)
         c.setStrokeColor(colors.black)
         c.line(LEFT, line_y, page_w - RIGHT, line_y)
@@ -331,10 +331,12 @@ def export_pdf(
     page_no = 1
     content_top_y = draw_header("BÁO CÁO KẾT QUẢ PHÂN TÍCH", page_no=page_no)
 
+    from reportlab.lib.units import mm
+    content_top_y -= 30 * mm
+
     gap_x = 10 * mm
     slot_w = (CONTENT_W - gap_x) / 2.0
-    # Giảm chiều cao tối đa của ảnh để cách logo xa hơn
-    max_img_h = 80 * mm
+    max_img_h = 90 * mm
 
     c.setFont(BODY_FONT, 11)
     c.setFillColor(colors.black)
@@ -1567,6 +1569,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
