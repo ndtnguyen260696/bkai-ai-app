@@ -160,38 +160,49 @@ from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas as RLCanvas
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics   # để đo độ rộng chữ
 
-# Giả sử anh đã có:
-# LOGO_PATH = "BKAI_Logo.png"
-# FONT_NAME  = "DejaVuSans" hoặc "TimesVN" tùy anh đã đăng ký
 
-def export_pdf_canvas_pro(
+def export_pdf_canvas_pro_plus(
     original_img,
     analyzed_img,
     metrics_df,
     chart_bar_png=None,
     chart_pie_png=None,
-    filename="bkai_report_pro.pdf",
+    filename="bkai_report_pro_plus.pdf",
 ):
     """
-    Xuất PDF 2 trang dùng canvas:
-    - Trang 1: Logo + tiêu đề + Ảnh gốc + Ảnh phân tích + Kết luận + 2 biểu đồ
-    - Trang 2: Logo + tiêu đề + Bảng 3 cột (~8 chỉ số chính)
+    BÁO CÁO BKAI – BẢN PRO++++++:
+    - Dùng canvas, không Platypus.
+    - Tự động chia nhiều trang nếu bảng metrics quá dài.
     """
+
     buf = io.BytesIO()
     c = RLCanvas(buf, pagesize=A4)
 
+    # ------------------- CONSTANTS -------------------
     page_w, page_h = A4
-    left_margin   = 20 * mm
-    right_margin  = 20 * mm
-    top_margin    = 20 * mm
-    bottom_margin = 20 * mm
-    content_w     = page_w - left_margin - right_margin
+    LEFT   = 20 * mm
+    RIGHT  = 20 * mm
+    TOP    = 20 * mm
+    BOTTOM = 20 * mm
+    CONTENT_W = page_w - LEFT - RIGHT
 
-    # ---------- Helper: header (logo + title) ----------
-    def draw_header(title, subtitle=None):
-        """Vẽ logo + tiêu đề, trả về tọa độ y (tính từ đáy) dưới phần header để đặt nội dung."""
-        y_top = page_h - top_margin
+    TITLE_FONT      = FONT_NAME
+    TITLE_SIZE      = 18
+    BODY_FONT       = FONT_NAME
+    BODY_SIZE       = 10
+    SMALL_FONT_SIZE = 8
+
+    # =================================================
+    # HELPER: HEADER / FOOTER
+    # =================================================
+    def draw_header(page_title, subtitle=None, page_no=None):
+        """
+        Vẽ logo + tiêu đề + gạch chân, trả về y_bottom của header
+        (tọa độ tính từ đáy trang).
+        """
+        y_top = page_h - TOP
 
         # Logo
         if os.path.exists(LOGO_PATH):
@@ -202,7 +213,7 @@ def export_pdf_canvas_pro(
                 logo_h = logo_w * ih / iw
                 c.drawImage(
                     logo,
-                    left_margin,
+                    LEFT,
                     y_top - logo_h,
                     width=logo_w,
                     height=logo_h,
@@ -213,32 +224,43 @@ def export_pdf_canvas_pro(
 
         # Tiêu đề
         c.setFillColor(colors.black)
-        c.setFont(FONT_NAME, 18)
-        c.drawCentredString(page_w / 2.0, y_top - 8 * mm, title)
+        c.setFont(TITLE_FONT, TITLE_SIZE)
+        c.drawCentredString(page_w / 2.0, y_top - 8 * mm, page_title)
 
         if subtitle:
-            c.setFont(FONT_NAME, 11)
+            c.setFont(BODY_FONT, 11)
             c.drawCentredString(page_w / 2.0, y_top - 15 * mm, subtitle)
 
-        # Gạch ngang ngăn cách header
+        # Gạch phân cách
         line_y = y_top - 19 * mm
         c.setLineWidth(0.5)
-        c.line(left_margin, line_y, page_w - right_margin, line_y)
-        return line_y - 6 * mm  # y để bắt đầu nội dung bên dưới
+        c.setStrokeColor(colors.black)
+        c.line(LEFT, line_y, page_w - RIGHT, line_y)
 
-    # ---------- Helper: vẽ ảnh PIL với giới hạn kích thước ----------
+        # Footer + số trang
+        footer_y = BOTTOM - 6
+        c.setFont(BODY_FONT, SMALL_FONT_SIZE)
+        c.setFillColor(colors.grey)
+        footer = f"BKAI – Concrete Crack Inspection | Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
+        c.drawString(LEFT, footer_y, footer)
+        if page_no is not None:
+            c.drawRightString(page_w - RIGHT, footer_y, f"Page {page_no}")
+
+        return line_y - 8 * mm  # y bắt đầu nội dung
+
+    # =================================================
+    # HELPER: PIL -> IMAGE trên canvas
+    # =================================================
     def draw_pil_image(pil_img, x_left, top_y, max_w, max_h):
         """
-        Vẽ PIL image sao cho không vượt quá max_w x max_h.
-        top_y: tọa độ Y (từ đáy) của mép trên hình.
-        Trả về bottom_y (tọa độ đáy hình).
+        Vẽ PIL image sao cho không vượt max_w x max_h.
+        Trả về bottom_y.
         """
         if pil_img is None:
             return top_y
 
         img = ImageReader(pil_img)
         iw, ih = img.getSize()
-        # tỉ lệ scale
         scale = min(max_w / iw, max_h / ih, 1.0)
         w = iw * scale
         h = ih * scale
@@ -246,198 +268,280 @@ def export_pdf_canvas_pro(
         c.drawImage(img, x_left, bottom_y, width=w, height=h, mask="auto")
         return bottom_y
 
-    # ======================== PAGE 1 ========================
-    content_top_y = draw_header("BÁO CÁO KẾT QUẢ PHÂN TÍCH")
+    # =================================================
+    # HELPER: WRAP TEXT
+    # =================================================
+    def wrap_text(text, font_name, font_size, max_width):
+        """
+        Cắt text thành nhiều dòng để vừa trong max_width.
+        """
+        words = str(text).split()
+        if not words:
+            return [""]
 
-    # ----- Hàng 1: Ảnh gốc & Ảnh phân tích -----
+        lines = []
+        current = words[0]
+        for w in words[1:]:
+            trial = current + " " + w
+            w_trial = pdfmetrics.stringWidth(trial, font_name, font_size)
+            if w_trial <= max_width:
+                current = trial
+            else:
+                lines.append(current)
+                current = w
+        lines.append(current)
+        return lines
+
+    # =================================================
+    # HELPER: vẽ 1 cell nhiều dòng trong bảng
+    # =================================================
+    def draw_wrapped_cell(text, x_left, y_top, col_width, font_name, font_size, leading):
+        """
+        Vẽ text trong một ô, y_top là đỉnh ô (không phải baseline).
+        Trả về tổng chiều cao thật sự đã dùng.
+        """
+        inner_width = col_width - 4  # trừ padding ngang
+        lines = wrap_text(text, font_name, font_size, inner_width)
+        c.setFont(font_name, font_size)
+        text_y = y_top - leading + 2  # padding trên
+        for line in lines:
+            c.drawString(x_left + 2, text_y, line)
+            text_y -= leading
+        used_height = leading * len(lines) + 4
+        return used_height, len(lines)
+
+    # =================================================
+    # LẤY KẾT LUẬN & MỨC ĐỘ NGUY HIỂM TỪ metrics_df
+    # =================================================
+    severity_val = ""
+    summary_val = ""
+    if metrics_df is not None:
+        for _, row in metrics_df.iterrows():
+            en = str(row.get("en", "")).strip()
+            if en.lower() == "severity level":
+                severity_val = str(row.get("value", ""))
+            if en.lower() == "summary":
+                summary_val = str(row.get("value", ""))
+
+    if not summary_val:
+        summary_val = "Kết luận: Vết nứt có nguy cơ, cần kiểm tra thêm."
+
+    # Chọn màu banner theo severity
+    if "Nguy hiểm" in severity_val or "Severe" in severity_val:
+        banner_fill = colors.HexColor("#ffebee")  # hồng nhạt
+        banner_text = colors.HexColor("#c62828")
+    elif "Trung bình" in severity_val:
+        banner_fill = colors.HexColor("#fff3e0")  # cam nhạt
+        banner_text = colors.HexColor("#ef6c00")
+    else:
+        banner_fill = colors.HexColor("#e8f5e9")  # xanh nhạt
+        banner_text = colors.HexColor("#2e7d32")
+
+    # =================================================
+    # =============== PAGE 1: ẢNH + BIỂU ĐỒ ===========
+    # =================================================
+    page_no = 1
+    content_top_y = draw_header("BÁO CÁO KẾT QUẢ PHÂN TÍCH", page_no=page_no)
+
+    # Ảnh gốc & phân tích
     gap_x = 10 * mm
-    slot_w = (content_w - gap_x) / 2.0
-    max_img_h = 90 * mm
+    slot_w = (CONTENT_W - gap_x) / 2.0
+    max_img_h = 90 * mm  # chiều cao tối đa cho mỗi ảnh
 
-    # Tiêu đề nhỏ trên 2 ảnh
-    c.setFont(FONT_NAME, 11)
-    c.drawString(left_margin,        content_top_y + 4 * mm, "Ảnh gốc")
-    c.drawString(left_margin + slot_w + gap_x, content_top_y + 4 * mm, "Ảnh phân tích")
+    c.setFont(BODY_FONT, 11)
+    c.setFillColor(colors.black)
+    c.drawString(LEFT, content_top_y + 4 * mm, "Ảnh gốc")
+    c.drawString(LEFT + slot_w + gap_x, content_top_y + 4 * mm, "Ảnh phân tích")
 
-    left_img_bottom  = draw_pil_image(
-        original_img,
-        left_margin,
-        content_top_y,
-        slot_w,
-        max_img_h,
-    )
-    right_img_bottom = draw_pil_image(
-        analyzed_img,
-        left_margin + slot_w + gap_x,
-        content_top_y,
-        slot_w,
-        max_img_h,
+    left_bottom = draw_pil_image(original_img, LEFT, content_top_y, slot_w, max_img_h)
+    right_bottom = draw_pil_image(
+        analyzed_img, LEFT + slot_w + gap_x, content_top_y, slot_w, max_img_h
     )
 
-    images_bottom_y = min(left_img_bottom, right_img_bottom)
+    images_bottom_y = min(left_bottom, right_bottom)
 
-    # ----- Thanh kết luận màu hồng -----
-    banner_h = 14 * mm
-    banner_bottom = images_bottom_y - 11 * mm
-    if banner_bottom < bottom_margin:
-        banner_bottom = bottom_margin + 5 * mm
+    # Banner kết luận
+    banner_h = 16 * mm
+    banner_bottom = images_bottom_y - 12 * mm
+    if banner_bottom < BOTTOM + 40 * mm:
+        banner_bottom = BOTTOM + 40 * mm
 
-    c.setFillColor(colors.HexColor("#ffe6e6"))
-    c.rect(
-        left_margin,
-        banner_bottom,
-        content_w,
-        banner_h,
-        stroke=0,
-        fill=1,
-    )
+    c.setFillColor(banner_fill)
+    c.setStrokeColor(colors.transparent)
+    c.rect(LEFT, banner_bottom, CONTENT_W, banner_h, stroke=0, fill=1)
 
-    c.setFillColor(colors.HexColor("#d32f2f"))
-    c.setFont(FONT_NAME, 11)
-    conclusion_text = (
-        "Kết luận: Vết nứt có nguy cơ, cần kiểm tra thêm."
-    )
-    c.drawString(left_margin + 4 * mm, banner_bottom + banner_h / 2.0 - 4, conclusion_text)
+    c.setFillColor(banner_text)
+    c.setFont(BODY_FONT, 11)
+    c.drawString(LEFT + 4 * mm, banner_bottom + banner_h / 2.0 - 4, summary_val)
 
-    # ----- Hàng dưới: 2 biểu đồ -----
+    # Biểu đồ bar & pie
     charts_top_y = banner_bottom - 18 * mm
-    if charts_top_y > bottom_margin + 40 * mm and (chart_bar_png or chart_pie_png):
+    max_chart_h = 70 * mm
+    chart_slot_w = slot_w
 
-        max_chart_h = 70 * mm
-        chart_slot_w = slot_w
+    # Bar chart
+    if chart_bar_png is not None:
+        chart_bar_png.seek(0)
+        bar_img = ImageReader(chart_bar_png)
+        bw, bh = bar_img.getSize()
+        scale_bar = min(chart_slot_w / bw, max_chart_h / bh)
+        cw = bw * scale_bar
+        ch = bh * scale_bar
+        bar_bottom = charts_top_y - ch
+        c.drawImage(bar_img, LEFT, bar_bottom, width=cw, height=ch, mask="auto")
+        c.setFont(BODY_FONT, 10)
+        c.setFillColor(colors.black)
+        c.drawString(LEFT, bar_bottom - 10, "Độ tin cậy từng vùng nứt")
 
-        # Biểu đồ bar
-        if chart_bar_png is not None:
-            chart_bar_png.seek(0)
-            bar_img = ImageReader(chart_bar_png)
-            bw, bh = bar_img.getSize()
-            scale_bar = min(chart_slot_w / bw, max_chart_h / bh)
-            cw = bw * scale_bar
-            ch = bh * scale_bar
-            bar_bottom = charts_top_y - ch
-            c.drawImage(
-                bar_img,
-                left_margin,
-                bar_bottom,
-                width=cw,
-                height=ch,
-                mask="auto",
-            )
-            c.setFont(FONT_NAME, 10)
-            c.setFillColor(colors.black)
-            c.drawString(left_margin, bar_bottom - 10, "Độ tin cậy từng vùng nứt")
+    # Pie chart
+    if chart_pie_png is not None:
+        chart_pie_png.seek(0)
+        pie_img = ImageReader(chart_pie_png)
+        pw, ph = pie_img.getSize()
+        scale_pie = min(chart_slot_w / pw, max_chart_h / ph)
+        cw = pw * scale_pie
+        ch = ph * scale_pie
+        pie_bottom = charts_top_y - ch
+        c.drawImage(
+            pie_img,
+            LEFT + chart_slot_w + gap_x,
+            pie_bottom,
+            width=cw,
+            height=ch,
+            mask="auto",
+        )
+        c.setFont(BODY_FONT, 10)
+        c.setFillColor(colors.black)
+        c.drawString(
+            LEFT + chart_slot_w + gap_x,
+            pie_bottom - 10,
+            "Tỷ lệ vùng nứt so với toàn ảnh",
+        )
 
-        # Biểu đồ pie
-        if chart_pie_png is not None:
-            chart_pie_png.seek(0)
-            pie_img = ImageReader(chart_pie_png)
-            pw, ph = pie_img.getSize()
-            scale_pie = min(chart_slot_w / pw, max_chart_h / ph)
-            cw = pw * scale_pie
-            ch = ph * scale_pie
-            pie_bottom = charts_top_y - ch
-            c.drawImage(
-                pie_img,
-                left_margin + chart_slot_w + gap_x,
-                pie_bottom,
-                width=cw,
-                height=ch,
-                mask="auto",
-            )
-            c.setFont(FONT_NAME, 10)
-            c.setFillColor(colors.black)
-            c.drawString(
-                left_margin + chart_slot_w + gap_x,
-                pie_bottom - 10,
-                "Tỷ lệ vùng nứt so với toàn ảnh",
-            )
+    c.showPage()
 
-    c.showPage()  # sang trang 2
-
-    # ======================== PAGE 2 ========================
+    # =================================================
+    # =============== PAGE 2+: BẢNG METRICS ==========
+    # =================================================
+    page_no += 1
+    subtitle = "Bảng tóm tắt các chỉ số vết nứt"
     content_top_y = draw_header(
-        "BÁO CÁO KẾT QUẢ PHÂN TÍCH",
-        subtitle="Bảng tóm tắt các chỉ số vết nứt",
+        "BÁO CÁO KẾT QUẢ PHÂN TÍCH", subtitle=subtitle, page_no=page_no
     )
 
-    # Chuẩn bị dữ liệu bảng: lấy khoảng 8 chỉ số đầu, bỏ chiều dài/chiều rộng nếu muốn
-    # (anh có thể lọc theo 'en' ở đây nếu muốn chính xác hơn)
+    # Chuẩn bị dữ liệu bảng: bỏ Crack Length & Crack Width nếu muốn
     rows = []
-    # ví dụ: bỏ những hàng có en == 'Crack Length' hoặc 'Crack Width'
-    skip_keys = {"Crack Length", "Crack Width"}
+    skip_keys = {"Crack Length", "Crack Width"}  # anh chỉnh theo ý
     for _, r in metrics_df.iterrows():
-        en_name = str(r.get("en", ""))
+        en_name = str(r.get("en", "")).strip()
         if en_name in skip_keys:
             continue
-        rows.append(
-            (
-                str(len(rows) + 1),
-                f"{r.get('vi', '')} ({en_name})",
-                str(r.get("value", "")),
-            )
-        )
-        if len(rows) >= 8:
-            break
+        label = f"{r.get('vi', '')} ({en_name})"
+        val = str(r.get("value", ""))
+        rows.append((label, val))
 
-    # ---- Vẽ bảng 3 cột ----
-    row_h = 9 * mm
-    table_top_y = content_top_y - 10 * mm
-    table_h = row_h * (len(rows) + 1)
+    # Nếu không có rows thì thôi
+    if not rows:
+        c.showPage()
+        c.save()
+        buf.seek(0)
+        return buf
 
-    # Nếu thiếu chỗ thì giảm xuống một chút
-    if table_top_y - table_h < bottom_margin:
-        table_top_y = bottom_margin + table_h + 5 * mm
-
+    # Cấu hình bảng
     col1_w = 12 * mm
-    col2_w = 90 * mm
-    col3_w = content_w - col1_w - col2_w
+    col2_w = 95 * mm
+    col3_w = CONTENT_W - col1_w - col2_w
 
-    x0 = left_margin
+    header_h   = 10 * mm
+    base_lead  = 4.0  # line height bổ sung (sẽ + fontSize)
+    max_body_y = content_top_y - 10 * mm
+
+    def start_table_page(page_no):
+        """Vẽ header/footer mới cho trang bảng tiếp theo."""
+        c.showPage()
+        y0 = draw_header(
+            "BÁO CÁO KẾT QUẢ PHÂN TÍCH", subtitle=subtitle, page_no=page_no
+        )
+        return y0 - 10 * mm
+
+    # Vẽ header bảng cho trang hiện tại
+    table_top_y = max_body_y
+    x0 = LEFT
     x1 = x0 + col1_w
     x2 = x1 + col2_w
     x3 = x2 + col3_w
 
-    # Khung ngoài
-    c.setStrokeColor(colors.black)
-    c.setLineWidth(0.5)
+    def draw_table_header(top_y):
+        c.setFillColor(colors.HexColor("#1e88e5"))
+        c.rect(x0, top_y - header_h, CONTENT_W, header_h, stroke=0, fill=1)
+        c.setFont(BODY_FONT, 10)
+        c.setFillColor(colors.white)
+        c.drawString(x0 + 2, top_y - header_h + 3, "No.")
+        c.drawString(x1 + 2, top_y - header_h + 3, "Chỉ số (VI / EN)")
+        c.drawString(x2 + 2, top_y - header_h + 3, "Giá trị / Value")
+        return top_y - header_h
 
-    # Kẻ dòng ngang
-    y = table_top_y
-    for i in range(len(rows) + 2):  # +1 header, +1 bottom
-        c.line(x0, y, x3, y)
-        y -= row_h
+    current_y = draw_table_header(table_top_y)
+    row_index = 0
 
-    # Kẻ cột dọc
-    c.line(x0, table_top_y, x0, table_top_y - table_h)
-    c.line(x1, table_top_y, x1, table_top_y - table_h)
-    c.line(x2, table_top_y, x2, table_top_y - table_h)
-    c.line(x3, table_top_y, x3, table_top_y - table_h)
+    for i, (label, val) in enumerate(rows, start=1):
+        # Ước lượng chiều cao dòng dựa trên wrap_text
+        label_lines = wrap_text(label, BODY_FONT, BODY_SIZE, col2_w - 4)
+        value_lines = wrap_text(val, BODY_FONT, BODY_SIZE, col3_w - 4)
+        n_lines = max(len(label_lines), len(value_lines))
+        leading = BODY_SIZE + base_lead
+        row_h = n_lines * leading + 6  # padding dọc
 
-    # Header
-    c.setFont(FONT_NAME, 10)
-    header_y = table_top_y - row_h + 3
-    c.drawString(x0 + 2, header_y, "No.")
-    c.drawString(x1 + 2, header_y, "Tiếng Việt / English")
-    c.drawString(x2 + 2, header_y, "Giá trị / Value")
+        # Nếu không đủ chỗ cho dòng này + ít nhất 1 dòng nữa -> sang trang
+        if current_y - row_h < BOTTOM + 30 * mm:
+            page_no += 1
+            current_y = start_table_page(page_no)
+            current_y = draw_table_header(current_y)
 
-    # Hàng dữ liệu
-    c.setFont(FONT_NAME, 9)
-    text_y = header_y - row_h
-    for (no, name, val) in rows:
-        c.drawString(x0 + 2, text_y, no)
-        c.drawString(x1 + 2, text_y, name[:80])  # cắt bớt nếu quá dài
-        c.drawString(x2 + 2, text_y, val)
-        text_y -= row_h
+        # Nền xen kẽ
+        if i % 2 == 0:
+            c.setFillColor(colors.HexColor("#e3f2fd"))
+            c.rect(x0, current_y - row_h, CONTENT_W, row_h, stroke=0, fill=1)
 
-    # Footer nhỏ
-    c.setFont(FONT_NAME, 8)
-    footer = f"BKAI © {datetime.datetime.now().year} – Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
-    c.drawRightString(page_w - right_margin, bottom_margin - 5, footer)
+        # Kẻ khung dòng
+        c.setStrokeColor(colors.grey)
+        c.setLineWidth(0.3)
+        c.rect(x0, current_y - row_h, CONTENT_W, row_h, stroke=1, fill=0)
 
-    # Lưu PDF
+        # Vẽ No.
+        c.setFont(BODY_FONT, BODY_SIZE)
+        c.setFillColor(colors.black)
+        c.drawString(x0 + 2, current_y - leading, str(i))
+
+        # Vẽ text bọc dòng cho 2 cột tiếp theo
+        label_height, _ = draw_wrapped_cell(
+            label,
+            x1,
+            current_y,
+            col2_w,
+            BODY_FONT,
+            BODY_SIZE,
+            leading,
+        )
+        value_height, _ = draw_wrapped_cell(
+            val,
+            x2,
+            current_y,
+            col3_w,
+            BODY_FONT,
+            BODY_SIZE,
+            leading,
+        )
+
+        current_y -= row_h
+        row_index += 1
+
+    # Kết thúc
+    c.showPage()
     c.save()
     buf.seek(0)
     return buf
+
 
 
 
@@ -1435,6 +1539,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
