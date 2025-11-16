@@ -160,17 +160,19 @@ def export_pdf(
     filename="bkai_report.pdf",
 ):
     """
-    3 mức:
-    1) Full report 3 trang (có biểu đồ + bảng đầy đủ).
-    2) Fallback 2 trang:
-       - Trang 1: logo + tiêu đề + ảnh gốc + ảnh phân tích
-       - Trang 2: logo + tiêu đề + bảng 3 cột ~8 chỉ số chính
-         (bỏ Chiều dài / Chiều rộng vết nứt, lề trên/dưới 15mm)
-    3) Nếu vẫn LayoutError -> Ultra simple: 1 trang, logo + tiêu đề + 4–5 chỉ số chính dạng bullet.
+    Mức 1 (chuẩn, theo yêu cầu):
+      Trang 1: logo + tiêu đề + ảnh gốc + ảnh phân tích
+      Trang 2: logo + tiêu đề + bảng 3 cột (~8 chỉ số chính, bỏ chiều dài / chiều rộng)
+
+    Mức 2 (fallback an toàn):
+      1 trang, CHỈ TEXT (không logo, không ảnh, không bảng),
+      liệt kê vài chỉ số quan trọng.
+
+    Nếu mức 2 vẫn bị gì đó rất lạ -> ultra fallback: 1 Paragraph đơn giản.
     """
     from PIL import Image as PILImage
 
-    # ================= STYLE CHUNG =================
+    # ------------ Style chung ------------
     styles = getSampleStyleSheet()
 
     title_style = ParagraphStyle(
@@ -213,29 +215,42 @@ def export_pdf(
         leading=9,
     )
 
-    # helper: PIL -> RLImage với giới hạn chiều cao
-    def pil_to_rl(pil_img, content_w, content_h, max_h_ratio=0.30):
+    # ------------ helper scale ảnh an toàn ------------
+    def pil_to_rl(pil_img, content_w, content_h, max_h_ratio=0.40):
+        """Resize ảnh để chiều cao <= max_h_ratio * content_h (chắc chắn < frame height)."""
         if pil_img is None:
             return None
         if not isinstance(pil_img, PILImage.Image):
             pil_img = pil_img.convert("RGB")
         w, h = pil_img.size
+        if w <= 0 or h <= 0:
+            return None
+
         max_h = content_h * max_h_ratio
         max_w = content_w
         scale = min(max_w / w, max_h / h, 1.0)
+        new_w, new_h = w * scale, h * scale
+
+        # Nếu vẫn “to” hơn frame → giảm thêm chút nữa
+        if new_h > content_h:
+            k = content_h / new_h * 0.95
+            new_w *= k
+            new_h *= k
+
         buf_img = io.BytesIO()
         pil_img.save(buf_img, format="PNG")
         buf_img.seek(0)
-        return RLImage(buf_img, width=w * scale, height=h * scale)
+        return RLImage(buf_img, width=new_w, height=new_h)
 
     # =========================================================
-    # 1) FULL REPORT 3 TRANG
+    # MỨC 1 – REPORT 2 TRANG THEO YÊU CẦU
     # =========================================================
-    def build_full_pdf() -> io.BytesIO:
+    def build_two_page_report() -> io.BytesIO:
+        # Lề: trên / dưới 15 mm theo yêu cầu
         left_margin = 25 * mm
         right_margin = 25 * mm
-        top_margin = 20 * mm
-        bottom_margin = 20 * mm
+        top_margin = 15 * mm
+        bottom_margin = 15 * mm
 
         page_w, page_h = A4
         content_w = page_w - left_margin - right_margin
@@ -243,167 +258,25 @@ def export_pdf(
 
         story = []
 
-        # ----- TRANG 1 -----
+        # ---------- TRANG 1 ----------
         if os.path.exists(LOGO_PATH):
-            story.append(RLImage(LOGO_PATH, width=32 * mm))
+            # logo để nhỏ, giảm nguy cơ “quá cao”
+            logo = RLImage(LOGO_PATH, width=28 * mm)
+            story.append(logo)
             story.append(Spacer(1, 3 * mm))
 
         story.append(Paragraph("BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG", title_style))
         story.append(Paragraph("Concrete Crack Inspection Report", subtitle_style))
         story.append(Spacer(1, 5 * mm))
 
-        story.append(Paragraph("Ảnh gốc / Original Image", h2_style))
-        rl_orig = pil_to_rl(original_img, content_w, content_h, max_h_ratio=0.30)
-        if rl_orig is not None:
-            story.append(rl_orig)
-            story.append(Spacer(1, 4 * mm))
-
-        story.append(Paragraph("Ảnh đã phân tích / Result Image", h2_style))
-        rl_anl = pil_to_rl(analyzed_img, content_w, content_h, max_h_ratio=0.30)
-        if rl_anl is not None:
-            story.append(rl_anl)
-            story.append(Spacer(1, 6 * mm))
-
-        story.append(PageBreak())
-
-        # ----- TRANG 2: BIỂU ĐỒ -----
-        if os.path.exists(LOGO_PATH):
-            story.append(RLImage(LOGO_PATH, width=25 * mm))
-            story.append(Spacer(1, 2 * mm))
-
-        story.append(Paragraph("BKAI – Thống kê kết quả phát hiện vết nứt", h2_style))
-        story.append(Spacer(1, 3 * mm))
-
-        if chart_bar_png is not None:
-            story.append(Paragraph("Biểu đồ độ tin cậy từng vùng nứt", small_style))
-            story.append(
-                RLImage(chart_bar_png, width=content_w, height=content_h * 0.35)
-            )
-            story.append(Spacer(1, 4 * mm))
-
-        if chart_pie_png is not None:
-            story.append(Paragraph("Biểu đồ tỷ lệ vùng nứt / toàn ảnh", small_style))
-            story.append(
-                RLImage(chart_pie_png, width=content_w, height=content_h * 0.35)
-            )
-            story.append(Spacer(1, 6 * mm))
-
-        story.append(PageBreak())
-
-        # ----- TRANG 3: BẢNG METRICS ĐẦY ĐỦ -----
-        if os.path.exists(LOGO_PATH):
-            story.append(RLImage(LOGO_PATH, width=25 * mm))
-            story.append(Spacer(1, 2 * mm))
-
-        story.append(Paragraph("Bảng thông tin vết nứt / Crack Metrics", h2_style))
-        story.append(Spacer(1, 3 * mm))
-
-        data = [[
-            Paragraph("Chỉ số (VI)", small_style),
-            Paragraph("Metric (EN)", small_style),
-            Paragraph("Giá trị / Value", small_style),
-            Paragraph("Ý nghĩa / Description", small_style),
-        ]]
-
-        for _, r in metrics_df.iterrows():
-            full_desc = str(r["desc"])
-            short_desc = full_desc if len(full_desc) <= 220 else full_desc[:220] + "..."
-            data.append(
-                [
-                    Paragraph(str(r["vi"]), small_style),
-                    Paragraph(str(r["en"]), small_style),
-                    Paragraph(str(r["value"]), small_style),
-                    Paragraph(short_desc, small_style),
-                ]
-            )
-
-        col_widths = [
-            0.18 * content_w,
-            0.18 * content_w,
-            0.18 * content_w,
-            0.46 * content_w,
-        ]
-
-        tbl = Table(
-            data,
-            colWidths=col_widths,
-            repeatRows=1,
-            splitByRow=1,
-        )
-        tbl.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e88e5")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("FONTNAME", (0, 0), (-1, -1), FONT_NAME),
-                    ("FONTSIZE", (0, 0), (-1, -1), 7),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                    ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                ]
-            )
-        )
-        story.append(tbl)
-
-        story.append(Spacer(1, 4 * mm))
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        story.append(
-            Paragraph(
-                f"BKAI © {datetime.datetime.now().year} – Report generated at {now}",
-                small_style,
-            )
-        )
-
-        buf = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buf,
-            pagesize=A4,
-            leftMargin=left_margin,
-            rightMargin=right_margin,
-            topMargin=top_margin,
-            bottomMargin=bottom_margin,
-        )
-        doc.build(story)
-        buf.seek(0)
-        return buf
-
-    # =========================================================
-    # 2) FALLBACK 2 TRANG – NHƯ ANH YÊU CẦU
-    # =========================================================
-    def build_fallback_pdf() -> io.BytesIO:
-        """
-        Trang 1: logo + tiêu đề + ảnh gốc + ảnh phân tích
-        Trang 2: logo + tiêu đề + bảng 3 cột ~8 chỉ số chính
-                 (bỏ Chiều dài vết nứt, Chiều rộng vết nứt)
-        Lề trên/dưới: 15 mm
-        """
-        left_margin = 25 * mm
-        right_margin = 25 * mm
-        top_margin = 15 * mm      # lề nhỏ hơn
-        bottom_margin = 15 * mm
-
-        page_w, page_h = A4
-        content_w = page_w - left_margin - right_margin
-        content_h = page_h - top_margin - bottom_margin
-
-        story = []
-
-        # ----- TRANG 1 -----
-        if os.path.exists(LOGO_PATH):
-            story.append(RLImage(LOGO_PATH, width=30 * mm))
-            story.append(Spacer(1, 3 * mm))
-
-        story.append(Paragraph("BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG", title_style))
-        story.append(Paragraph("Concrete Crack Inspection Report (Short Version)", subtitle_style))
-        story.append(Spacer(1, 5 * mm))
-
+        # Ảnh gốc
         story.append(Paragraph("Ảnh gốc / Original Image", h2_style))
         rl_orig = pil_to_rl(original_img, content_w, content_h, max_h_ratio=0.40)
         if rl_orig is not None:
             story.append(rl_orig)
             story.append(Spacer(1, 4 * mm))
 
+        # Ảnh phân tích
         story.append(Paragraph("Ảnh đã phân tích / Result Image", h2_style))
         rl_anl = pil_to_rl(analyzed_img, content_w, content_h, max_h_ratio=0.40)
         if rl_anl is not None:
@@ -412,15 +285,15 @@ def export_pdf(
 
         story.append(PageBreak())
 
-        # ----- TRANG 2: BẢNG 3 CỘT ~8 CHỈ SỐ -----
+        # ---------- TRANG 2 : BẢNG 3 CỘT ----------
         if os.path.exists(LOGO_PATH):
-            story.append(RLImage(LOGO_PATH, width=25 * mm))
+            story.append(RLImage(LOGO_PATH, width=24 * mm))
             story.append(Spacer(1, 2 * mm))
 
-        story.append(Paragraph("Tóm tắt chỉ số chính / Key Metrics Summary", h2_style))
+        story.append(Paragraph("Tóm tắt các chỉ số chính / Key Metrics Summary", h2_style))
         story.append(Spacer(1, 4 * mm))
 
-        # Bỏ 2 dòng Chiều dài / Chiều rộng, rồi lấy ~8 chỉ số đầu
+        # Bỏ Chiều dài / Chiều rộng vết nứt, lấy ~8 dòng
         metrics_filtered = metrics_df[
             ~metrics_df["vi"].isin(["Chiều dài vết nứt", "Chiều rộng vết nứt"])
             & ~metrics_df["en"].isin(["Crack Length", "Crack Width"])
@@ -430,12 +303,12 @@ def export_pdf(
         data = [[
             Paragraph("Chỉ số", small_style),
             Paragraph("Giá trị / Value", small_style),
-            Paragraph("Ý nghĩa ngắn", small_style),
+            Paragraph("Mô tả ngắn", small_style),
         ]]
 
         for _, r in metrics_short.iterrows():
             desc = str(r["desc"])
-            short_desc = desc if len(desc) <= 160 else desc[:160] + "..."
+            short_desc = desc if len(desc) <= 150 else desc[:150] + "..."
             data.append(
                 [
                     Paragraph(str(r["vi"]), small_style),
@@ -445,16 +318,16 @@ def export_pdf(
             )
 
         col_widths = [
-            0.25 * content_w,
+            0.28 * content_w,
             0.20 * content_w,
-            0.55 * content_w,
+            0.52 * content_w,
         ]
 
         tbl = Table(
             data,
             colWidths=col_widths,
             repeatRows=1,
-            splitByRow=1,
+            splitByRow=1,  # cho phép tách qua trang nếu lỡ dài
         )
         tbl.setStyle(
             TableStyle(
@@ -481,15 +354,14 @@ def export_pdf(
             topMargin=top_margin,
             bottomMargin=bottom_margin,
         )
-        # Nếu bảng vẫn gây LayoutError → ném ra cho caller
-        doc.build(story)
+        doc.build(story)  # nếu có LayoutError -> throw lên ngoài
         buf.seek(0)
         return buf
 
     # =========================================================
-    # 3) ULTRA SIMPLE – LUÔN AN TOÀN 1 TRANG
+    # MỨC 2 – FALLBACK CHỈ TEXT (KHÔNG ẢNH, KHÔNG BẢNG)
     # =========================================================
-    def build_ultra_simple_pdf() -> io.BytesIO:
+    def build_text_only_report() -> io.BytesIO:
         left_margin = 25 * mm
         right_margin = 25 * mm
         top_margin = 20 * mm
@@ -506,180 +378,56 @@ def export_pdf(
         )
 
         story = []
-        if os.path.exists(LOGO_PATH):
-            story.append(RLImage(LOGO_PATH, width=30 * mm))
-            story.append(Spacer(1, 4 * mm))
-
-        story.append(Paragraph("BKAI - Báo cáo rút gọn", title_style))
+        story.append(Paragraph("BKAI - Báo cáo rút gọn (chỉ văn bản)", title_style))
         story.append(
             Paragraph(
-                "Nội dung quá dài hoặc không phù hợp khổ giấy A4. "
-                "Hệ thống tự động rút gọn, vui lòng xem chi tiết trên web BKAI.",
+                "Do hạn chế bố cục PDF, hệ thống chuyển sang bản rút gọn. "
+                "Anh/chị vui lòng xem chi tiết hình ảnh trực tiếp trên web BKAI.",
                 normal_style,
             )
         )
         story.append(Spacer(1, 8 * mm))
 
-        # Lấy vài chỉ số quan trọng để vẫn có thông tin
+        # Lấy một số chỉ số quan trọng
         important_keys = [
             "Tên ảnh",
             "Thời gian xử lý",
             "Tốc độ mô hình AI",
+            "Độ tin cậy (Confidence)",
+            "mAP (Độ chính xác trung bình)",
             "Phần trăm vùng nứt",
             "Mức độ nguy hiểm",
         ]
+
         for _, r in metrics_df.iterrows():
             if r["vi"] in important_keys:
                 story.append(
-                    Paragraph(
-                        f"<b>{r['vi']}:</b> {r['value']}", normal_style
-                    )
+                    Paragraph(f"<b>{r['vi']}:</b> {r['value']}", normal_style)
                 )
-                story.append(Spacer(1, 2 * mm))
+                story.append(Spacer(1, 3 * mm))
 
-        doc.build(story)
+        doc.build(story)  # chỉ Paragraph + Spacer, gần như không thể LayoutError
         buf.seek(0)
         return buf
 
     # =========================================================
-    # 4) ƯU TIÊN FULL → FALLBACK → ULTRA SIMPLE
+    # LUỒNG CHÍNH: THỬ 2 TRANG → RÚT GỌN TEXT → SIÊU RÚT GỌN
     # =========================================================
     try:
-        # cố build full report 3 trang
-        return build_full_pdf()
+        return build_two_page_report()
     except LayoutError:
-        # nếu lỗi layout, thử bản 2 trang
+        # Nếu vẫn lỗi layout với ảnh + bảng -> bỏ hết ảnh/bảng, chỉ để text
         try:
-            return build_fallback_pdf()
-        except LayoutError:
-            # nếu vẫn lỗi, chơi bản tối giản 1 trang cho chắc
-            return build_ultra_simple_pdf()
+            return build_text_only_report()
+        except Exception:
+            # Ultra fallback: 1 Paragraph mặc định, để chắc chắn không crash app
+            buf = io.BytesIO()
+            doc = SimpleDocTemplate(buf, pagesize=A4)
+            doc.build([Paragraph("BKAI - Không thể tạo báo cáo chi tiết, "
+                                "vui lòng xem kết quả trên web.", styles["Normal"])])
+            buf.seek(0)
+            return buf
 
-
-    # =========================================================
-    # 2) FALLBACK 2 TRANG – THEO YÊU CẦU
-    # =========================================================
-    def build_fallback_pdf() -> io.BytesIO:
-        """
-        Trang 1: logo + tiêu đề + ảnh gốc + ảnh phân tích
-        Trang 2: logo + tiêu đề + bảng 3 cột ~8 chỉ số chính
-                 (bỏ Chiều dài vết nứt, Chiều rộng vết nứt)
-        Lề trên/dưới: 15 mm
-        """
-        left_margin = 25 * mm
-        right_margin = 25 * mm
-        top_margin = 15 * mm      # lề nhỏ hơn
-        bottom_margin = 15 * mm
-
-        page_w, page_h = A4
-        content_w = page_w - left_margin - right_margin
-        content_h = page_h - top_margin - bottom_margin
-
-        story = []
-
-        # ----- TRANG 1 -----
-        if os.path.exists(LOGO_PATH):
-            story.append(RLImage(LOGO_PATH, width=30 * mm))
-            story.append(Spacer(1, 3 * mm))
-
-        story.append(Paragraph("BÁO CÁO KIỂM TRA VẾT NỨT BÊ TÔNG", title_style))
-        story.append(Paragraph("Concrete Crack Inspection Report (Short Version)", subtitle_style))
-        story.append(Spacer(1, 5 * mm))
-
-        story.append(Paragraph("Ảnh gốc / Original Image", h2_style))
-        rl_orig = pil_to_rl(original_img, content_w, content_h, max_h_ratio=0.40)
-        if rl_orig is not None:
-            story.append(rl_orig)
-            story.append(Spacer(1, 4 * mm))
-
-        story.append(Paragraph("Ảnh đã phân tích / Result Image", h2_style))
-        rl_anl = pil_to_rl(analyzed_img, content_w, content_h, max_h_ratio=0.40)
-        if rl_anl is not None:
-            story.append(rl_anl)
-            story.append(Spacer(1, 4 * mm))
-
-        story.append(PageBreak())
-
-        # ----- TRANG 2: BẢNG 3 CỘT ~8 CHỈ SỐ -----
-        if os.path.exists(LOGO_PATH):
-            story.append(RLImage(LOGO_PATH, width=25 * mm))
-            story.append(Spacer(1, 2 * mm))
-
-        story.append(Paragraph("Tóm tắt chỉ số chính / Key Metrics Summary", h2_style))
-        story.append(Spacer(1, 4 * mm))
-
-        # Bỏ 2 dòng Chiều dài / Chiều rộng, rồi lấy ~8 chỉ số đầu
-        metrics_filtered = metrics_df[
-            ~metrics_df["vi"].isin(["Chiều dài vết nứt", "Chiều rộng vết nứt"])
-            & ~metrics_df["en"].isin(["Crack Length", "Crack Width"])
-        ]
-        metrics_short = metrics_filtered.head(8).copy()
-
-        data = [[
-            Paragraph("Chỉ số", small_style),
-            Paragraph("Giá trị / Value", small_style),
-            Paragraph("Ý nghĩa ngắn", small_style),
-        ]]
-
-        for _, r in metrics_short.iterrows():
-            desc = str(r["desc"])
-            short_desc = desc if len(desc) <= 160 else desc[:160] + "..."
-            data.append(
-                [
-                    Paragraph(str(r["vi"]), small_style),
-                    Paragraph(str(r["value"]), small_style),
-                    Paragraph(short_desc, small_style),
-                ]
-            )
-
-        col_widths = [
-            0.25 * content_w,
-            0.20 * content_w,
-            0.55 * content_w,
-        ]
-
-        tbl = Table(
-            data,
-            colWidths=col_widths,
-            repeatRows=1,
-            splitByRow=1,
-        )
-        tbl.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e88e5")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("FONTNAME", (0, 0), (-1, -1), FONT_NAME),
-                    ("FONTSIZE", (0, 0), (-1, -1), 7),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                    ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                ]
-            )
-        )
-        story.append(tbl)
-
-        buf = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buf,
-            pagesize=A4,
-            leftMargin=left_margin,
-            rightMargin=right_margin,
-            topMargin=top_margin,
-            bottomMargin=bottom_margin,
-        )
-        doc.build(story)
-        buf.seek(0)
-        return buf
-
-    # =========================================================
-    # 3) ƯU TIÊN FULL, NẾU LỖI THÌ DÙNG FALLBACK
-    # =========================================================
-    try:
-        return build_full_pdf()
-    except LayoutError:
-        return build_fallback_pdf()
 
 
 # =========================================================
@@ -1674,6 +1422,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
