@@ -163,7 +163,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics   # để đo độ rộng chữ
 
 
-def export_pdf_canvas_pro_plus(
+def export_pdf(
     original_img,
     analyzed_img,
     metrics_df,
@@ -1539,6 +1539,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
