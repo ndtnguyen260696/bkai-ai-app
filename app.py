@@ -1489,8 +1489,8 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 def show_auth_page():
-    st.title("BKAI - Concrete Crack Inspection")
-    st.subheader("Vui lòng đăng nhập để sử dụng hệ thống phân tích vết nứt bê tông.")
+    st.title("BKAI -MÔ HÌNH CNN PHÁT HIỆN VẾT VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG ")
+    st.subheader("Vui lòng đăng nhập để sử dụng model phân tích vết nứt bê tông.")
 
     tab_login, tab_register = st.tabs(["🔑 Đăng nhập", "📝 Đăng ký"])
 
@@ -1538,6 +1538,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
