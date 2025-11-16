@@ -311,7 +311,7 @@ def export_pdf(
                 summary_val = str(row.get("value", ""))
 
     if not summary_val:
-        summary_val = "Kết luận: Vết nứt có nguy cơ, cần kiểm tra thêm."
+        summary_val = "Kết luận: Ảnh bê tông có vết nứt, cần kiểm tra thêm."
 
     if "Nguy hiểm" in severity_val or "Severe" in severity_val:
         banner_fill = colors.HexColor("#ffebee")
@@ -1570,6 +1570,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
