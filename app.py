@@ -1607,14 +1607,34 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 def show_auth_page():
-    st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG")
-    st.subheader("Vui lòng đăng nhập để sử dụng model phân tích vết nứt bê tông.")
+    # Khung trên cùng: logo + tiêu đề
+    col_logo, col_header = st.columns([1, 3])
 
+    with col_logo:
+        if os.path.exists(LOGO_PATH):
+            st.image(LOGO_PATH, width=90)
+        else:
+            st.markdown("### BKAI")
+
+    with col_header:
+        st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG")
+        st.markdown(
+            "<p style='font-size:16px;color:#555;'>"
+            "Vui lòng đăng nhập hoặc đăng ký để sử dụng hệ thống phân tích vết nứt bê tông."
+            "</p>",
+            unsafe_allow_html=True,
+        )
+
+    st.write("---")
+
+    # Tabs: Đăng nhập / Đăng ký
     tab_login, tab_register = st.tabs(["🔑 Đăng nhập", "📝 Đăng ký"])
 
     with tab_login:
+        st.subheader("Đăng nhập tài khoản BKAI")
         login_user = st.text_input("Tên đăng nhập", key="login_user")
         login_pass = st.text_input("Mật khẩu", type="password", key="login_pass")
+
         if st.button("Đăng nhập"):
             if login_user in users and users[login_user] == login_pass:
                 st.session_state.authenticated = True
@@ -1625,6 +1645,7 @@ def show_auth_page():
                 st.error("Sai tên đăng nhập hoặc mật khẩu.")
 
     with tab_register:
+        st.subheader("Tạo tài khoản mới")
         reg_user = st.text_input("Tên đăng nhập mới", key="reg_user")
         reg_pass = st.text_input("Mật khẩu mới", type="password", key="reg_pass")
         reg_pass2 = st.text_input("Nhập lại mật khẩu", type="password", key="reg_pass2")
@@ -1642,6 +1663,7 @@ def show_auth_page():
                     json.dump(users, f, ensure_ascii=False, indent=2)
                 st.success("Tạo tài khoản thành công! Bạn có thể quay lại tab Đăng nhập.")
 
+
 # =========================================================
 # 8. MAIN ENTRY
 # =========================================================
@@ -1656,4 +1678,5 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
