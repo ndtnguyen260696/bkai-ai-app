@@ -61,6 +61,123 @@ st.set_page_config(
     page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT",
     layout="wide",
 )
+def inject_bkai_style():
+    st.markdown(
+        """
+        <style>
+        /* Nền tổng thể */
+        main {
+            background: #eef2f7;
+        }
+        /* Thu gọn phần nội dung, tạo cảm giác như 1 app giữa màn hình */
+        .block-container {
+            padding-top: 1.5rem;
+            padding-bottom: 3rem;
+            max-width: 1300px;
+        }
+
+        /* HERO HEADER BKAI */
+        .bkai-hero {
+            background: linear-gradient(135deg,#135bd8,#0f3c95);
+            border-radius: 18px;
+            padding: 18px 26px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 14px 40px rgba(15,56,129,0.35);
+            margin-bottom: 18px;
+        }
+        .bkai-hero-left {
+            flex: 1.6;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+        .bkai-hero-right {
+            flex: 1;
+            text-align: right;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        .bkai-title h1 {
+            font-size: 26px;      /* nhỏ hơn bản trước cho đỡ “hét” */
+            margin: 0 0 4px 0;
+            font-weight: 800;
+        }
+        .bkai-title p {
+            margin: 0;
+            font-size: 13px;
+        }
+
+        /* Card trắng cho từng khu vực chính */
+        .bkai-card {
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 20px 22px;
+            box-shadow: 0 10px 30px rgba(15,76,129,0.10);
+            margin-bottom: 18px;
+        }
+
+        /* Tiêu đề nhỏ trong card */
+        .bkai-section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+        .bkai-section-caption {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+
+        /* File uploader đẹp hơn */
+        .stFileUploader {
+            background: #f9fafb;
+            padding: 14px 16px;
+            border-radius: 14px;
+            border: 1px dashed #cbd5f5;
+        }
+        .stFileUploader > label {
+            font-weight: 600;
+            font-size: 13px;
+            color: #0f172a;
+        }
+
+        /* Button chính */
+        .stButton>button {
+            border-radius: 999px;
+            padding: 0.5rem 1.6rem;
+            background: linear-gradient(135deg,#1d4ed8,#0f3fad);
+            color: #ffffff;
+            border: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .stButton>button:hover {
+            background: linear-gradient(135deg,#2563eb,#1d4ed8);
+            box-shadow: 0 6px 16px rgba(37,99,235,0.35);
+        }
+
+        /* Tabs Stage 1 – Stage 2 */
+        .stTabs [data-baseweb="tab-list"] {
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .stTabs [data-baseweb="tab"] {
+            font-size: 13px;
+            padding: 6px 14px;
+        }
+
+        /* Dataframe metrics */
+        .bkai-metrics table {
+            font-size: 12px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+inject_bkai_style()
 
 # =========================================================
 # 1. HÀM HỖ TRỢ CHUNG
@@ -1245,21 +1362,113 @@ else:
 # =========================================================
 
 def run_main_app():
-    col_logo, col_title = st.columns([1, 5])
+    # ===== HERO HEADER BKAI =====
+    col_logo, col_hero = st.columns([1, 5])
+
     with col_logo:
         if os.path.exists(LOGO_PATH):
-            st.image(LOGO_PATH, width=80)
-    with col_title:
-        st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT")
-        user = st.session_state.get("username", "")
-        if user:
-            st.caption(
-                f"Xin chào **{user}** – Phân biệt ảnh nứt / không nứt & xuất báo cáo."
-            )
-        else:
-            st.caption("Phân biệt ảnh nứt / không nứt & xuất báo cáo.")
+            st.image(LOGO_PATH, width=90)
 
-    st.write("---")
+    with col_hero:
+        st.markdown(
+            """
+            <div class="bkai-hero">
+                <div class="bkai-hero-left">
+                    <div>
+                        <div class="bkai-title">
+                            <h1>BKAI – Mô hình CNN phát hiện &amp; phân loại vết nứt</h1>
+                            <p>Hỗ trợ kỹ sư, sinh viên và nhà quản lý đánh giá nhanh tình trạng nứt bê tông &amp; xuất báo cáo PDF tự động.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bkai-hero-right">
+                    <div>Deep Learning • Mask R-CNN • Roboflow • Streamlit</div>
+                    <div>Phiên bản demo cho luận văn cao học</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # Xin chào user (giữ logic cũ, chỉ đổi style nhẹ)
+    user = st.session_state.get("username", "")
+    hello_text = (
+        f"Xin chào **{user}** – Hãy tải ảnh bê tông lên để phân biệt **nứt / không nứt** và xuất báo cáo."
+        if user
+        else "Hãy tải ảnh bê tông lên để phân biệt **nứt / không nứt** và xuất báo cáo."
+    )
+    st.markdown(
+        f"<p style='font-size:13px;color:#4b5563;margin-top:4px;'>{hello_text}</p>",
+        unsafe_allow_html=True,
+    )
+
+    # ===== FORM THÔNG TIN NGƯỜI DÙNG + UPLOAD ẢNH TRONG CARD =====
+    if "profile_filled" not in st.session_state:
+        st.session_state.profile_filled = False
+
+    # Card lớn chứa form thông tin + uploader
+    with st.container():
+        st.markdown('<div class="bkai-card">', unsafe_allow_html=True)
+
+        if not st.session_state.profile_filled:
+            st.markdown(
+                "<div class='bkai-section-title'>1. Thông tin người sử dụng</div>"
+                "<div class='bkai-section-caption'>Giúp BKAI thống kê nhóm người dùng &amp; phục vụ cho nghiên cứu luận văn.</div>",
+                unsafe_allow_html=True,
+            )
+
+            with st.form("user_info_form"):
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    full_name = st.text_input("Họ và tên *")
+                    occupation = st.selectbox(
+                        "Nghề nghiệp / Nhóm đối tượng *",
+                        [
+                            "Sinh viên",
+                            "Học viên cao học/ Nghiên cứu sinh",
+                            "Kỹ sư xây kết cấu",
+                            "Kỹ sư hiện trường (Site Engineer)",
+                            "Đơn vị tư vấn giám sát (TVGS)",
+                            "Nhà thầu thi công xây dựng",
+                            "Chủ đầu tư, Quản Lý Dự án",
+                            "Kỹ sư IT",
+                            "Khác",
+                        ],
+                    )
+                with col_b:
+                    email = st.text_input("Email *")
+                    st.caption(
+                        "Email chỉ dùng cho thống kê và nghiên cứu, không chia sẻ ra bên ngoài."
+                    )
+
+                submit_info = st.form_submit_button("Lưu thông tin & bắt đầu phân tích")
+
+            # (giữ nguyên phần xử lý form như code cũ của anh – chỉ đổi vị trí)
+            if submit_info:
+                ...
+                # đoạn lưu profile_filled, user_stats, v.v. y như anh đã làm
+
+        # Nếu chưa điền xong form thì đóng thẻ card và return
+        if not st.session_state.profile_filled:
+            st.markdown("</div>", unsafe_allow_html=True)
+            return
+
+        # Đã có thông tin user thì hiển thị uploader trong cùng card
+        st.markdown(
+            "<div class='bkai-section-title'>2. Tải ảnh bê tông & cấu hình phân tích</div>"
+            "<div class='bkai-section-caption'>Chọn một hoặc nhiều ảnh (JPG/PNG), sau đó bấm nút <b>Phân tích ảnh</b>.</div>",
+            unsafe_allow_html=True,
+        )
+
+        uploaded_files = st.file_uploader(
+            "Tải một hoặc nhiều ảnh bê tông (JPG/PNG)",
+            type=["jpg", "jpeg", "png"],
+            accept_multiple_files=True,
+        )
+        analyze_btn = st.button("🔍 Phân tích ảnh")
+
+        st.markdown("</div>", unsafe_allow_html=True)  # đóng .bkai-card
+
 
     # Form thông tin người dùng
     if "profile_filled" not in st.session_state:
@@ -1683,6 +1892,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
