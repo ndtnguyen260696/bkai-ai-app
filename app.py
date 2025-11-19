@@ -36,8 +36,7 @@ A4_LANDSCAPE = landscape(A4)
 # =========================================================
 
 ROBOFLOW_FULL_URL = (
-    "https://detect.roboflow.com/crack_segmentation_detection/4"
-    "?api_key=nWA6ayjI5bGNpXkkbsAb"
+    "https://outline.roboflow.com/concrete-crack-dfd3i/2?api_key=t5l0P6BeYqoA0WOpz4oO"
 )
 
 LOGO_PATH = "BKAI_Logo.png"
@@ -1683,6 +1682,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
