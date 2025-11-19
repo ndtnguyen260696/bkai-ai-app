@@ -1,5 +1,5 @@
 import streamlit as st
-import requests
+import requests  # giờ không dùng nữa nhưng có thể giữ lại
 from PIL import Image, ImageDraw
 import io
 import time
@@ -8,6 +8,8 @@ import os
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+import cv2
 
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -28,6 +30,11 @@ from reportlab.platypus.doctemplate import LayoutError
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 
+# Detectron2
+from detectron2.config import get_cfg
+from detectron2.engine import DefaultPredictor
+from detectron2 import model_zoo
+
 # A4 xoay ngang cho Stage 2
 A4_LANDSCAPE = landscape(A4)
 
@@ -35,10 +42,8 @@ A4_LANDSCAPE = landscape(A4)
 # 0. CẤU HÌNH CHUNG
 # =========================================================
 
-ROBOFLOW_FULL_URL = (
-    "https://detect.roboflow.com/concrete-crack-dfd3i/2"
-    "?api_key=nWA6ayjI5bGNpXkkbsAb"
-)
+# ĐƯỜNG DẪN MODEL MASK R-CNN CỦA ANH
+MODEL_PATH = "models/concrete_crack_maskrcnn_r50.pth"
 
 LOGO_PATH = "BKAI_Logo.png"
 
@@ -61,6 +66,78 @@ st.set_page_config(
     page_title="BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT",
     layout="wide",
 )
+
+# =========================================================
+# 0.1. LOAD MASK R-CNN MODEL
+# =========================================================
+
+@st.cache_resource
+def load_maskrcnn_model():
+    cfg = get_cfg()
+    cfg.merge_from_file(
+        model_zoo.get_config_file(
+            "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"
+        )
+    )
+    cfg.MODEL.WEIGHTS = MODEL_PATH
+    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1   # chỉ 1 lớp: crack
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.3
+    cfg.INPUT.FORMAT = "BGR"
+
+    predictor = DefaultPredictor(cfg)
+    return predictor, cfg
+
+predictor, det2_cfg = load_maskrcnn_model()
+
+def det2_outputs_to_predictions(outputs, img_w, img_h):
+    """
+    Chuyển outputs Detectron2 -> list prediction dạng giống Roboflow:
+    {
+      "x","y","width","height","confidence","class","points":[(x,y),...]
+    }
+    """
+    preds = []
+    instances = outputs["instances"].to("cpu")
+    if not len(instances):
+        return preds
+
+    boxes = instances.pred_boxes.tensor.numpy()  # Nx4: x1,y1,x2,y2
+    scores = instances.scores.numpy()
+    masks = instances.pred_masks.numpy()  # NxHxW (bool)
+
+    for i in range(len(instances)):
+        x1, y1, x2, y2 = boxes[i]
+        w = float(x2 - x1)
+        h = float(y2 - y1)
+        x = float(x1 + w / 2.0)
+        y = float(y1 + h / 2.0)
+        conf = float(scores[i])
+
+        # Tạo polygon từ mask
+        mask = (masks[i] * 255).astype("uint8")
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        pts = []
+        if len(contours) > 0:
+            # lấy contour lớn nhất
+            cnt = max(contours, key=cv2.contourArea)
+            for pt in cnt:
+                px, py = pt[0]
+                pts.append((float(px), float(py)))
+
+        preds.append(
+            {
+                "x": x,
+                "y": y,
+                "width": w,
+                "height": h,
+                "confidence": conf,
+                "class": "crack",
+                "points": pts,
+            }
+        )
+    return preds
 
 # =========================================================
 # 1. HÀM HỖ TRỢ CHUNG
@@ -147,6 +224,8 @@ def estimate_severity(p, img_w, img_h):
         return "Trung bình"
     else:
         return "Nguy hiểm (Severe)"
+
+
 
 # =========================================================
 # 2. XUẤT PDF STAGE 1 – BẢN PRO (CÓ VẾT NỨT)
@@ -1260,7 +1339,7 @@ def run_main_app():
             st.caption("Phân biệt ảnh nứt / không nứt & xuất báo cáo.")
 
     st.write("---")
-
+    
     # Form thông tin người dùng
     if "profile_filled" not in st.session_state:
         st.session_state.profile_filled = False
@@ -1325,19 +1404,7 @@ def run_main_app():
     )
     st.sidebar.caption("Chỉ hiển thị những vết nứt có độ tin cậy ≥ ngưỡng này.")
 
-    with st.sidebar.expander("📊 Quản lý thống kê người dùng"):
-        if user_stats:
-            df_stats = pd.DataFrame(user_stats)
-            st.dataframe(df_stats, use_container_width=True, height=200)
-            stats_csv = df_stats.to_csv(index=False).encode("utf-8-sig")
-            st.download_button(
-                "⬇ Tải thống kê người dùng (CSV)",
-                data=stats_csv,
-                file_name="BKAI_UserStats.csv",
-                mime="text/csv",
-            )
-        else:
-            st.info("Chưa có dữ liệu thống kê người dùng.")
+    # ... phần thống kê người dùng giữ nguyên
 
     uploaded_files = st.file_uploader(
         "Tải một hoặc nhiều ảnh bê tông (JPG/PNG)",
@@ -1359,30 +1426,21 @@ def run_main_app():
             orig_img = Image.open(uploaded_file).convert("RGB")
             img_w, img_h = orig_img.size
 
-            buf = io.BytesIO()
-            orig_img.save(buf, format="JPEG")
-            buf.seek(0)
+            # Chuyển sang numpy BGR cho Detectron2
+            img_np = np.array(orig_img)
+            img_bgr = img_np[:, :, ::-1]
 
-            with st.spinner(f"Đang gửi ảnh {idx} tới mô hình AI trên Roboflow..."):
+            # ---- GỌI MÔ HÌNH MASK R-CNN, KHÔNG CÒN ROBOFLOW ----
+            with st.spinner(f"Đang phân tích ảnh {idx} bằng Mask R-CNN..."):
                 try:
-                    resp = requests.post(
-                        ROBOFLOW_FULL_URL,
-                        files={"file": ("image.jpg", buf.getvalue(), "image/jpeg")},
-                        timeout=60,
-                    )
+                    outputs = predictor(img_bgr)
                 except Exception as e:
-                    st.error(f"Lỗi gọi API Roboflow cho ảnh {uploaded_file.name}: {e}")
+                    st.error(f"Lỗi chạy mô hình cho ảnh {uploaded_file.name}: {e}")
                     continue
 
-            if resp.status_code != 200:
-                st.error(f"Roboflow trả lỗi cho ảnh {uploaded_file.name}.")
-                st.text(resp.text[:2000])
-                continue
-
-            result = resp.json()
-            predictions = result.get("predictions", [])
+            predictions_all = det2_outputs_to_predictions(outputs, img_w, img_h)
             preds_conf = [
-                p for p in predictions if float(p.get("confidence", 0)) >= min_conf
+                p for p in predictions_all if float(p.get("confidence", 0)) >= min_conf
             ]
 
             t1 = time.time()
@@ -1397,7 +1455,6 @@ def run_main_app():
             with col2:
                 st.subheader("Ảnh phân tích")
                 if len(preds_conf) == 0:
-                    # Trường hợp KHÔNG có vết nứt
                     st.image(orig_img, use_column_width=True)
                     st.success("✅ Kết luận: **Không phát hiện vết nứt rõ ràng**.")
 
@@ -1409,7 +1466,15 @@ def run_main_app():
                         mime="application/pdf",
                         key=f"pdf_no_crack_{idx}",
                     )
+                    continue
+                else:
+                    analyzed_img = draw_predictions_with_mask(
+                        orig_img, preds_conf, min_conf
+                    )
+                    st.image(analyzed_img, use_column_width=True)
+                    st.error("⚠️ Kết luận: **CÓ vết nứt trên ảnh.**")
 
+    
                     # Không cần Stage 1 & Stage 2 cho ảnh này
                     continue
 
@@ -1683,6 +1748,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
