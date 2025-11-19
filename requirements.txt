@@ -4,6 +4,12 @@ pillow
 matplotlib
 pandas
 reportlab
+torch
+torchvision
+opencv-python-headless
+numpy
+detectron2 @ git+https://github.com/facebookresearch/detectron2.git
+
 
 
 
