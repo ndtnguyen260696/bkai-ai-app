@@ -41,7 +41,7 @@ A4_LANDSCAPE = landscape(A4)
 
 # 🔴 QUAN TRỌNG:
 # ĐÂY LÀ URL API MÔ HÌNH MASK R-CNN + RESNET50 TRÊN COLAB 
-MASK_RCNN_API_URL = "https://1a2b-34-72-182-10.ngrok-free.app/predict"
+MASK_RCNN_API_URL = "https://karren-clecha-unapologetically.ngrok-free.dev/predict"
 
 def call_maskrcnn_api(image):
     img_bytes = io.BytesIO()
@@ -1735,3 +1735,4 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
