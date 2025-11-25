@@ -4,10 +4,9 @@ pillow
 matplotlib
 pandas
 reportlab
-torch
-torchvision
 opencv-python-headless
 numpy
+
 
 
 
