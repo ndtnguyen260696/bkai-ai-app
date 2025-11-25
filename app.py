@@ -8,10 +8,6 @@ import os
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
-import requests
-import io
-from PIL import Image
-import base64
 
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -39,28 +35,15 @@ A4_LANDSCAPE = landscape(A4)
 # 0. CẤU HÌNH CHUNG
 # =========================================================
 
-# 🔴 QUAN TRỌNG:
-# ĐÂY LÀ URL API MÔ HÌNH MASK R-CNN + RESNET50 TRÊN COLAB 
-MASK_RCNN_API_URL = "https://karren-clecha-unapologetically.ngrok-free.dev/predict"
+ROBOFLOW_MODEL = "concrete-crack-dfd3i"
+ROBOFLOW_VERSION = "2"
+ROBOFLOW_API_KEY = "t5l0P6BeYqoA0WOpz4oO"
 
-def call_maskrcnn_api(image):
-    img_bytes = io.BytesIO()
-    image.save(img_bytes, format="JPEG")
-    img_bytes = img_bytes.getvalue()
+ROBOFLOW_FULL_URL = (
+    f"https://outline.roboflow.com/{ROBOFLOW_MODEL}/{ROBOFLOW_VERSION}"
+    f"?api_key={ROBOFLOW_API_KEY}"
+)
 
-    response = requests.post(
-        MASKRCNN_API,
-        files={"file": img_bytes},
-        timeout=200
-    )
-
-    data = response.json()
-    result_hex = data["image"]                # ảnh trả về ở dạng HEX
-
-    result_bytes = bytes.fromhex(result_hex)
-    result_img = Image.open(io.BytesIO(result_bytes))
-
-    return result_img
 LOGO_PATH = "BKAI_Logo.png"
 
 FONT_PATH = "times.ttf"
@@ -95,11 +78,6 @@ def fig_to_png(fig) -> io.BytesIO:
 
 
 def extract_poly_points(points_field):
-    """
-    Chuẩn hóa dữ liệu polygon trả về từ API:
-    - Có thể là list [[x1,y1], [x2,y2], ...]
-    - Hoặc dict { "0": [[x1,y1],...], "1":[...], ... }
-    """
     flat = []
     if isinstance(points_field, dict):
         for k in sorted(points_field.keys()):
@@ -116,14 +94,6 @@ def extract_poly_points(points_field):
 
 
 def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float = 0.0):
-    """
-    Vẽ bbox + mask từ kết quả dự đoán của API Mask R-CNN.
-    Kỳ vọng mỗi phần tử trong predictions có:
-      - x, y, width, height (theo center-format)
-      - confidence
-      - class (vd: "crack")
-      - points (đa giác mask – list hoặc dict)
-    """
     base = image.convert("RGB")
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
@@ -148,16 +118,13 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
         x1 = x + w / 2
         y1 = y + h / 2
 
-        # Vẽ bbox
         draw.rectangle([x0, y0, x1, y1], outline=green_solid, width=3)
 
-        # Nhãn lớp + score
         cls = p.get("class", "crack")
         label = f"{cls} {conf:.2f}"
         text_pos = (x0 + 3, y0 + 3)
         draw.text(text_pos, label, fill=green_solid)
 
-        # Vẽ mask (nếu có)
         pts_raw = p.get("points")
         flat_pts = extract_poly_points(pts_raw) if pts_raw is not None else []
         if len(flat_pts) >= 3:
@@ -169,9 +136,6 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
 
 
 def estimate_severity(p, img_w, img_h):
-    """
-    Đánh giá mức độ nguy hiểm dựa trên tỉ lệ diện tích bbox lớn nhất so với ảnh.
-    """
     w = float(p.get("width", 0))
     h = float(p.get("height", 0))
     if img_w <= 0 or img_h <= 0:
@@ -1384,7 +1348,7 @@ def run_main_app():
         type=["jpg", "jpeg", "png"],
         accept_multiple_files=True,
     )
-    analyze_btn = st.button("🔍 Phân tích ảnh bằng Mask R-CNN (Colab)")
+    analyze_btn = st.button("🔍 Phân tích ảnh")
 
     if analyze_btn:
         if not uploaded_files:
@@ -1403,35 +1367,23 @@ def run_main_app():
             orig_img.save(buf, format="JPEG")
             buf.seek(0)
 
-            with st.spinner(f"Đang gửi ảnh {idx} tới mô hình Mask R-CNN trên Colab..."):
+            with st.spinner(f"Đang gửi ảnh {idx} tới mô hình AI trên Roboflow..."):
                 try:
                     resp = requests.post(
-                        MASK_RCNN_API_URL,
+                        ROBOFLOW_FULL_URL,
                         files={"file": ("image.jpg", buf.getvalue(), "image/jpeg")},
-                        timeout=120,
+                        timeout=60,
                     )
                 except Exception as e:
-                    st.error(f"Lỗi gọi API Mask R-CNN cho ảnh {uploaded_file.name}: {e}")
+                    st.error(f"Lỗi gọi API Roboflow cho ảnh {uploaded_file.name}: {e}")
                     continue
 
             if resp.status_code != 200:
-                st.error(f"API Mask R-CNN trả lỗi cho ảnh {uploaded_file.name}.")
+                st.error(f"Roboflow trả lỗi cho ảnh {uploaded_file.name}.")
                 st.text(resp.text[:2000])
                 continue
 
-            # Kỳ vọng API trả JSON dạng:
-            # {
-            #   "predictions": [
-            #       {"x":..., "y":..., "width":..., "height":..., "confidence":..., "class":"crack", "points":[...]}
-            #   ]
-            # }
-            try:
-                result = resp.json()
-            except Exception as e:
-                st.error(f"Không parse được JSON từ API cho ảnh {uploaded_file.name}: {e}")
-                st.text(resp.text[:2000])
-                continue
-
+            result = resp.json()
             predictions = result.get("predictions", [])
             preds_conf = [
                 p for p in predictions if float(p.get("confidence", 0)) >= min_conf
@@ -1447,7 +1399,7 @@ def run_main_app():
 
             analyzed_img = None
             with col2:
-                st.subheader("Ảnh phân tích (Mask R-CNN)")
+                st.subheader("Ảnh phân tích")
                 if len(preds_conf) == 0:
                     # Trường hợp KHÔNG có vết nứt
                     st.image(orig_img, use_column_width=True)
@@ -1476,16 +1428,15 @@ def run_main_app():
             # Nếu tới đây thì CHỈ có trường hợp có vết nứt
             st.write("---")
             tab_stage1, tab_stage2 = st.tabs(
-                ["Stage 1 – Báo cáo chi tiết (Mask R-CNN)", "Stage 2 – Phân loại vết nứt"]
+                ["Stage 1 – Báo cáo chi tiết", "Stage 2 – Phân loại vết nứt"]
             )
 
             # ================== STAGE 1 ==================
             with tab_stage1:
-                st.subheader("Bảng thông tin vết nứt (từ Mask R-CNN)")
+                st.subheader("Bảng thông tin vết nứt")
 
                 confs = [float(p.get("confidence", 0)) for p in preds_conf]
                 avg_conf = sum(confs) / len(confs)
-                # Ở đây vẫn ước lượng mAP từ confidence (anh có thể thay bằng giá trị mAP thực tế nếu muốn)
                 map_val = round(min(1.0, avg_conf - 0.05), 2)
 
                 max_ratio = 0.0
@@ -1512,28 +1463,28 @@ def run_main_app():
                         "vi": "Thời gian xử lý",
                         "en": "Total Processing Time",
                         "value": f"{total_time:.2f} s",
-                        "desc": "Tổng thời gian thực hiện toàn bộ quy trình (gồm gửi API).",
+                        "desc": "Tổng thời gian thực hiện toàn bộ quy trình",
                     },
                     {
                         "vi": "Tốc độ mô hình AI",
                         "en": "Inference Speed",
                         "value": f"{total_time:.2f} s/image",
-                        "desc": "Thời gian xử lý mỗi ảnh (Mask R-CNN trên Colab).",
+                        "desc": "Thời gian xử lý mỗi ảnh",
                     },
                     {
                         "vi": "Độ tin cậy (Confidence)",
                         "en": "Confidence",
                         "value": f"{avg_conf:.2f}",
-                        "desc": "Mức tin cậy trung bình của mô hình Mask R-CNN.",
+                        "desc": "Mức tin cậy trung bình của mô hình",
                     },
                     {
-                        "vi": "mAP (Độ chính xác trung bình – ước lượng)",
+                        "vi": "mAP (Độ chính xác trung bình)",
                         "en": "Mean Average Precision",
                         "value": f"{map_val:.2f}",
-                        "desc": "Ước lượng từ Confidence (mAP thật lấy từ kết quả huấn luyện Detectron2).",
+                        "desc": "Độ chính xác định vị vùng nứt (ước lượng từ Confidence).",
                     },
                     {
-                        "vi": "Phần trăm vùng nứt lớn nhất",
+                        "vi": "Phần trăm vùng nứt",
                         "en": "Crack Area Ratio",
                         "value": f"{crack_area_ratio:.2f} %",
                         "desc": "Diện tích vùng nứt lớn nhất / tổng diện tích ảnh.",
@@ -1572,7 +1523,7 @@ def run_main_app():
                             if "Nguy hiểm" in severity
                             else "Vết nứt nhỏ, nên tiếp tục theo dõi."
                         ),
-                        "desc": "Kết luận tự động của hệ thống BKAI.",
+                        "desc": "Kết luận tự động của hệ thống.",
                     },
                 ]
 
@@ -1604,7 +1555,7 @@ def run_main_app():
                     plt.xlabel("Crack #")
                     plt.ylabel("Confidence")
                     plt.ylim(0, 1)
-                    plt.title("Độ tin cậy từng vùng nứt (Mask R-CNN)")
+                    plt.title("Độ tin cậy từng vùng nứt")
                     st.pyplot(fig1)
                     bar_png = fig_to_png(fig1)
                     plt.close(fig1)
@@ -1721,6 +1672,7 @@ def show_auth_page():
                     json.dump(users, f, ensure_ascii=False, indent=2)
                 st.success("Tạo tài khoản thành công! Bạn có thể quay lại tab Đăng nhập.")
 
+
 # =========================================================
 # 8. MAIN ENTRY
 # =========================================================
@@ -1735,4 +1687,6 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
+
 
