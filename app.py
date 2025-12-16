@@ -1,6 +1,5 @@
 # =========================================================
-# BKAI – Streamlit Cloud Safe App (Roboflow + PDF Report)
-# 1 FILE DUY NHẤT: app.py
+# BKAI – Streamlit Cloud Safe App 
 # =========================================================
 
 import os
@@ -46,8 +45,7 @@ APP_DIR = Path(__file__).parent if "__file__" in globals() else Path(".")
 DATA_DIR = APP_DIR / "data"
 IMG_DIR = APP_DIR / "images"
 STAGE2_DIR = IMG_DIR / "stage2"
-
-DATA_DIR.mkdir(parents=True, exist_ok=True)  # Cloud: OK, but may reset when redeploy
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Assets
 LOGO_PATH = str(APP_DIR / "BKAI_Logo.png")     # đặt logo tại root repo
@@ -59,7 +57,7 @@ USER_STATS_FILE = DATA_DIR / "user_stats.json"
 
 
 # =========================================================
-# 1) SAFE ROBOTFLOW CONFIG (NO HARD-CODE KEY)
+# 1) SAFE ROBOTFLOW CONFIG (STREAMLIT SECRETS)
 # =========================================================
 def get_secret(name: str, default: str = "") -> str:
     # ưu tiên Streamlit Secrets, fallback env
@@ -71,21 +69,23 @@ def get_secret(name: str, default: str = "") -> str:
         pass
     return str(os.getenv(name, default)).strip()
 
-ROBOFLOW_API_KEY = get_secret("t5l0P6BeYqoA0WOpz4oO")
-ROBOFLOW_MODEL   = get_secret("concrete-crack-dfd3i/3")
-ROBOFLOW_VERSION = get_secret("3")
+# ✅ ĐÚNG: truyền TÊN BIẾN, không truyền giá trị
+ROBOFLOW_API_KEY  = get_secret("ROBOFLOW_API_KEY")
+ROBOFLOW_API_URL  = get_secret("ROBOFLOW_API_URL", "https://serverless.roboflow.com")
+ROBOFLOW_MODEL_ID = get_secret("ROBOFLOW_MODEL_ID")  # ví dụ: concrete-crack-dfd3i/3
 
 def roboflow_is_configured() -> bool:
-    return bool(ROBOFLOW_API_KEY and ROBOFLOW_MODEL and ROBOFLOW_VERSION)
+    return bool(ROBOFLOW_API_KEY and ROBOFLOW_API_URL and ROBOFLOW_MODEL_ID)
 
 def build_roboflow_url() -> str:
-    return f"https://detect.roboflow.com/{ROBOFLOW_MODEL}/{ROBOFLOW_VERSION}?api_key={ROBOFLOW_API_KEY}"
+    # ✅ Serverless endpoint đúng theo Roboflow “Hosted Image Inference”
+    base = ROBOFLOW_API_URL.rstrip("/")
+    return f"{base}/{ROBOFLOW_MODEL_ID}?api_key={ROBOFLOW_API_KEY}"
 
 
 # =========================================================
 # 2) FONTS (CLOUD SAFE)
 # =========================================================
-# ƯU TIÊN: times.ttf nếu bạn có, nếu không thì dùng DejaVuSans (gần như chắc có trên Linux)
 FONT_NAME = "DejaVuSans"
 
 def register_fonts():
@@ -199,7 +199,6 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
         label = f"{cls} {conf:.2f}"
         draw.text((x0 + 3, y0 + 3), label, fill=green_solid)
 
-        # Polygon points (safe)
         flat_pts = []
         try:
             pts_raw = p.get("points")
@@ -234,7 +233,7 @@ def estimate_severity(p, img_w, img_h):
 
 
 # =========================================================
-# 5) ROBOTFLOW CALL (ROBUST)
+# 5) ROBOTFLOW CALL (SERVERLESS)
 # =========================================================
 def call_roboflow(image_bytes: bytes, filename="image.jpg", timeout=60):
     """
@@ -277,19 +276,18 @@ def call_roboflow(image_bytes: bytes, filename="image.jpg", timeout=60):
             "status_code": status,
             "raw": data,
             "fix": [
-                "1) Kiểm tra lại ROBOFLOW_MODEL_ID đúng y như Deploy/Hosted Image Inference (ví dụ concrete-crack-dfd3i/3).",
-                "2) Kiểm tra lại ROBOFLOW_API_URL phải là https://serverless.roboflow.com",
-                "3) Tạo API key mới nếu nghi key cũ bị revoke.",
-                "4) Nếu project private: đảm bảo key có quyền Hosted/Serverless Inference."
+                "1) ROBOFLOW_MODEL_ID phải đúng như Roboflow (vd: concrete-crack-dfd3i/3).",
+                "2) ROBOFLOW_API_URL phải là https://serverless.roboflow.com",
+                "3) Nếu nghi key bị revoke: tạo API key mới trong Roboflow rồi cập nhật Secrets.",
+                "4) Nếu Project/Deployment bị giới hạn quyền: kiểm tra quyền Hosted/Serverless inference."
             ]
         }, status
 
     return False, {"error": "Roboflow error", "status_code": status, "raw": data}, status
 
 
-
 # =========================================================
-# 6) PDF EXPORTS
+# 6) PDF EXPORTS 
 # =========================================================
 def export_pdf(original_img, analyzed_img, metrics_df, chart_bar_png=None, chart_pie_png=None):
     buf = io.BytesIO()
@@ -498,11 +496,11 @@ def export_pdf(original_img, analyzed_img, metrics_df, chart_bar_png=None, chart
     x2 = x1 + col2_w
 
     current_y = draw_table_header(content_top_y - 10 * mm, x0, x1, x2)
-    leading = BODY_SIZE + 4.0
+    leading = 10 + 4.0
 
     for i, (label, val) in enumerate(rows, start=1):
-        label_lines = wrap_text(label, FONT_NAME, BODY_SIZE, col2_w - 4)
-        value_lines = wrap_text(val, FONT_NAME, BODY_SIZE, col3_w - 4)
+        label_lines = wrap_text(label, FONT_NAME, 10, col2_w - 4)
+        value_lines = wrap_text(val, FONT_NAME, 10, col3_w - 4)
         n_lines = max(len(label_lines), len(value_lines))
         row_h = n_lines * leading + 6
 
@@ -520,7 +518,7 @@ def export_pdf(original_img, analyzed_img, metrics_df, chart_bar_png=None, chart
         c.setLineWidth(0.3)
         c.rect(x0, current_y - row_h, CONTENT_W, row_h, stroke=1, fill=0)
 
-        c.setFont(FONT_NAME, BODY_SIZE)
+        c.setFont(FONT_NAME, 10)
         c.setFillColor(colors.black)
         c.drawString(x0 + 2, current_y - leading, str(i))
 
@@ -618,7 +616,7 @@ def export_pdf_no_crack(original_img):
 
 
 # =========================================================
-# 7) STAGE 2 PDF + UI
+# 7) STAGE 2 PDF + UI (GIỮ NGUYÊN)
 # =========================================================
 def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     left_margin = 20 * mm
@@ -710,12 +708,13 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
 
     for _, row in component_df.iterrows():
         img_path = row.get("Ảnh (path)", "") or row.get("Hình ảnh minh họa", "")
+        abs_img = str(APP_DIR / img_path) if isinstance(img_path, str) and img_path.startswith("images/") else str(img_path)
         data.append([
             Paragraph(str(row["Cấu kiện"]), normal),
             Paragraph(str(row["Loại vết nứt"]), normal),
             Paragraph(str(row["Nguyên nhân"]), normal),
             Paragraph(str(row["Đặc trưng hình dạng"]), normal),
-            make_thumb(str(APP_DIR / img_path) if isinstance(img_path, str) and img_path.startswith("images/") else str(img_path)),
+            make_thumb(abs_img),
         ])
 
     table = Table(
@@ -793,12 +792,8 @@ def render_component_crack_table(component_df: pd.DataFrame):
             c4.write(row["Đặc trưng hình dạng"])
 
             img_path = row.get("Ảnh (path)", "") or row.get("Hình ảnh minh họa", "")
-            # Convert relative images/... to absolute
-            abs_path = None
-            if isinstance(img_path, str) and img_path:
-                abs_path = (APP_DIR / img_path) if img_path.startswith("images/") else Path(img_path)
-
-            if abs_path and abs_path.exists():
+            abs_path = (APP_DIR / img_path) if isinstance(img_path, str) and img_path.startswith("images/") else Path(str(img_path))
+            if abs_path.exists():
                 c5.image(str(abs_path), use_container_width=True)
             else:
                 c5.write("—")
@@ -867,7 +862,7 @@ def show_stage2_demo(key_prefix="stage2"):
 
 
 # =========================================================
-# 8) AUTH (LOGIN/REGISTER) – CLOUD SAFE
+# 8) AUTH (LOGIN/REGISTER)
 # =========================================================
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -924,13 +919,11 @@ def show_auth_page():
             else:
                 users[reg_user] = reg_pass
                 st.session_state.users = users
-
-                # Best-effort save
                 saved = safe_write_json(USERS_FILE, users)
                 if saved:
                     st.success("Tạo tài khoản thành công! (đã lưu) Bạn có thể quay lại tab Đăng nhập.")
                 else:
-                    st.warning("Tạo tài khoản thành công! (chạy Cloud có thể không lưu vĩnh viễn) Bạn có thể đăng nhập ngay trong phiên này.")
+                    st.warning("Tạo tài khoản thành công! (Cloud có thể không lưu vĩnh viễn) Bạn có thể đăng nhập ngay trong phiên này.")
 
 
 # =========================================================
@@ -954,10 +947,11 @@ def run_main_app():
     with st.sidebar:
         st.header("Roboflow Status")
         if roboflow_is_configured():
-            st.success("Roboflow config OK (key/model/version đã set).")
-            st.caption(f"Model: {ROBOFLOW_MODEL} | Version: {ROBOFLOW_VERSION}")
+            st.success("Roboflow config OK (Secrets đã set).")
+            st.caption(f"API_URL: {ROBOFLOW_API_URL}")
+            st.caption(f"MODEL_ID: {ROBOFLOW_MODEL_ID}")
         else:
-            st.error("Thiếu Roboflow Secrets (API_KEY / MODEL / VERSION).")
+            st.error("Thiếu Roboflow Secrets (ROBOFLOW_API_KEY / ROBOFLOW_API_URL / ROBOFLOW_MODEL_ID).")
 
         if st.button("🧪 Test Roboflow API", key="btn_test_rf"):
             test_img = Image.new("RGB", (256, 256), (255, 255, 255))
@@ -1017,8 +1011,6 @@ def run_main_app():
                 "email": email,
             }
             st.session_state.user_stats.append(record)
-
-            # Best-effort save (Cloud may not persist after redeploy)
             safe_write_json(USER_STATS_FILE, st.session_state.user_stats)
 
             st.success("Đã lưu thông tin. Bạn có thể tải ảnh lên để phân tích.")
@@ -1157,7 +1149,6 @@ def run_main_app():
                 st.subheader("Biểu đồ thống kê")
                 col_chart1, col_chart2 = st.columns(2)
 
-                # Bar chart
                 with col_chart1:
                     fig1 = plt.figure(figsize=(5, 3.2))
                     plt.bar(range(1, len(confs) + 1), confs)
@@ -1169,7 +1160,6 @@ def run_main_app():
                     bar_png = fig_to_png(fig1)
                     plt.close(fig1)
 
-                # Pie chart
                 with col_chart2:
                     labels = ["Vùng nứt lớn nhất", "Phần ảnh còn lại"]
                     sizes = [max_ratio, max(0.0, 1 - max_ratio)]
@@ -1214,5 +1204,3 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
-
-
