@@ -71,9 +71,9 @@ def get_secret(name: str, default: str = "") -> str:
         pass
     return str(os.getenv(name, default)).strip()
 
-ROBOFLOW_API_KEY = get_secret("ROBOFLOW_API_KEY")
-ROBOFLOW_MODEL   = get_secret("ROBOFLOW_MODEL")
-ROBOFLOW_VERSION = get_secret("ROBOFLOW_VERSION")
+ROBOFLOW_API_KEY = get_secret("t5l0P6BeYqoA0WOpz4oO")
+ROBOFLOW_MODEL   = get_secret("concrete-crack-dfd3i/3")
+ROBOFLOW_VERSION = get_secret("3")
 
 def roboflow_is_configured() -> bool:
     return bool(ROBOFLOW_API_KEY and ROBOFLOW_MODEL and ROBOFLOW_VERSION)
@@ -1214,4 +1214,5 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
