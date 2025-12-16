@@ -243,7 +243,7 @@ def call_roboflow(image_bytes: bytes, filename="image.jpg", timeout=60):
     if not roboflow_is_configured():
         return False, {
             "error": "Missing Roboflow config",
-            "hint": "Set ROBOFLOW_API_KEY / ROBOFLOW_MODEL / ROBOFLOW_VERSION in Streamlit Secrets."
+            "hint": "Set ROBOFLOW_API_KEY / ROBOFLOW_API_URL / ROBOFLOW_MODEL_ID in Streamlit Secrets."
         }, 0
 
     url = build_roboflow_url()
@@ -257,7 +257,7 @@ def call_roboflow(image_bytes: bytes, filename="image.jpg", timeout=60):
             timeout=timeout,
         )
     except requests.exceptions.Timeout:
-        return False, {"error": "Timeout", "hint": "Request timed out. Try again."}, 408
+        return False, {"error": "Timeout", "hint": "Roboflow request timed out. Try again."}, 408
     except Exception as e:
         return False, {"error": "Request failed", "detail": str(e)}, 0
 
@@ -268,10 +268,8 @@ def call_roboflow(image_bytes: bytes, filename="image.jpg", timeout=60):
     except Exception:
         data = resp.text
 
-    if status == 200:
-        if isinstance(data, dict):
-            return True, data, status
-        return False, {"error": "Invalid JSON response", "raw": str(data)[:2000]}, status
+    if status == 200 and isinstance(data, dict):
+        return True, data, status
 
     if status in (401, 403):
         return False, {
@@ -279,14 +277,15 @@ def call_roboflow(image_bytes: bytes, filename="image.jpg", timeout=60):
             "status_code": status,
             "raw": data,
             "fix": [
-                "1) API key đúng chưa? (tạo key mới nếu cần)",
-                "2) Model/Version đúng chưa? (tên model, số version)",
-                "3) Project Roboflow có Private không? Key có quyền Hosted Inference không?",
-                "4) Key có bị revoke do lộ trên GitHub không?"
+                "1) Kiểm tra lại ROBOFLOW_MODEL_ID đúng y như Deploy/Hosted Image Inference (ví dụ concrete-crack-dfd3i/3).",
+                "2) Kiểm tra lại ROBOFLOW_API_URL phải là https://serverless.roboflow.com",
+                "3) Tạo API key mới nếu nghi key cũ bị revoke.",
+                "4) Nếu project private: đảm bảo key có quyền Hosted/Serverless Inference."
             ]
         }, status
 
     return False, {"error": "Roboflow error", "status_code": status, "raw": data}, status
+
 
 
 # =========================================================
@@ -1215,3 +1214,4 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
