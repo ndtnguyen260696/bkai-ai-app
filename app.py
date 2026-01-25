@@ -53,7 +53,7 @@ ROBOFLOW_FULL_URL = (
 ) or os.getenv(
     "ROBOFLOW_FULL_URL",
     # Fallback (bạn có thể thay bằng URL của bạn)
-    "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=YOUR_API_KEY"
+    "https://detect.roboflow.com/crack_segmentation_detection/4?api_key=nWA6ayjI5bGNpXkkbsAb"
 )
 
 LOGO_PATH = "BKAI_Logo.png"
@@ -1427,3 +1427,4 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
