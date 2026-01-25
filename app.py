@@ -218,7 +218,7 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
             draw.rectangle([x0, y0, x1, y1], fill=(r, g, b, 60))
 
         # ===== BBOX =====
-        draw.rectangle([x0, y0, x1, y1], outline=box_color, width=1)
+        draw.rectangle([x0, y0, x1, y1], outline=box_color, width=2)
 
         # ===== LABEL (nền đen + chữ cùng màu) =====
         cls = p.get("class", "crack")
@@ -1795,6 +1795,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
