@@ -120,18 +120,10 @@ def _get_palette():
     ]
 
 
-def draw_predictions_detectron_style(
-    image: Image.Image,
-    predictions,
-    min_conf: float = 0.0,
-    mask_alpha: int = 90,        # 0..255
-    box_thickness: int = 3,
-    outline_thickness: int = 3,
-    font_size: int = 16,
-):
+def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float = 0.0):
     """
     Vẽ ảnh phân tích kiểu Detectron2:
-    - mask overlay trong suốt
+    - mask overlay  đồng màu với box
     - viền mask
     - bbox
     - label + % có nền đen
@@ -143,74 +135,94 @@ def draw_predictions_detectron_style(
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
 
-    palette = _get_palette()
+    # ✅ Bảng màu đa dạng (mỗi instance 1 màu)
+    palette = [
+        (128, 0, 128),   # purple
+        (0, 158, 115),   # green
+        (0, 114, 178),   # blue
+        (213, 94, 0),    # orange
+        (204, 121, 167), # pink
+        (230, 159, 0),   # yellow
+        (86, 180, 233),  # sky
+        (240, 228, 66),  # lemon
+        (160, 32, 240),  # violet
+        (220, 20, 60),   # crimson
+    ]
 
-    # font
+    # ✅ font (ưu tiên DejaVuSans)
     try:
-        font = ImageFont.truetype("DejaVuSans.ttf", font_size)
+        font = ImageFont.truetype("DejaVuSans.ttf", 16)
     except Exception:
         try:
-            font = ImageFont.truetype("arial.ttf", font_size)
+            font = ImageFont.truetype("arial.ttf", 16)
         except Exception:
             font = ImageFont.load_default()
 
+    def clamp(v, lo, hi):
+        return max(lo, min(hi, v))
+
     def clamp_box(x0, y0, x1, y1):
-        x0 = max(0, min(W - 1, x0))
-        x1 = max(0, min(W - 1, x1))
-        y0 = max(0, min(H - 1, y0))
-        y1 = max(0, min(H - 1, y1))
+        x0 = clamp(x0, 0, W - 1)
+        x1 = clamp(x1, 0, W - 1)
+        y0 = clamp(y0, 0, H - 1)
+        y1 = clamp(y1, 0, H - 1)
         return x0, y0, x1, y1
+
+    # ✅ tham số style
+    mask_alpha = 90          # độ trong suốt của mask (0..255)
+    box_width = 3
+    outline_width = 3
+    label_pad = 4
 
     for i, p in enumerate(predictions):
         conf = float(p.get("confidence", 0))
         if conf < min_conf:
             continue
 
-        color = palette[i % len(palette)]
-        solid = (color[0], color[1], color[2], 255)
-        fill  = (color[0], color[1], color[2], mask_alpha)
+        # ✅ màu cho instance i
+        r, g, b = palette[i % len(palette)]
+        solid = (r, g, b, 255)           # box + outline
+        fill  = (r, g, b, mask_alpha)    # mask overlay (đồng màu box)
 
-        # bbox (Roboflow: center-based)
-        x = p.get("x")
-        y = p.get("y")
-        w = p.get("width")
-        h = p.get("height")
-
-        # polygon mask (vẽ trước để box/label nổi lên trên)
+        # ========= 1) MASK (polygon) =========
         pts_raw = p.get("points")
         flat_pts = extract_poly_points(pts_raw) if pts_raw is not None else []
         if len(flat_pts) >= 3:
-            draw.polygon(flat_pts, fill=fill)
-            draw.line(flat_pts + [flat_pts[0]], fill=solid, width=outline_thickness)
+            draw.polygon(flat_pts, fill=fill)  # overlay
+            draw.line(flat_pts + [flat_pts[0]], fill=solid, width=outline_width)  # outline
 
-        if None not in (x, y, w, h):
-            x0 = x - w / 2
-            y0 = y - h / 2
-            x1 = x + w / 2
-            y1 = y + h / 2
-            x0, y0, x1, y1 = clamp_box(x0, y0, x1, y1)
+        # ========= 2) BOX + LABEL =========
+        x = p.get("x"); y = p.get("y"); w = p.get("width"); h = p.get("height")
+        if None in (x, y, w, h):
+            continue
 
-            # box
-            draw.rectangle([x0, y0, x1, y1], outline=solid, width=box_thickness)
+        x0 = x - w / 2
+        y0 = y - h / 2
+        x1 = x + w / 2
+        y1 = y + h / 2
+        x0, y0, x1, y1 = clamp_box(x0, y0, x1, y1)
 
-            # label
-            cls = p.get("class", "crack")
-            label = f"{cls} {conf*100:.0f}%"
+        # bbox
+        draw.rectangle([x0, y0, x1, y1], outline=solid, width=box_width)
 
-            # đo text
-            tb = draw.textbbox((0, 0), label, font=font)
-            tw = tb[2] - tb[0]
-            th = tb[3] - tb[1]
-            pad = 4
+        # label + %
+        cls = p.get("class", "crack")
+        label = f"{cls} {conf*100:.0f}%"
 
-            lx0 = x0
-            ly0 = max(0, y0 - (th + 2 * pad))
-            lx1 = x0 + tw + 2 * pad
-            ly1 = ly0 + th + 2 * pad
+        tb = draw.textbbox((0, 0), label, font=font)
+        tw = tb[2] - tb[0]
+        th = tb[3] - tb[1]
 
-            # nền đen sau chữ
-            draw.rectangle([lx0, ly0, lx1, ly1], fill=(0, 0, 0, 180))
-            draw.text((lx0 + pad, ly0 + pad), label, font=font, fill=(255, 255, 255, 255))
+        # label box (nền đen) đặt phía trên bbox nếu còn chỗ, không thì đặt trong bbox
+        lx0 = x0
+        ly0 = y0 - (th + 2 * label_pad)
+        if ly0 < 0:
+            ly0 = y0 + 2  # đẩy xuống trong bbox
+        lx1 = lx0 + tw + 2 * label_pad
+        ly1 = ly0 + th + 2 * label_pad
+
+        draw.rectangle([lx0, ly0, lx1, ly1], fill=(0, 0, 0, 180))  # nền đen
+        draw.text((lx0 + label_pad, ly0 + label_pad), label, font=font, fill=(255, 255, 255, 255))
 
     result = Image.alpha_composite(base.convert("RGBA"), overlay)
     return result.convert("RGB")
@@ -1427,4 +1439,5 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
