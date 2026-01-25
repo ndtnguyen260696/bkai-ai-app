@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import io
 import time
 import datetime
@@ -1758,6 +1758,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
