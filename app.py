@@ -75,16 +75,15 @@ def fig_to_png(fig) -> io.BytesIO:
 
 
 def _stable_rgb(i: int):
-    """
-    Tạo màu đa dạng theo từng instance (ổn định theo index).
-    Trả về (r,g,b) 0-255.
-    """
+    """Màu đa dạng theo instance, ổn định theo index. Trả về RGB 0-255."""
     h = (i * 0.17) % 1.0
     s = 0.90
     v = 0.95
     r, g, b = colorsys.hsv_to_rgb(h, s, v)
     return (int(r * 255), int(g * 255), int(b * 255))
 
+
+@st.cache_resource
 def _get_font(size=18):
     for fp in [
         "DejaVuSans.ttf",
@@ -97,6 +96,11 @@ def _get_font(size=18):
         except Exception:
             continue
     return ImageFont.load_default()
+
+
+# =========================================================
+# 1.1 PARSE POLYGON + TÍNH DIỆN TÍCH MASK
+# =========================================================
 
 def extract_poly_points(points_field, img_w: int, img_h: int):
     """
@@ -113,7 +117,10 @@ def extract_poly_points(points_field, img_w: int, img_h: int):
     def _append_xy(x, y):
         if x is None or y is None:
             return
-        pts.append((float(x), float(y)))
+        try:
+            pts.append((float(x), float(y)))
+        except Exception:
+            return
 
     # 1) dict nhiều segment
     if isinstance(points_field, dict):
@@ -122,7 +129,7 @@ def extract_poly_points(points_field, img_w: int, img_h: int):
             if isinstance(seg, list):
                 for p in seg:
                     if isinstance(p, dict) and "x" in p and "y" in p:
-                        _append_xy(p["x"], p["y"])
+                        _append_xy(p.get("x"), p.get("y"))
                     elif isinstance(p, (list, tuple)) and len(p) == 2:
                         _append_xy(p[0], p[1])
 
@@ -130,22 +137,20 @@ def extract_poly_points(points_field, img_w: int, img_h: int):
     elif isinstance(points_field, list):
         for p in points_field:
             if isinstance(p, dict) and "x" in p and "y" in p:
-                _append_xy(p["x"], p["y"])
+                _append_xy(p.get("x"), p.get("y"))
             elif isinstance(p, (list, tuple)) and len(p) == 2:
                 _append_xy(p[0], p[1])
 
     if len(pts) < 3:
         return []
 
-    # --- Detect normalized vs pixel ---
     xs = [x for x, _ in pts]
     ys = [y for _, y in pts]
-    max_x = max(xs)
-    max_y = max(ys)
+    max_x = max(xs) if xs else 0
+    max_y = max(ys) if ys else 0
 
-    # Nếu max_x <= 1.5 -> xem như normalized theo chiều ngang
+    # max_x <= 1.5 coi như normalized (0..1)
     x_norm = (max_x <= 1.5)
-    # y thường pixel, nhưng nếu y cũng <= 1.5 thì normalized luôn
     y_norm = (max_y <= 1.5)
 
     out = []
@@ -154,21 +159,77 @@ def extract_poly_points(points_field, img_w: int, img_h: int):
             x = x * img_w
         if y_norm:
             y = y * img_h
-        # clamp vào ảnh
-        x = max(0.0, min(float(img_w - 1), x))
-        y = max(0.0, min(float(img_h - 1), y))
+        x = max(0.0, min(float(img_w - 1), float(x)))
+        y = max(0.0, min(float(img_h - 1), float(y)))
         out.append((x, y))
 
     return out
+
+
+def extract_polygons(points_field, img_w: int, img_h: int):
+    """Trả về list polygon; mỗi polygon là list[(x_pixel, y_pixel)]."""
+    polys = []
+
+    if isinstance(points_field, dict):
+        for k in sorted(points_field.keys(), key=lambda x: str(x)):
+            seg = points_field[k]
+            poly = extract_poly_points(seg, img_w, img_h)
+            if len(poly) >= 3:
+                polys.append(poly)
+
+    elif isinstance(points_field, list):
+        poly = extract_poly_points(points_field, img_w, img_h)
+        if len(poly) >= 3:
+            polys.append(poly)
+
+    return polys
+
+
+def crack_area_from_predictions(predictions, img_w: int, img_h: int):
+    """
+    Tính diện tích vùng nứt theo MASK polygon (pixel^2) bằng cách rasterize.
+    """
+    if img_w <= 0 or img_h <= 0:
+        return 0.0
+
+    mask = Image.new("L", (img_w, img_h), 0)
+    d = ImageDraw.Draw(mask)
+
+    for p in predictions:
+        pts_raw = p.get("points", None)
+        if pts_raw is None:
+            continue
+        polys = extract_polygons(pts_raw, img_w, img_h)
+        for poly in polys:
+            if len(poly) >= 3:
+                d.polygon(poly, fill=255)
+
+    # đếm pixel trắng
+    return float(sum(1 for v in mask.getdata() if v > 0))
+
+
+def crack_area_ratio_percent(predictions, img_w: int, img_h: int):
+    """
+    Trả về (ratio_percent, area_px2)
+    ratio_percent = diện tích mask / diện tích ảnh * 100
+    """
+    img_area = float(img_w * img_h) if img_w > 0 and img_h > 0 else 0.0
+    area_px2 = crack_area_from_predictions(predictions, img_w, img_h)
+    ratio = (area_px2 / img_area) if img_area > 0 else 0.0
+    return (ratio * 100.0, area_px2)
+
+
+# =========================================================
+# 1.2 VẼ MASK + BOX KIỂU DETECTRON2
+# =========================================================
 
 def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float = 0.0):
     """
     Detectron2-style:
     - đa màu theo instance
-    - màu CHỮ %, BOX, OVERLAY = GIỐNG NHAU (cùng 1 màu RGB)
+    - màu CHỮ %, BOX, OVERLAY = giống nhau (cùng RGB)
     - label nền đen
-    - có polygon thì overlay theo mask
-    - không có polygon thì overlay theo bbox (fallback)
+    - có polygon -> overlay mask; không có polygon -> overlay bbox fallback
     """
     base = image.convert("RGB")
     W, H = base.size
@@ -182,7 +243,7 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
         if conf < float(min_conf):
             continue
 
-        # BBOX: Roboflow dùng center x,y + width,height
+        # Roboflow bbox center x,y + width,height
         x = p.get("x"); y = p.get("y")
         w = p.get("width"); h = p.get("height")
         if None in (x, y, w, h):
@@ -193,20 +254,17 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
         x1 = float(x) + float(w) / 2
         y1 = float(y) + float(h) / 2
 
-        # clamp bbox
         x0 = max(0.0, min(W - 1.0, x0))
         y0 = max(0.0, min(H - 1.0, y0))
         x1 = max(0.0, min(W - 1.0, x1))
         y1 = max(0.0, min(H - 1.0, y1))
 
-        # 1 màu duy nhất cho instance
         r, g, b = _stable_rgb(i)
         box_color    = (r, g, b, 255)
-        overlay_fill = (r, g, b, 110)  # đậm hơn cho giống detectron2
+        overlay_fill = (r, g, b, 110)
         overlay_edge = (r, g, b, 255)
         text_color   = (r, g, b, 255)
 
-        # ===== POLYGON (đã sửa parse + normalize) =====
         pts_raw = p.get("points", None)
         poly = extract_poly_points(pts_raw, W, H) if pts_raw is not None else []
 
@@ -214,16 +272,14 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
             draw.polygon(poly, fill=overlay_fill)
             draw.line(poly + [poly[0]], fill=overlay_edge, width=1)
         else:
-            # fallback: overlay theo bbox
             draw.rectangle([x0, y0, x1, y1], fill=(r, g, b, 60))
 
-        # ===== BBOX =====
+        # bbox
         draw.rectangle([x0, y0, x1, y1], outline=box_color, width=2)
 
-        # ===== LABEL (nền đen + chữ cùng màu) =====
+        # label
         cls = p.get("class", "crack")
         label = f"{cls} {int(round(conf * 100))}%"
-
         tb = draw.textbbox((0, 0), label, font=font)
         tw = tb[2] - tb[0]
         th = tb[3] - tb[1]
@@ -241,24 +297,22 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
     return result.convert("RGB")
 
 
+# =========================================================
+# 1.3 SEVERITY (DỰA THEO % MASK)
+# =========================================================
 
-
-def estimate_severity(p, img_w, img_h):
-    w = float(p.get("width", 0))
-    h = float(p.get("height", 0))
-    if img_w <= 0 or img_h <= 0:
-        return "Không xác định"
-
-    area_box = w * h
-    area_img = img_w * img_h
-    ratio = area_box / area_img
-
-    if ratio < 0.01:
+def estimate_severity_from_ratio(area_ratio_percent: float):
+    """
+    Phân cấp theo % diện tích mask so với ảnh (có thể chỉnh ngưỡng).
+    """
+    r = float(area_ratio_percent)
+    if r < 0.2:
         return "Nhỏ"
-    elif ratio < 0.05:
+    elif r < 1.0:
         return "Trung bình"
     else:
         return "Nguy hiểm (Severe)"
+
 
 # =========================================================
 # 2. XUẤT PDF STAGE 1 – BẢN PRO (CÓ VẾT NỨT)
@@ -274,7 +328,7 @@ def export_pdf(
 ):
     """
     BÁO CÁO BKAI – STAGE 1 (PRO, CÓ VẾT NỨT):
-    - Dùng canvas, không Platypus.
+    - Dùng canvas.
     - Trang 1: logo + tiêu đề + 2 ảnh + banner kết luận + biểu đồ.
     - Trang 2+: bảng metrics.
     """
@@ -295,13 +349,7 @@ def export_pdf(
     BODY_SIZE       = 10
     SMALL_FONT_SIZE = 8
 
-    # =================================================
-    # HELPER: HEADER / FOOTER
-    # =================================================
     def draw_header(page_title, subtitle=None, page_no=None):
-        """
-        Vẽ logo + tiêu đề, trả về y_top cho nội dung.
-        """
         y_top = page_h - TOP
 
         # Logo
@@ -312,18 +360,11 @@ def export_pdf(
                 logo_w = 30 * mm
                 iw, ih = logo.getSize()
                 logo_h = logo_w * ih / iw
-                c.drawImage(
-                    logo,
-                    LEFT,
-                    y_top - logo_h,
-                    width=logo_w,
-                    height=logo_h,
-                    mask="auto",
-                )
+                c.drawImage(logo, LEFT, y_top - logo_h, width=logo_w, height=logo_h, mask="auto")
             except Exception:
                 logo_h = 0
 
-        # Tiêu đề
+        # Title
         c.setFillColor(colors.black)
         c.setFont(TITLE_FONT, TITLE_SIZE)
         c.drawCentredString(page_w / 2.0, y_top - 6 * mm, page_title)
@@ -336,21 +377,14 @@ def export_pdf(
         footer_y = BOTTOM - 6
         c.setFont(BODY_FONT, SMALL_FONT_SIZE)
         c.setFillColor(colors.grey)
-        footer = (
-            f"BKAI – Concrete Crack Inspection | "
-            f"Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
-        )
+        footer = f"BKAI – Concrete Crack Inspection | Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}"
         c.drawString(LEFT, footer_y, footer)
         if page_no is not None:
             c.drawRightString(page_w - RIGHT, footer_y, f"Page {page_no}")
 
-        # Nội dung bắt đầu cách logo khoảng 20mm
         content_start_y = y_top - max(logo_h, 15 * mm) - 20 * mm
         return content_start_y
 
-    # =================================================
-    # HELPER: VẼ ẢNH
-    # =================================================
     def draw_pil_image(pil_img, x_left, top_y, max_w, max_h):
         if pil_img is None:
             return top_y
@@ -363,14 +397,10 @@ def export_pdf(
         c.drawImage(img, x_left, bottom_y, width=w, height=h, mask="auto")
         return bottom_y
 
-    # =================================================
-    # HELPER: WRAP TEXT
-    # =================================================
     def wrap_text(text, font_name, font_size, max_width):
         words = str(text).split()
         if not words:
             return [""]
-
         lines = []
         current = words[0]
         for w in words[1:]:
@@ -395,9 +425,7 @@ def export_pdf(
         used_height = leading * len(lines) + 4
         return used_height, len(lines)
 
-    # =================================================
-    # LẤY KẾT LUẬN & MỨC ĐỘ NGUY HIỂM
-    # =================================================
+    # lấy severity + summary
     severity_val = ""
     summary_val = ""
     if metrics_df is not None:
@@ -421,15 +449,11 @@ def export_pdf(
         banner_fill = colors.HexColor("#e8f5e9")
         banner_text = colors.HexColor("#2e7d32")
 
-    # =================================================
-    # PAGE 1 – ẢNH + BIỂU ĐỒ
-    # =================================================
+    # PAGE 1
     page_no = 1
     content_top_y = draw_header("BÁO CÁO KẾT QUẢ PHÂN TÍCH", page_no=page_no)
 
-    # Hạ ảnh gốc & ảnh phân tích xuống thêm ~5mm
     content_top_y -= 5 * mm
-
     gap_x = 10 * mm
     slot_w = (CONTENT_W - gap_x) / 2.0
     max_img_h = 90 * mm
@@ -440,12 +464,10 @@ def export_pdf(
     c.drawString(LEFT + slot_w + gap_x, content_top_y + 4 * mm, "Ảnh phân tích")
 
     left_bottom = draw_pil_image(original_img, LEFT, content_top_y, slot_w, max_img_h)
-    right_bottom = draw_pil_image(
-        analyzed_img, LEFT + slot_w + gap_x, content_top_y, slot_w, max_img_h
-    )
+    right_bottom = draw_pil_image(analyzed_img, LEFT + slot_w + gap_x, content_top_y, slot_w, max_img_h)
     images_bottom_y = min(left_bottom, right_bottom)
 
-    # Banner kết luận
+    # banner
     banner_h = 16 * mm
     banner_bottom = images_bottom_y - 12 * mm
     if banner_bottom < BOTTOM + 40 * mm:
@@ -459,7 +481,7 @@ def export_pdf(
     c.setFont(BODY_FONT, 11)
     c.drawString(LEFT + 4 * mm, banner_bottom + banner_h / 2.0 - 4, summary_val)
 
-    # Biểu đồ
+    # charts
     charts_top_y = banner_bottom - 18 * mm
     max_chart_h = 70 * mm
     chart_slot_w = slot_w
@@ -485,32 +507,17 @@ def export_pdf(
         cw = pw * scale_pie
         ch = ph * scale_pie
         pie_bottom = charts_top_y - ch
-        c.drawImage(
-            pie_img,
-            LEFT + chart_slot_w + gap_x,
-            pie_bottom,
-            width=cw,
-            height=ch,
-            mask="auto",
-        )
+        c.drawImage(pie_img, LEFT + chart_slot_w + gap_x, pie_bottom, width=cw, height=ch, mask="auto")
         c.setFont(BODY_FONT, 10)
         c.setFillColor(colors.black)
-        c.drawString(
-            LEFT + chart_slot_w + gap_x,
-            pie_bottom - 10,
-            "Tỷ lệ vùng nứt so với toàn ảnh",
-        )
+        c.drawString(LEFT + chart_slot_w + gap_x, pie_bottom - 10, "Tỷ lệ vùng nứt so với toàn ảnh")
 
     c.showPage()
 
-    # =================================================
-    # PAGE 2+ – BẢNG METRICS
-    # =================================================
+    # PAGE 2+ metrics table
     page_no += 1
     subtitle = "Bảng tóm tắt các chỉ số vết nứt"
-    content_top_y = draw_header(
-        "BÁO CÁO KẾT QUẢ PHÂN TÍCH", subtitle=subtitle, page_no=page_no
-    )
+    content_top_y = draw_header("BÁO CÁO KẾT QUẢ PHÂN TÍCH", subtitle=subtitle, page_no=page_no)
 
     rows = []
     skip_keys = {"Crack Length", "Crack Width"}
@@ -537,9 +544,7 @@ def export_pdf(
 
     def start_table_page(page_no):
         c.showPage()
-        y0 = draw_header(
-            "BÁO CÁO KẾT QUẢ PHÂN TÍCH", subtitle=subtitle, page_no=page_no
-        )
+        y0 = draw_header("BÁO CÁO KẾT QUẢ PHÂN TÍCH", subtitle=subtitle, page_no=page_no)
         return y0 - 10 * mm
 
     table_top_y = max_body_y
@@ -592,17 +597,12 @@ def export_pdf(
     buf.seek(0)
     return buf
 
+
 # =========================================================
 # PDF CHO TRƯỜNG HỢP KHÔNG CÓ VẾT NỨT
 # =========================================================
 
 def export_pdf_no_crack(original_img):
-    """
-    Báo cáo 1 trang khi KHÔNG phát hiện vết nứt:
-    - Logo + tiêu đề
-    - Ảnh gốc + Ảnh phân tích (cùng là ảnh gốc)
-    - Dòng kết luận bên dưới
-    """
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
 
@@ -626,32 +626,20 @@ def export_pdf_no_crack(original_img):
                 logo_w = 30 * mm
                 iw, ih = logo.getSize()
                 logo_h = logo_w * ih / iw
-                c.drawImage(
-                    logo,
-                    LEFT,
-                    y_top - logo_h,
-                    width=logo_w,
-                    height=logo_h,
-                    mask="auto",
-                )
+                c.drawImage(logo, LEFT, y_top - logo_h, width=logo_w, height=logo_h, mask="auto")
             except Exception:
                 logo_h = 0
 
         c.setFont(TITLE_FONT, 18)
         c.drawCentredString(page_w / 2, y_top - 6 * mm, "BÁO CÁO KẾT QUẢ PHÂN TÍCH")
         c.setFont(BODY_FONT, 11)
-        c.drawCentredString(
-            page_w / 2,
-            y_top - 14 * mm,
-            "Trường hợp: Không phát hiện vết nứt rõ ràng",
-        )
+        c.drawCentredString(page_w / 2, y_top - 14 * mm, "Trường hợp: Không phát hiện vết nứt rõ ràng")
 
         content_top = y_top - max(logo_h, 15 * mm) - 20 * mm
         return content_top
 
     content_top_y = draw_header_no_crack()
 
-    # Ảnh gốc & Ảnh phân tích
     max_img_h = 90 * mm
     gap_x = 10 * mm
     slot_w = (CONTENT_W - gap_x) / 2
@@ -671,9 +659,8 @@ def export_pdf_no_crack(original_img):
     c.drawString(LEFT + slot_w + gap_x, content_top_y + 4 * mm, "Ảnh phân tích")
 
     left_bottom = draw_pil(original_img, LEFT, content_top_y)
-    _           = draw_pil(original_img, LEFT + slot_w + gap_x, content_top_y)
+    _ = draw_pil(original_img, LEFT + slot_w + gap_x, content_top_y)
 
-    # Kết luận
     banner_y = left_bottom - 12 * mm
     banner_h = 16 * mm
 
@@ -682,21 +669,12 @@ def export_pdf_no_crack(original_img):
 
     c.setFillColor(colors.HexColor("#2e7d32"))
     c.setFont(BODY_FONT, 11)
-    c.drawString(
-        LEFT + 4 * mm,
-        banner_y + banner_h / 2 - 4,
-        "Không phát hiện vết nứt rõ ràng trong ảnh theo ngưỡng của mô hình.",
-    )
+    c.drawString(LEFT + 4 * mm, banner_y + banner_h / 2 - 4, "Không phát hiện vết nứt rõ ràng trong ảnh theo ngưỡng của mô hình.")
 
-    # Footer đơn giản
     footer_y = BOTTOM - 6
     c.setFont(BODY_FONT, 8)
     c.setFillColor(colors.grey)
-    c.drawString(
-        LEFT,
-        footer_y,
-        f"BKAI – Concrete Crack Inspection | Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}",
-    )
+    c.drawString(LEFT, footer_y, f"BKAI – Concrete Crack Inspection | Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}")
     c.drawRightString(page_w - RIGHT, footer_y, "Page 1")
 
     c.showPage()
@@ -704,18 +682,12 @@ def export_pdf_no_crack(original_img):
     buf.seek(0)
     return buf
 
+
 # =========================================================
 # 3. XUẤT PDF STAGE 2 (KIẾN THỨC, LANDSCAPE)
 # =========================================================
 
 def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
-    """
-    Xuất PDF KIẾN THỨC STAGE 2:
-    - Logo BKAI + tiêu đề giống Stage 1.
-    - Bảng 5 cột có hình minh hoạ.
-    - A4 xoay ngang để bảng không tràn.
-    """
-
     left_margin   = 20 * mm
     right_margin  = 20 * mm
     top_margin    = 20 * mm
@@ -767,16 +739,10 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
 
     elements = []
 
-    # Header: logo + title
-    header_row = []
     if os.path.exists(LOGO_PATH):
         logo_flow = RLImage(LOGO_PATH, width=28 * mm, height=28 * mm)
-        header_row.append(logo_flow)
-        header_row.append(
-            Paragraph("BKAI – BÁO CÁO KIẾN THỨC VẾT NỨT (STAGE 2)", title_style)
-        )
         header_table = Table(
-            [header_row],
+            [[logo_flow, Paragraph("BKAI – BÁO CÁO KIẾN THỨC VẾT NỨT (STAGE 2)", title_style)]],
             colWidths=[30 * mm, doc.width - 30 * mm],
             hAlign="LEFT",
         )
@@ -794,9 +760,7 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
         )
         elements.append(header_table)
     else:
-        elements.append(
-            Paragraph("BKAI – BÁO CÁO KIẾN THỨC VẾT NỨT (STAGE 2)", title_style)
-        )
+        elements.append(Paragraph("BKAI – BÁO CÁO KIẾN THỨC VẾT NỨT (STAGE 2)", title_style))
 
     elements.append(
         Paragraph(
@@ -805,7 +769,6 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
         )
     )
 
-    # Chuẩn bị dữ liệu bảng
     data = [
         [
             Paragraph("Cấu kiện", normal),
@@ -819,8 +782,7 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     def make_thumb(path: str):
         if isinstance(path, str) and path and os.path.exists(path):
             return RLImage(path, width=25 * mm, height=25 * mm)
-        else:
-            return Paragraph("—", normal)
+        return Paragraph("—", normal)
 
     for _, row in component_df.iterrows():
         img_path = row.get("Ảnh (path)", "") or row.get("Hình ảnh minh họa", "")
@@ -837,11 +799,11 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     table = Table(
         data,
         colWidths=[
-            0.12 * usable_width,  # Cấu kiện
-            0.18 * usable_width,  # Loại vết nứt
-            0.30 * usable_width,  # Nguyên nhân
-            0.25 * usable_width,  # Đặc trưng
-            0.15 * usable_width,  # Ảnh
+            0.12 * usable_width,
+            0.18 * usable_width,
+            0.30 * usable_width,
+            0.25 * usable_width,
+            0.15 * usable_width,
         ],
         repeatRows=1,
         hAlign="LEFT",
@@ -874,10 +836,10 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     )
 
     elements.append(table)
-
     doc.build(elements)
     buf.seek(0)
     return buf
+
 
 # =========================================================
 # 4. STAGE 2 – TABLE ĐẸP + MAPPING ẢNH (STREAMLIT)
@@ -893,18 +855,9 @@ def render_component_crack_table(component_df: pd.DataFrame):
     )
     h1.markdown(f"<div style='{header_style}'>Cấu kiện</div>", unsafe_allow_html=True)
     h2.markdown(f"<div style='{header_style}'>Loại vết nứt</div>", unsafe_allow_html=True)
-    h3.markdown(
-        f"<div style='{header_style}'>Nguyên nhân hình thành vết nứt</div>",
-        unsafe_allow_html=True,
-    )
-    h4.markdown(
-        f"<div style='{header_style}'>Đặc trưng về hình dạng vết nứt</div>",
-        unsafe_allow_html=True,
-    )
-    h5.markdown(
-        f"<div style='{header_style}'>Hình ảnh minh họa vết nứt</div>",
-        unsafe_allow_html=True,
-    )
+    h3.markdown(f"<div style='{header_style}'>Nguyên nhân hình thành vết nứt</div>", unsafe_allow_html=True)
+    h4.markdown(f"<div style='{header_style}'>Đặc trưng về hình dạng vết nứt</div>", unsafe_allow_html=True)
+    h5.markdown(f"<div style='{header_style}'>Hình ảnh minh họa vết nứt</div>", unsafe_allow_html=True)
 
     st.markdown("<hr style='margin:2px 0 6px 0;'>", unsafe_allow_html=True)
 
@@ -912,7 +865,7 @@ def render_component_crack_table(component_df: pd.DataFrame):
         st.markdown(
             f"<div style='background-color:#bbdefb;padding:4px 10px;margin:4px 0;"
             f"font-weight:bold;border-left:4px solid #1976d2;'>"
-            f"{component.upper()}</div>",
+            f"{str(component).upper()}</div>",
             unsafe_allow_html=True,
         )
 
@@ -921,10 +874,7 @@ def render_component_crack_table(component_df: pd.DataFrame):
             c1, c2, c3, c4, c5 = st.columns([1, 1.2, 2.2, 2.2, 1.6])
 
             if first_row:
-                c1.markdown(
-                    f"<div style='padding:4px;font-weight:bold;'>{component}</div>",
-                    unsafe_allow_html=True,
-                )
+                c1.markdown(f"<div style='padding:4px;font-weight:bold;'>{component}</div>", unsafe_allow_html=True)
                 first_row = False
             else:
                 c1.markdown("&nbsp;", unsafe_allow_html=True)
@@ -939,44 +889,30 @@ def render_component_crack_table(component_df: pd.DataFrame):
             else:
                 c5.write("—")
 
-        st.markdown(
-            "<hr style='margin:6px 0 10px 0;border-top:1px dashed #b0bec5;'>",
-            unsafe_allow_html=True,
-        )
+        st.markdown("<hr style='margin:6px 0 10px 0;border-top:1px dashed #b0bec5;'>", unsafe_allow_html=True)
+
 
 def show_stage2_demo(key_prefix="stage2"):
     st.subheader("Stage 2 – Phân loại vết nứt & gợi ý nguyên nhân / biện pháp")
 
-    # 2.0 Hình minh hoạ
     st.markdown("### 2.0. Sơ đồ & ví dụ vết nứt trên kết cấu")
     col_img1, col_img2 = st.columns([3, 4])
     with col_img1:
         tree_path = "images/stage2_crack_tree.png"
         if os.path.exists(tree_path):
-            st.image(
-                tree_path,
-                caption=(
-                    "Sơ đồ phân loại các loại vết nứt theo thời điểm xuất hiện "
-                    "và mức độ ảnh hưởng"
-                ),
-                use_container_width=True,
-            )
+            st.image(tree_path, caption="Sơ đồ phân loại các loại vết nứt (Stage 2)", use_container_width=True)
         else:
             st.info("Chưa thấy images/stage2_crack_tree.png")
+
     with col_img2:
         example_path = "images/stage2_structural_example.png"
         if os.path.exists(example_path):
-            st.image(
-                example_path,
-                caption="Ví dụ các loại vết nứt kết cấu bê tông (dầm, cột, tường, sàn)",
-                use_container_width=True,
-            )
+            st.image(example_path, caption="Ví dụ vết nứt trên cấu kiện", use_container_width=True)
         else:
             st.info("Chưa thấy images/stage2_structural_example.png")
 
     st.markdown("---")
 
-    # 2.1 Bảng tổng hợp theo cơ chế (giữ cho phụ lục)
     options = [
         "I.1 Nứt co ngót dẻo (Plastic Shrinkage Crack)",
         "I.2 Nứt lún dẻo / lắng dẻo (Plastic Settlement Crack)",
@@ -990,359 +926,48 @@ def show_stage2_demo(key_prefix="stage2"):
         "II.6b Nứt do tải trọng – nứt cắt/nén/xoắn (Shear/Compression/Torsion Cracks)",
         "II.7 Nứt do lún (Settlement Crack)",
     ]
-    st.selectbox(
-        "Chọn loại vết nứt (tóm tắt):",
-        options,
-        key=f"{key_prefix}_summary_selectbox",
-    )
+    st.selectbox("Chọn loại vết nứt (tóm tắt):", options, key=f"{key_prefix}_summary_selectbox")
+    st.caption("Bảng 1 – Tổng hợp dạng nứt theo cơ chế (dùng làm phụ lục).")
 
-    st.caption(
-        "Bảng 1 – Tổng hợp các dạng nứt theo cơ chế hình thành và biện pháp kiểm soát "
-        "(có thể dùng làm phụ lục trong luận văn)."
-    )
-
-    # 2.2 Bảng 2 – mapping ảnh đầy đủ
-    st.subheader("Phân loại các vết nứt bê tông thường xảy ra cho từng loại cấu kiện")
+    st.subheader("Phân loại các vết nứt bê tông theo cấu kiện")
 
     component_crack_data = pd.DataFrame(
         [
-            # ===== DẦM =====
-            {
-                "Cấu kiện": "Dầm",
-                "Loại vết nứt": "Vết nứt uốn",
-                "Nguyên nhân": (
-                    "Do mô men uốn vượt quá giới hạn chịu tải của dầm; "
-                    "tiết diện hoặc cốt thép chịu uốn không đủ."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt thường chéo hoặc hơi cong, xuất hiện nhiều ở giữa nhịp; "
-                    "rộng nhất ở vùng chịu kéo."
-                ),
-                "Ảnh (path)": "images/stage2/beam_uon.png",
-            },
-            {
-                "Cấu kiện": "Dầm",
-                "Loại vết nứt": "Vết nứt cắt",
-                "Nguyên nhân": (
-                    "Lực cắt lớn tại gối hoặc gần điểm uốn; khả năng chịu cắt của bê tông/cốt đai không đủ."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt xiên khoảng 45° so với trục dầm; có thể đơn lẻ hoặc nhóm."
-                ),
-                "Ảnh (path)": "images/stage2/beam_cat.png",
-            },
-            {
-                "Cấu kiện": "Dầm",
-                "Loại vết nứt": "Vết nứt xoắn",
-                "Nguyên nhân": (
-                    "Độ bền xoắn không đủ; thiếu cốt thép chịu xoắn; tiết diện dầm không phù hợp."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt chéo, dạng xoắn ốc hoặc ziczac quanh dầm; "
-                    "bề rộng tương đối đồng đều."
-                ),
-                "Ảnh (path)": "images/stage2/beam_xoan.png",
-            },
-            {
-                "Cấu kiện": "Dầm",
-                "Loại vết nứt": "Vết nứt trượt",
-                "Nguyên nhân": (
-                    "Bê tông bị xáo trộn khi cường độ chưa đạt; gối đỡ/cốp pha dịch chuyển."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt gần mép gối đỡ, chạy gần phương thẳng đứng; "
-                    "rộng nhất tại đáy dầm."
-                ),
-                "Ảnh (path)": "images/stage2/beam_truot.png",
-            },
-            {
-                "Cấu kiện": "Dầm",
-                "Loại vết nứt": "Vết nứt kéo",
-                "Nguyên nhân": (
-                    "Cốt thép chịu kéo không đủ, dầm quá tải, biến dạng không đều."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt gần vuông góc với trục dầm; phía dưới rộng hơn phía trên; "
-                    "thường song song."
-                ),
-                "Ảnh (path)": "images/stage2/beam_keo.png",
-            },
-            {
-                "Cấu kiện": "Dầm",
-                "Loại vết nứt": "Vết nứt ăn mòn cốt thép",
-                "Nguyên nhân": (
-                    "Lớp bảo vệ mỏng, môi trường xâm thực; cốt thép gỉ giãn nở ép vào bê tông."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt chạy dọc theo thanh thép; thường kèm hoen gỉ, bong lớp bảo vệ."
-                ),
-                "Ảnh (path)": "images/stage2/beam_anmon.png",
-            },
-            {
-                "Cấu kiện": "Dầm",
-                "Loại vết nứt": "Vết nứt co ngót",
-                "Nguyên nhân": (
-                    "Bê tông co ngót do mất nước, bị kiềm chế bởi cốt thép/kết cấu lân cận."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt nhỏ, nhiều, có thể vuông góc trục dầm hoặc tạo mạng lưới."
-                ),
-                "Ảnh (path)": "images/stage2/beam_congot.png",
-            },
+            {"Cấu kiện":"Dầm","Loại vết nứt":"Vết nứt uốn","Nguyên nhân":"Do mô men uốn vượt giới hạn; cốt thép chịu uốn/tiết diện không đủ.","Đặc trưng hình dạng":"Nhiều ở giữa nhịp; rộng nhất vùng chịu kéo.","Ảnh (path)":"images/stage2/beam_uon.png"},
+            {"Cấu kiện":"Dầm","Loại vết nứt":"Vết nứt cắt","Nguyên nhân":"Lực cắt lớn; khả năng chịu cắt bê tông/cốt đai không đủ.","Đặc trưng hình dạng":"Xiên ~45° so với trục dầm.","Ảnh (path)":"images/stage2/beam_cat.png"},
+            {"Cấu kiện":"Dầm","Loại vết nứt":"Vết nứt xoắn","Nguyên nhân":"Thiếu cốt thép chịu xoắn; tiết diện không phù hợp.","Đặc trưng hình dạng":"Chéo, ziczac quanh dầm.","Ảnh (path)":"images/stage2/beam_xoan.png"},
+            {"Cấu kiện":"Dầm","Loại vết nứt":"Vết nứt ăn mòn cốt thép","Nguyên nhân":"Môi trường xâm thực; lớp bảo vệ mỏng; thép gỉ giãn nở.","Đặc trưng hình dạng":"Chạy dọc theo thép; có thể kèm hoen gỉ/bong lớp bảo vệ.","Ảnh (path)":"images/stage2/beam_anmon.png"},
 
-            # ===== CỘT =====
-            {
-                "Cấu kiện": "Cột",
-                "Loại vết nứt": "Vết nứt ngang",
-                "Nguyên nhân": (
-                    "Không đủ mô-men kiềm chế, diện tích cốt thép nhỏ; chịu uốn/cắt lớn."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt ngang quanh cột, thường tại vùng nối dầm–cột."
-                ),
-                "Ảnh (path)": "images/stage2/column_ngang.png",
-            },
-            {
-                "Cấu kiện": "Cột",
-                "Loại vết nứt": "Vết nứt chéo",
-                "Nguyên nhân": (
-                    "Cột chịu nén – uốn / cắt lớn; thiết kế hoặc cường độ vật liệu không đủ."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt xiên trên bề mặt cột, xuất hiện khi tải gần/vượt sức chịu tải."
-                ),
-                "Ảnh (path)": "images/stage2/column_cheo.png",
-            },
-            {
-                "Cấu kiện": "Cột",
-                "Loại vết nứt": "Vết nứt tách (dọc)",
-                "Nguyên nhân": (
-                    "Cốt thép dọc không đủ; bê tông cường độ thấp; ứng suất nén lớn gây tách dọc."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Các vết nứt dọc song song, độ dài và rộng khác nhau."
-                ),
-                "Ảnh (path)": "images/stage2/column_tach.png",
-            },
-            {
-                "Cấu kiện": "Cột",
-                "Loại vết nứt": "Vết nứt do ăn mòn",
-                "Nguyên nhân": (
-                    "Cốt thép bị gỉ do môi trường xâm thực; sản phẩm ăn mòn giãn nở."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt dọc theo cốt thép; bong tróc, vết gỉ trên bề mặt."
-                ),
-                "Ảnh (path)": "images/stage2/column_anmon.png",
-            },
-            {
-                "Cấu kiện": "Cột",
-                "Loại vết nứt": "Vết nứt co ngót",
-                "Nguyên nhân": (
-                    "Co ngót bê tông bị kiềm chế bởi cốt thép và cấu kiện liên kết."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt dọc mảnh, nhiều, phân bố tương đối đều."
-                ),
-                "Ảnh (path)": "images/stage2/column_congot.png",
-            },
+            {"Cấu kiện":"Cột","Loại vết nứt":"Vết nứt chéo","Nguyên nhân":"Cột chịu nén-uốn/cắt lớn; vật liệu/thiết kế không đủ.","Đặc trưng hình dạng":"Xiên trên bề mặt khi tải gần/vượt khả năng chịu tải.","Ảnh (path)":"images/stage2/column_cheo.png"},
+            {"Cấu kiện":"Cột","Loại vết nứt":"Vết nứt tách (dọc)","Nguyên nhân":"Ứng suất nén lớn gây tách dọc; bê tông yếu; cốt dọc không đủ.","Đặc trưng hình dạng":"Nhiều vết dọc song song.","Ảnh (path)":"images/stage2/column_tach.png"},
 
-            # ===== SÀN =====
-            {
-                "Cấu kiện": "Sàn",
-                "Loại vết nứt": "Vết nứt co ngót dẻo",
-                "Nguyên nhân": (
-                    "Nhiệt độ cao, gió, độ ẩm thấp; bốc hơi nước nhanh khi bê tông còn dẻo."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt nông, nhỏ; hình dạng ngẫu nhiên, đa giác."
-                ),
-                "Ảnh (path)": "images/stage2/slab_congot_deo.png",
-            },
-            {
-                "Cấu kiện": "Sàn",
-                "Loại vết nứt": "Vết nứt co ngót khô",
-                "Nguyên nhân": (
-                    "Co ngót do nước bay hơi sau khi bê tông đông cứng trong môi trường khô/nóng."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt rõ, tạo mạng lưới (map cracking) hoặc đường thẳng."
-                ),
-                "Ảnh (path)": "images/stage2/slab_congot_kho.png",
-            },
-            {
-                "Cấu kiện": "Sàn",
-                "Loại vết nứt": "Vết nứt do nhiệt",
-                "Nguyên nhân": "Chênh lệch nhiệt độ giữa bề mặt và bên trong sàn.",
-                "Đặc trưng hình dạng": (
-                    "Vết nứt bề mặt, có thể kết hợp bong tróc lớp bê tông."
-                ),
-                "Ảnh (path)": "images/stage2/slab_nhiet.png",
-            },
-            {
-                "Cấu kiện": "Sàn",
-                "Loại vết nứt": "Vết nứt uốn",
-                "Nguyên nhân": (
-                    "Mô men uốn vượt khả năng chịu uốn; thép chịu kéo không đủ."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt chéo/hơi cong, rộng nhất ở mặt chịu kéo (thường mặt dưới giữa nhịp)."
-                ),
-                "Ảnh (path)": "images/stage2/slab_uon.png",
-            },
-            {
-                "Cấu kiện": "Sàn",
-                "Loại vết nứt": "Vết nứt cắt",
-                "Nguyên nhân": (
-                    "Lực cắt lớn gần gối hoặc vùng chịu tải tập trung; thiếu thép chịu cắt."
-                ),
-                "Đặc trưng hình dạng": "Vết nứt xiên ~45° so với trục sàn.",
-                "Ảnh (path)": "images/stage2/slab_cat.png",
-            },
-            {
-                "Cấu kiện": "Sàn",
-                "Loại vết nứt": "Vết nứt xoắn",
-                "Nguyên nhân": (
-                    "Sàn làm việc như bản chịu xoắn (bản console, vùng góc…); độ bền xoắn không đủ."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt chéo dạng xoắn ốc; bề rộng tương đối đồng đều."
-                ),
-                "Ảnh (path)": "images/stage2/slab_xoan.png",
-            },
-            {
-                "Cấu kiện": "Sàn",
-                "Loại vết nứt": "Vết nứt ăn mòn cốt thép",
-                "Nguyên nhân": (
-                    "Ion Cl-, nước biển, muối khử băng xâm nhập; lớp bảo vệ mỏng; thép gỉ."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt chạy dọc theo thép; kèm hoen gỉ, bong lớp bảo vệ."
-                ),
-                "Ảnh (path)": "images/stage2/slab_anmon.png",
-            },
-            {
-                "Cấu kiện": "Sàn",
-                "Loại vết nứt": "Vết nứt do tải trọng – lực tập trung",
-                "Nguyên nhân": "Quá tải cục bộ; thiếu cốt thép chịu uốn cục bộ.",
-                "Đặc trưng hình dạng": (
-                    "Vết nứt vuông góc phương ứng suất kéo; dạng chữ thập/tỏa ra từ điểm tải."
-                ),
-                "Ảnh (path)": "images/stage2/slab_taptrung.png",
-            },
-            {
-                "Cấu kiện": "Sàn",
-                "Loại vết nứt": "Vết nứt do tải trọng – lực phân bố",
-                "Nguyên nhân": (
-                    "Tải phân bố vượt khả năng làm việc lâu dài; sàn thiếu độ cứng."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt dạng chữ thập, mạng lưới hoặc xiên từ giữa sàn ra cạnh."
-                ),
-                "Ảnh (path)": "images/stage2/slab_phanbo.png",
-            },
+            {"Cấu kiện":"Sàn","Loại vết nứt":"Vết nứt co ngót dẻo","Nguyên nhân":"Bốc hơi nước nhanh khi bê tông còn dẻo (gió/nóng/khô).","Đặc trưng hình dạng":"Nông, nhỏ; dạng đa giác.","Ảnh (path)":"images/stage2/slab_congot_deo.png"},
+            {"Cấu kiện":"Sàn","Loại vết nứt":"Vết nứt co ngót khô","Nguyên nhân":"Co ngót sau đông cứng trong môi trường khô/nóng.","Đặc trưng hình dạng":"Mạng lưới (map cracking) hoặc đường thẳng.","Ảnh (path)":"images/stage2/slab_congot_kho.png"},
 
-            # ===== TƯỜNG =====
-            {
-                "Cấu kiện": "Tường bê tông",
-                "Loại vết nứt": "Vết nứt co ngót",
-                "Nguyên nhân": (
-                    "Bề mặt tường bốc hơi nước nhanh; ứng suất co ngót vượt khả năng chịu kéo."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt bề mặt ngẫu nhiên, đa giác, bắt chéo hoặc song song."
-                ),
-                "Ảnh (path)": "images/stage2/wall_congot.png",
-            },
-            {
-                "Cấu kiện": "Tường bê tông",
-                "Loại vết nứt": "Vết nứt do nhiệt",
-                "Nguyên nhân": (
-                    "Chênh lệch nhiệt độ trong bề dày tường; giãn nở/co lại không đều."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Thường là vết nứt thẳng đứng; rộng hơn ở vùng chịu kéo do nhiệt."
-                ),
-                "Ảnh (path)": "images/stage2/wall_nhiet.png",
-            },
-            {
-                "Cấu kiện": "Tường bê tông",
-                "Loại vết nứt": "Vết nứt ngang do tải trọng",
-                "Nguyên nhân": (
-                    "Tường chịu tải vượt mức; phân bố tải không đều; trượt/xoay tại chân tường."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt ngang chia tường thành hai phần; phần trên có thể nghiêng."
-                ),
-                "Ảnh (path)": "images/stage2/wall_ngang_taitrong.png",
-            },
-            {
-                "Cấu kiện": "Tường bê tông",
-                "Loại vết nứt": "Vết nứt dọc do tải trọng",
-                "Nguyên nhân": "Tải đứng lớn, lún cục bộ, thiếu thép dọc.",
-                "Đặc trưng hình dạng": (
-                    "Vết nứt tách dọc chia tường thành hai mảng song song."
-                ),
-                "Ảnh (path)": "images/stage2/wall_doc_taitrong.png",
-            },
-            {
-                "Cấu kiện": "Tường bê tông",
-                "Loại vết nứt": "Vết nứt chéo do tải trọng",
-                "Nguyên nhân": (
-                    "Tường vừa chịu nén vừa chịu cắt/uốn do tải ngang và đứng."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt chéo; rộng nhất gần vùng chịu lực lớn."
-                ),
-                "Ảnh (path)": "images/stage2/wall_cheo_taitrong.png",
-            },
-            {
-                "Cấu kiện": "Tường bê tông",
-                "Loại vết nứt": "Vết nứt ăn mòn cốt thép",
-                "Nguyên nhân": (
-                    "Cốt thép tường bị gỉ; sản phẩm ăn mòn giãn nở làm nứt lớp bảo vệ."
-                ),
-                "Đặc trưng hình dạng": (
-                    "Vết nứt chạy theo vị trí thanh thép; thường kèm bong tróc, hoen gỉ."
-                ),
-                "Ảnh (path)": "images/stage2/wall_anmon.png",
-            },
+            {"Cấu kiện":"Tường bê tông","Loại vết nứt":"Vết nứt co ngót","Nguyên nhân":"Bốc hơi nước nhanh; ứng suất co ngót vượt khả năng chịu kéo.","Đặc trưng hình dạng":"Ngẫu nhiên, đa giác/bắt chéo.","Ảnh (path)":"images/stage2/wall_congot.png"},
+            {"Cấu kiện":"Tường bê tông","Loại vết nứt":"Vết nứt do nhiệt","Nguyên nhân":"Chênh lệch nhiệt độ trong bề dày tường.","Đặc trưng hình dạng":"Thường thẳng đứng; rộng hơn vùng chịu kéo do nhiệt.","Ảnh (path)":"images/stage2/wall_nhiet.png"},
         ]
     )
 
     render_component_crack_table(component_crack_data)
 
-    st.caption(
-        "Bảng 2 – Phân loại các vết nứt bê tông thường gặp theo từng loại cấu kiện "
-        "(dầm, cột, sàn, tường) – có thể in ra phụ lục kèm hình minh họa."
-    )
+    st.caption("Bảng 2 – Mapping theo cấu kiện (có hình minh hoạ).")
 
     st.markdown("### 2.3. Xuất báo cáo kiến thức Stage 2")
-
     csv_bytes = component_crack_data.to_csv(index=False).encode("utf-8-sig")
-    st.download_button(
-        "⬇ Tải bảng Stage 2 (CSV)",
-        data=csv_bytes,
-        file_name="BKAI_Stage2_CrackTable.csv",
-        mime="text/csv",
-        key=f"stage2_csv_{key_prefix}",
-    )
+    st.download_button("⬇ Tải bảng Stage 2 (CSV)", data=csv_bytes, file_name="BKAI_Stage2_CrackTable.csv",
+                       mime="text/csv", key=f"stage2_csv_{key_prefix}")
 
     pdf_buf = export_stage2_pdf(component_crack_data)
-    st.download_button(
-        "📄 Tải báo cáo kiến thức Stage 2 (PDF)",
-        data=pdf_buf.getvalue(),
-        file_name="BKAI_Stage2_Report.pdf",
-        mime="application/pdf",
-        key=f"stage2_pdf_{key_prefix}",
-    )
+    st.download_button("📄 Tải báo cáo kiến thức Stage 2 (PDF)", data=pdf_buf.getvalue(),
+                       file_name="BKAI_Stage2_Report.pdf", mime="application/pdf", key=f"stage2_pdf_{key_prefix}")
+
 
 # =========================================================
 # 5. LƯU THỐNG KÊ NGƯỜI DÙNG
 # =========================================================
 
 USER_STATS_FILE = "user_stats.json"
-
 if os.path.exists(USER_STATS_FILE):
     with open(USER_STATS_FILE, "r", encoding="utf-8") as f:
         try:
@@ -1352,11 +977,17 @@ if os.path.exists(USER_STATS_FILE):
 else:
     user_stats = []
 
+
 # =========================================================
 # 6. GIAO DIỆN PHÂN TÍCH CHÍNH
 # =========================================================
 
 def run_main_app():
+    if not ROBOFLOW_FULL_URL:
+        st.error("❌ Chưa cấu hình ROBOFLOW_API_KEY. Hãy set trong Streamlit secrets hoặc biến môi trường.")
+        st.info("Gợi ý: tạo file .streamlit/secrets.toml với dòng: ROBOFLOW_API_KEY = \"...\"")
+        st.stop()
+
     col_logo, col_title = st.columns([1, 5])
     with col_logo:
         if os.path.exists(LOGO_PATH):
@@ -1365,11 +996,9 @@ def run_main_app():
         st.title("BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT")
         user = st.session_state.get("username", "")
         if user:
-            st.caption(
-                f"Xin chào **{user}** – Phân biệt ảnh nứt / không nứt & xuất báo cáo."
-            )
+            st.caption(f"Xin chào **{user}** – Phân tích ảnh & xuất báo cáo.")
         else:
-            st.caption("Phân biệt ảnh nứt / không nứt & xuất báo cáo.")
+            st.caption("Phân tích ảnh & xuất báo cáo.")
 
     st.write("---")
 
@@ -1379,7 +1008,6 @@ def run_main_app():
 
     if not st.session_state.profile_filled:
         st.subheader("Thông tin người sử dụng (bắt buộc trước khi phân tích)")
-
         with st.form("user_info_form"):
             full_name = st.text_input("Họ và tên *")
             occupation = st.selectbox(
@@ -1397,7 +1025,6 @@ def run_main_app():
                 ],
             )
             email = st.text_input("Email *")
-
             submit_info = st.form_submit_button("Lưu thông tin & bắt đầu phân tích")
 
         if submit_info:
@@ -1432,9 +1059,7 @@ def run_main_app():
 
     # Sidebar
     st.sidebar.header("Cấu hình phân tích")
-    min_conf = st.sidebar.slider(
-        "Ngưỡng confidence tối thiểu", 0.0, 1.0, 0.3, 0.05
-    )
+    min_conf = st.sidebar.slider("Ngưỡng confidence tối thiểu", 0.0, 1.0, 0.3, 0.05)
     st.sidebar.caption("Chỉ hiển thị những vết nứt có độ tin cậy ≥ ngưỡng này.")
 
     with st.sidebar.expander("📊 Quản lý thống kê người dùng"):
@@ -1442,12 +1067,8 @@ def run_main_app():
             df_stats = pd.DataFrame(user_stats)
             st.dataframe(df_stats, use_container_width=True, height=200)
             stats_csv = df_stats.to_csv(index=False).encode("utf-8-sig")
-            st.download_button(
-                "⬇ Tải thống kê người dùng (CSV)",
-                data=stats_csv,
-                file_name="BKAI_UserStats.csv",
-                mime="text/csv",
-            )
+            st.download_button("⬇ Tải thống kê người dùng (CSV)", data=stats_csv,
+                               file_name="BKAI_UserStats.csv", mime="text/csv")
         else:
             st.info("Chưa có dữ liệu thống kê người dùng.")
 
@@ -1493,9 +1114,7 @@ def run_main_app():
 
             result = resp.json()
             predictions = result.get("predictions", [])
-            preds_conf = [
-                p for p in predictions if float(p.get("confidence", 0)) >= min_conf
-            ]
+            preds_conf = [p for p in predictions if float(p.get("confidence", 0)) >= float(min_conf)]
 
             t1 = time.time()
             total_time = t1 - t0
@@ -1503,14 +1122,13 @@ def run_main_app():
             col1, col2 = st.columns(2)
             with col1:
                 st.subheader("Ảnh gốc")
-                st.image(orig_img, use_column_width=True)
+                st.image(orig_img, use_container_width=True)
 
             analyzed_img = None
             with col2:
                 st.subheader("Ảnh phân tích")
                 if len(preds_conf) == 0:
-                    # Trường hợp KHÔNG có vết nứt
-                    st.image(orig_img, use_column_width=True)
+                    st.image(orig_img, use_container_width=True)
                     st.success("✅ Kết luận: **Không phát hiện vết nứt rõ ràng**.")
 
                     pdf_no_crack = export_pdf_no_crack(orig_img)
@@ -1521,135 +1139,51 @@ def run_main_app():
                         mime="application/pdf",
                         key=f"pdf_no_crack_{idx}",
                     )
-
-                    # Không cần Stage 1 & Stage 2 cho ảnh này
                     continue
-
                 else:
-                    # Có vết nứt
-                    analyzed_img = draw_predictions_with_mask(
-                        orig_img, preds_conf, min_conf
-                    )
-                    st.image(analyzed_img, use_column_width=True)
+                    analyzed_img = draw_predictions_with_mask(orig_img, preds_conf, min_conf)
+                    st.image(analyzed_img, use_container_width=True)
                     st.error("⚠️ Kết luận: **CÓ vết nứt trên ảnh.**")
 
-            # Nếu tới đây thì CHỈ có trường hợp có vết nứt
+            # Tabs
             st.write("---")
-            tab_stage1, tab_stage2 = st.tabs(
-                ["Stage 1 – Báo cáo chi tiết", "Stage 2 – Phân loại vết nứt"]
-            )
+            tab_stage1, tab_stage2 = st.tabs(["Stage 1 – Báo cáo chi tiết", "Stage 2 – Phân loại vết nứt"])
 
             # ================== STAGE 1 ==================
             with tab_stage1:
                 st.subheader("Bảng thông tin vết nứt")
 
                 confs = [float(p.get("confidence", 0)) for p in preds_conf]
-                avg_conf = sum(confs) / len(confs)
-                map_val = round(min(1.0, avg_conf - 0.05), 2)
+                avg_conf = (sum(confs) / len(confs)) if confs else 0.0
 
-                max_ratio = 0.0
-                max_p = preds_conf[0]
-                for p in preds_conf:
-                    w = float(p.get("width", 0))
-                    h = float(p.get("height", 0))
-                    ratio = (w * h) / (img_w * img_h)
-                    if ratio > max_ratio:
-                        max_ratio = ratio
-                        max_p = p
-
-                crack_area_ratio = round(max_ratio * 100, 2)
-                severity = estimate_severity(max_p, img_w, img_h)
+                # ✅ TÍNH % MASK THẬT (không dùng bbox)
+                crack_ratio_percent, crack_area_px2 = crack_area_ratio_percent(preds_conf, img_w, img_h)
+                severity = estimate_severity_from_ratio(crack_ratio_percent)
 
                 metrics = [
-                    {
-                        "vi": "Tên ảnh",
-                        "en": "Image Name",
-                        "value": uploaded_file.name,
-                        "desc": "File ảnh người dùng tải lên",
-                    },
-                    {
-                        "vi": "Thời gian xử lý",
-                        "en": "Total Processing Time",
-                        "value": f"{total_time:.2f} s",
-                        "desc": "Tổng thời gian thực hiện toàn bộ quy trình",
-                    },
-                    {
-                        "vi": "Tốc độ mô hình AI",
-                        "en": "Inference Speed",
-                        "value": f"{total_time:.2f} s/image",
-                        "desc": "Thời gian xử lý mỗi ảnh",
-                    },
-                    {
-                        "vi": "Độ tin cậy (Confidence)",
-                        "en": "Confidence",
-                        "value": f"{avg_conf:.2f}",
-                        "desc": "Mức tin cậy trung bình của mô hình",
-                    },
-                    {
-                        "vi": "mAP (Độ chính xác trung bình)",
-                        "en": "Mean Average Precision",
-                        "value": f"{map_val:.2f}",
-                        "desc": "Độ chính xác định vị vùng nứt (ước lượng từ Confidence).",
-                    },
-                    {
-                        "vi": "Phần trăm vùng nứt",
-                        "en": "Crack Area Ratio",
-                        "value": f"{crack_area_ratio:.2f} %",
-                        "desc": "Diện tích vùng nứt lớn nhất / tổng diện tích ảnh.",
-                    },
-                    {
-                        "vi": "Chiều dài vết nứt",
-                        "en": "Crack Length",
-                        "value": "—",
-                        "desc": "Có thể ước lượng nếu biết tỉ lệ pixel-thực tế.",
-                    },
-                    {
-                        "vi": "Chiều rộng vết nứt",
-                        "en": "Crack Width",
-                        "value": "—",
-                        "desc": "Độ rộng lớn nhất của vết nứt (cần thang đo chuẩn).",
-                    },
-                    {
-                        "vi": "Mức độ nguy hiểm",
-                        "en": "Severity Level",
-                        "value": severity,
-                        "desc": "Phân cấp theo diện tích tương đối vùng nứt lớn nhất.",
-                    },
-                    {
-                        "vi": "Thời gian phân tích",
-                        "en": "Timestamp",
-                        "value": datetime.datetime.now().strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        ),
-                        "desc": "Thời điểm thực hiện phân tích.",
-                    },
+                    {"vi": "Tên ảnh", "en": "Image Name", "value": uploaded_file.name, "desc": "File ảnh người dùng tải lên"},
+                    {"vi": "Thời gian xử lý", "en": "Total Processing Time", "value": f"{total_time:.2f} s", "desc": "Tổng thời gian xử lý"},
+                    {"vi": "Tốc độ mô hình AI", "en": "Inference Speed", "value": f"{total_time:.2f} s/image", "desc": "Thời gian/ảnh"},
+                    {"vi": "Độ tin cậy trung bình", "en": "Average Confidence", "value": f"{avg_conf:.2f}", "desc": "Trung bình confidence"},
+                    {"vi": "Diện tích vùng nứt", "en": "Crack Area (px^2)", "value": f"{crack_area_px2:.0f}", "desc": "Diện tích mask theo pixel"},
+                    {"vi": "Phần trăm vùng nứt", "en": "Crack Area Ratio", "value": f"{crack_ratio_percent:.2f} %", "desc": "Mask/diện tích ảnh (%)"},
+                    {"vi": "Chiều dài vết nứt", "en": "Crack Length", "value": "—", "desc": "Ước lượng nếu có tỉ lệ pixel-thực tế"},
+                    {"vi": "Chiều rộng vết nứt", "en": "Crack Width", "value": "—", "desc": "Cần thang đo chuẩn"},
+                    {"vi": "Mức độ nguy hiểm", "en": "Severity Level", "value": severity, "desc": "Phân cấp theo % mask"},
+                    {"vi": "Thời gian phân tích", "en": "Timestamp", "value": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "desc": "Thời điểm chạy"},
                     {
                         "vi": "Nhận xét tổng quan",
                         "en": "Summary",
-                        "value": (
-                            "Vết nứt có nguy cơ, cần kiểm tra thêm."
-                            if "Nguy hiểm" in severity
-                            else "Vết nứt nhỏ, nên tiếp tục theo dõi."
-                        ),
-                        "desc": "Kết luận tự động của hệ thống.",
+                        "value": ("Vết nứt có nguy cơ, cần kiểm tra thêm." if "Nguy hiểm" in severity else "Vết nứt nhỏ/trung bình, nên tiếp tục theo dõi."),
+                        "desc": "Kết luận tự động",
                     },
                 ]
 
                 metrics_df = pd.DataFrame(metrics)
                 styled_df = metrics_df.style.set_table_styles(
                     [
-                        {
-                            "selector": "th",
-                            "props": [
-                                ("background-color", "#1e88e5"),
-                                ("color", "white"),
-                                ("font-weight", "bold"),
-                            ],
-                        },
-                        {
-                            "selector": "td",
-                            "props": [("background-color", "#fafafa")],
-                        },
+                        {"selector": "th", "props": [("background-color", "#1e88e5"), ("color", "white"), ("font-weight", "bold")]},
+                        {"selector": "td", "props": [("background-color", "#fafafa")]},
                     ]
                 )
                 st.dataframe(styled_df, use_container_width=True)
@@ -1669,8 +1203,10 @@ def run_main_app():
                     plt.close(fig1)
 
                 with col_chart2:
-                    labels = ["Vùng nứt lớn nhất", "Phần ảnh còn lại"]
-                    sizes = [max_ratio, 1 - max_ratio]
+                    labels = ["Vùng nứt (mask)", "Phần ảnh còn lại"]
+                    ratio = crack_ratio_percent / 100.0
+                    ratio = max(0.0, min(1.0, ratio))
+                    sizes = [ratio, 1 - ratio]
                     fig2 = plt.figure(figsize=(4, 3))
                     plt.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=140)
                     plt.title("Tỷ lệ vùng nứt so với toàn ảnh")
@@ -1698,8 +1234,9 @@ def run_main_app():
             with tab_stage2:
                 show_stage2_demo(key_prefix=f"stage2_{idx}")
 
+
 # =========================================================
-# 7. ĐĂNG KÝ / ĐĂNG NHẬP
+# 7. ĐĂNG KÝ / ĐĂNG NHẬP (GIỮ NGUYÊN KIỂU JSON NHƯ BẠN)
 # =========================================================
 
 USERS_FILE = "users.json"
@@ -1719,7 +1256,6 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 def show_auth_page():
-    # Khung trên cùng: logo + tiêu đề
     col_logo, col_header = st.columns([1, 3])
 
     with col_logo:
@@ -1729,22 +1265,21 @@ def show_auth_page():
             st.markdown("### BKAI")
 
     with col_header:
-       st.markdown(
-           "<h2 style='margin:5px 0 5px 0; color:#333;'>"
-           "BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG"
-           "</h2>",
-           unsafe_allow_html=True,
-       )
-       st.markdown(
-           "<p style='font-size:15px; color:#555;'>"
-           "Vui lòng đăng nhập hoặc đăng ký để sử dụng hệ thống."
-           "</p>",
-           unsafe_allow_html=True,
-      )
+        st.markdown(
+            "<h2 style='margin:5px 0 5px 0; color:#333;'>"
+            "BKAI - MÔ HÌNH CNN PHÁT HIỆN VÀ PHÂN LOẠI VẾT NỨT BÊ TÔNG"
+            "</h2>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<p style='font-size:15px; color:#555;'>"
+            "Vui lòng đăng nhập hoặc đăng ký để sử dụng hệ thống."
+            "</p>",
+            unsafe_allow_html=True,
+        )
 
     st.write("---")
 
-    # Tabs: Đăng nhập / Đăng ký
     tab_login, tab_register = st.tabs(["🔑 Đăng nhập", "📝 Đăng ký"])
 
     with tab_login:
@@ -1753,7 +1288,7 @@ def show_auth_page():
         login_pass = st.text_input("Mật khẩu", type="password", key="login_pass")
 
         if st.button("Đăng nhập"):
-            if login_user in users and users[login_user] == login_pass:
+            if login_user in users and users.get(login_user) == login_pass:
                 st.session_state.authenticated = True
                 st.session_state.username = login_user
                 st.success(f"Đăng nhập thành công! Xin chào, {login_user} 👋")
@@ -1795,7 +1330,6 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
-
 
 
 
