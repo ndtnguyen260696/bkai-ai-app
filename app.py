@@ -90,18 +90,78 @@ def extract_poly_points(points_field):
 
 
 def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float = 0.0):
+    """
+    Detectron2-style visualization (PIL):
+    - đa màu theo từng instance
+    - mask overlay đồng màu với bbox
+    - viền mask
+    - bbox
+    - label + % có nền đen
+    """
     base = image.convert("RGB")
+    W, H = base.size
+
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
 
-    green_solid = (0, 255, 0, 255)
-    green_fill = (0, 255, 0, 80)
+    # Palette đa màu (đẹp + dễ nhìn)
+    palette = [
+        (128, 0, 128),   # purple
+        (0, 158, 115),   # green
+        (0, 114, 178),   # blue
+        (213, 94, 0),    # orange
+        (204, 121, 167), # pink
+        (230, 159, 0),   # yellow-orange
+        (86, 180, 233),  # sky
+        (240, 228, 66),  # yellow
+        (220, 20, 60),   # crimson
+        (160, 32, 240),  # violet
+    ]
 
-    for p in predictions:
+    # Font label (ưu tiên DejaVuSans, fallback về default)
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 16)
+    except Exception:
+        try:
+            font = ImageFont.truetype("arial.ttf", 16)
+        except Exception:
+            font = ImageFont.load_default()
+
+    def clamp(v, lo, hi):
+        return max(lo, min(hi, v))
+
+    def clamp_box(x0, y0, x1, y1):
+        x0 = clamp(x0, 0, W - 1)
+        x1 = clamp(x1, 0, W - 1)
+        y0 = clamp(y0, 0, H - 1)
+        y1 = clamp(y1, 0, H - 1)
+        return x0, y0, x1, y1
+
+    mask_alpha = 90         # độ đậm mask
+    box_width = 3           # độ dày bbox
+    outline_width = 3       # độ dày viền mask
+    label_pad = 4           # padding cho nền label
+
+    for i, p in enumerate(predictions):
         conf = float(p.get("confidence", 0))
         if conf < min_conf:
             continue
 
+        # Màu cho instance i
+        r, g, b = palette[i % len(palette)]
+        solid = (r, g, b, 255)         # bbox + viền
+        fill = (r, g, b, mask_alpha)   # overlay mask
+
+        # ====== 1) MASK POLYGON ======
+        pts_raw = p.get("points")
+        flat_pts = extract_poly_points(pts_raw) if pts_raw is not None else []
+        if len(flat_pts) >= 3:
+            # overlay
+            draw.polygon(flat_pts, fill=fill)
+            # outline
+            draw.line(flat_pts + [flat_pts[0]], fill=solid, width=outline_width)
+
+        # ====== 2) BBOX + LABEL ======
         x = p.get("x")
         y = p.get("y")
         w = p.get("width")
@@ -113,22 +173,37 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
         y0 = y - h / 2
         x1 = x + w / 2
         y1 = y + h / 2
+        x0, y0, x1, y1 = clamp_box(x0, y0, x1, y1)
 
-        draw.rectangle([x0, y0, x1, y1], outline=green_solid, width=3)
+        # bbox
+        draw.rectangle([x0, y0, x1, y1], outline=solid, width=box_width)
 
+        # label + %
         cls = p.get("class", "crack")
-        label = f"{cls} {conf:.2f}"
-        text_pos = (x0 + 3, y0 + 3)
-        draw.text(text_pos, label, fill=green_solid)
+        label = f"{cls} {conf*100:.0f}%"
 
-        pts_raw = p.get("points")
-        flat_pts = extract_poly_points(pts_raw) if pts_raw is not None else []
-        if len(flat_pts) >= 3:
-            draw.polygon(flat_pts, fill=green_fill)
-            draw.line(flat_pts + [flat_pts[0]], fill=green_solid, width=3)
+        # đo kích thước chữ
+        tb = draw.textbbox((0, 0), label, font=font)
+        tw = tb[2] - tb[0]
+        th = tb[3] - tb[1]
+
+        # vị trí label: ưu tiên trên bbox, nếu không đủ thì chuyển xuống dưới
+        lx0 = x0
+        ly0 = y0 - (th + 2 * label_pad)
+        if ly0 < 0:
+            ly0 = y0 + 2
+
+        lx1 = lx0 + tw + 2 * label_pad
+        ly1 = ly0 + th + 2 * label_pad
+
+        # nền đen (semi-transparent)
+        draw.rectangle([lx0, ly0, lx1, ly1], fill=(0, 0, 0, 180))
+        # chữ trắng
+        draw.text((lx0 + label_pad, ly0 + label_pad), label, font=font, fill=(255, 255, 255, 255))
 
     result = Image.alpha_composite(base.convert("RGBA"), overlay)
     return result.convert("RGB")
+
 
 
 def estimate_severity(p, img_w, img_h):
@@ -1683,6 +1758,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
