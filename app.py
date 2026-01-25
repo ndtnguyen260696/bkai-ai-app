@@ -98,20 +98,68 @@ def _get_font(size=18):
             continue
     return ImageFont.load_default()
 
-def extract_poly_points(points_field):
-    flat = []
+def extract_poly_points(points_field, img_w: int, img_h: int):
+    """
+    Chuẩn hoá mọi kiểu 'points' của Roboflow về list[(x_pixel, y_pixel)].
+
+    Roboflow thường trả:
+      - list dict: [{"x":0.35,"y":58.1}, ...]
+      - list pair: [(x,y), ...] (hiếm)
+      - dict nhiều segment: {"0":[...], "1":[...]} (tuỳ model)
+    Đồng thời tự nhận biết x/y là normalized (0..1) hay pixel.
+    """
+    pts = []
+
+    def _append_xy(x, y):
+        if x is None or y is None:
+            return
+        pts.append((float(x), float(y)))
+
+    # 1) dict nhiều segment
     if isinstance(points_field, dict):
-        for k in sorted(points_field.keys()):
+        for k in sorted(points_field.keys(), key=lambda x: str(x)):
             seg = points_field[k]
             if isinstance(seg, list):
-                for pt in seg:
-                    if isinstance(pt, (list, tuple)) and len(pt) == 2:
-                        flat.append((float(pt[0]), float(pt[1])))
+                for p in seg:
+                    if isinstance(p, dict) and "x" in p and "y" in p:
+                        _append_xy(p["x"], p["y"])
+                    elif isinstance(p, (list, tuple)) and len(p) == 2:
+                        _append_xy(p[0], p[1])
+
+    # 2) list trực tiếp
     elif isinstance(points_field, list):
-        for pt in points_field:
-            if isinstance(pt, (list, tuple)) and len(pt) == 2:
-                flat.append((float(pt[0]), float(pt[1])))
-    return flat
+        for p in points_field:
+            if isinstance(p, dict) and "x" in p and "y" in p:
+                _append_xy(p["x"], p["y"])
+            elif isinstance(p, (list, tuple)) and len(p) == 2:
+                _append_xy(p[0], p[1])
+
+    if len(pts) < 3:
+        return []
+
+    # --- Detect normalized vs pixel ---
+    xs = [x for x, _ in pts]
+    ys = [y for _, y in pts]
+    max_x = max(xs)
+    max_y = max(ys)
+
+    # Nếu max_x <= 1.5 -> xem như normalized theo chiều ngang
+    x_norm = (max_x <= 1.5)
+    # y thường pixel, nhưng nếu y cũng <= 1.5 thì normalized luôn
+    y_norm = (max_y <= 1.5)
+
+    out = []
+    for x, y in pts:
+        if x_norm:
+            x = x * img_w
+        if y_norm:
+            y = y * img_h
+        # clamp vào ảnh
+        x = max(0.0, min(float(img_w - 1), x))
+        y = max(0.0, min(float(img_h - 1), y))
+        out.append((x, y))
+
+    return out
 
 def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float = 0.0):
     """
@@ -119,18 +167,22 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
     - đa màu theo instance
     - màu CHỮ %, BOX, OVERLAY = GIỐNG NHAU (cùng 1 màu RGB)
     - label nền đen
-    - có polygon thì overlay theo mask, không có polygon thì overlay theo bbox (fallback)
+    - có polygon thì overlay theo mask
+    - không có polygon thì overlay theo bbox (fallback)
     """
     base = image.convert("RGB")
+    W, H = base.size
+
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
     font = _get_font(18)
 
     for i, p in enumerate(predictions):
-        conf = float(p.get("confidence", 0))
-        if conf < min_conf:
+        conf = float(p.get("confidence", 0.0))
+        if conf < float(min_conf):
             continue
 
+        # BBOX: Roboflow dùng center x,y + width,height
         x = p.get("x"); y = p.get("y")
         w = p.get("width"); h = p.get("height")
         if None in (x, y, w, h):
@@ -141,56 +193,53 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
         x1 = float(x) + float(w) / 2
         y1 = float(y) + float(h) / 2
 
+        # clamp bbox
+        x0 = max(0.0, min(W - 1.0, x0))
+        y0 = max(0.0, min(H - 1.0, y0))
+        x1 = max(0.0, min(W - 1.0, x1))
+        y1 = max(0.0, min(H - 1.0, y1))
+
         # 1 màu duy nhất cho instance
         r, g, b = _stable_rgb(i)
+        box_color    = (r, g, b, 255)
+        overlay_fill = (r, g, b, 110)  # đậm hơn cho giống detectron2
+        overlay_edge = (r, g, b, 255)
+        text_color   = (r, g, b, 255)
 
-        # BOX = RGB + alpha 255
-        box_color = (r, g, b, 255)
-
-        # OVERLAY = cùng RGB nhưng alpha thấp hơn
-        overlay_fill = (r, g, b, 90)      # vùng tô
-        overlay_edge = (r, g, b, 255)     # viền mask
-
-        # TEXT = cùng RGB + alpha 255
-        text_color = (r, g, b, 255)
-
-        # ===== MASK / OVERLAY =====
+        # ===== POLYGON (đã sửa parse + normalize) =====
         pts_raw = p.get("points", None)
-        poly = extract_poly_points(pts_raw) if pts_raw is not None else []
+        poly = extract_poly_points(pts_raw, W, H) if pts_raw is not None else []
 
         if len(poly) >= 3:
             draw.polygon(poly, fill=overlay_fill)
             draw.line(poly + [poly[0]], fill=overlay_edge, width=4)
         else:
-            # fallback: vẫn có overlay (theo bbox)
-            draw.rectangle([x0, y0, x1, y1], fill=(r, g, b, 45))
+            # fallback: overlay theo bbox
+            draw.rectangle([x0, y0, x1, y1], fill=(r, g, b, 60))
 
         # ===== BBOX =====
         draw.rectangle([x0, y0, x1, y1], outline=box_color, width=4)
 
-        # ===== LABEL nền đen + chữ cùng màu instance =====
+        # ===== LABEL (nền đen + chữ cùng màu) =====
         cls = p.get("class", "crack")
         label = f"{cls} {int(round(conf * 100))}%"
 
-        # đo kích thước text
-        bbox = draw.textbbox((0, 0), label, font=font)
-        tw = bbox[2] - bbox[0]
-        th = bbox[3] - bbox[1]
+        tb = draw.textbbox((0, 0), label, font=font)
+        tw = tb[2] - tb[0]
+        th = tb[3] - tb[1]
 
         pad = 6
         lx = x0
-        ly = max(0, y0 - (th + 2 * pad))
+        ly = y0 - (th + 2 * pad)
+        if ly < 0:
+            ly = y0 + 2
 
-        # nền đen
-        draw.rectangle(
-            [lx, ly, lx + tw + 2 * pad, ly + th + 2 * pad],
-            fill=(0, 0, 0, 200),
-        )
-        # chữ (cùng màu với box/overlay)
+        draw.rectangle([lx, ly, lx + tw + 2 * pad, ly + th + 2 * pad], fill=(0, 0, 0, 200))
         draw.text((lx + pad, ly + pad), label, fill=text_color, font=font)
 
     result = Image.alpha_composite(base.convert("RGBA"), overlay)
     return result.convert("RGB")
+
 
 
 
@@ -1746,6 +1795,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
