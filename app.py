@@ -1191,18 +1191,39 @@ def run_main_app():
                 st.subheader("Biểu đồ thống kê")
                 col_chart1, col_chart2 = st.columns(2)
 
-                with col_chart1:
-                    fig1 = plt.figure(figsize=(4, 3))
-                    plt.bar(range(1, len(confs) + 1), confs)
-                    plt.xlabel("Crack #")
-                    plt.ylabel("Confidence")
-                    plt.ylim(0, 1)
-                    plt.title("Độ tin cậy từng vùng nứt")
-                    st.pyplot(fig1)
-                    bar_png = fig_to_png(fig1)
-                    plt.close(fig1)
 
-                with col_chart2:
+                with col_chart1:
+                    fig1, ax = plt.subplots(figsize=(5.2, 3.2), dpi=150)
+
+                    xs = list(range(1, len(confs) + 1))
+
+                    ax.bar(xs, confs, width=0.35)  # cột mảnh hơn
+
+                    ax.set_ylim(0, 1)
+                    ax.set_xticks(xs)
+                    ax.set_xlabel("Crack #")
+                    ax.set_ylabel("Confidence")
+                    ax.set_title("Độ tin cậy từng vùng nứt", pad=8)
+
+                    ax.grid(axis="y", alpha=0.25)
+                    ax.spines["top"].set_visible(False)
+                    ax.spines["right"].set_visible(False)
+
+                    # Nhãn % nhỏ phía trên cột
+                   for x, v in zip(xs, confs):
+                      ax.text(x, v + 0.02, f"{v*100:.0f}%", ha="center", va="bottom", fontsize=8)
+
+                   # Trường hợp chỉ có 1 crack → không bị cột to
+                   if len(xs) == 1:
+                      ax.set_xlim(0.5, 1.5)
+
+                   fig1.tight_layout()
+                   st.pyplot(fig1)
+
+                   bar_png = fig_to_png(fig1)
+                   plt.close(fig1)
+
+                 with col_chart2:
                     labels = ["Vùng nứt (mask)", "Phần ảnh còn lại"]
                     ratio = crack_ratio_percent / 100.0
                     ratio = max(0.0, min(1.0, ratio))
@@ -1330,6 +1351,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
