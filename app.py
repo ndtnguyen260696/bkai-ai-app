@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import colorsys
 import io
 import time
@@ -25,16 +25,15 @@ from reportlab.lib import colors
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus.doctemplate import LayoutError
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
-
-# A4 xoay ngang cho Stage 2
-A4_LANDSCAPE = landscape(A4)
 
 # =========================================================
 # 0. CẤU HÌNH CHUNG
 # =========================================================
+
+# A4 xoay ngang cho Stage 2
+A4_LANDSCAPE = landscape(A4)
 
 ROBOFLOW_FULL_URL = (
     "https://detect.roboflow.com/crack_segmentation_detection/4"
@@ -48,7 +47,10 @@ FONT_NAME = "TimesVN"
 
 # Cấu hình font PDF
 if os.path.exists(FONT_PATH):
-    pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
+    try:
+        pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_PATH))
+    except Exception:
+        FONT_NAME = "DejaVuSans"
 else:
     FONT_NAME = "DejaVuSans"
     try:
@@ -85,6 +87,12 @@ def _stable_rgb(i: int):
 
 @st.cache_resource
 def _get_font(size=18):
+    """
+    FIX lỗi NameError ImageFont trên Streamlit Cloud:
+    - Import ImageFont cục bộ trong hàm để không bị shadow/NameError.
+    """
+    from PIL import ImageFont as PILImageFont
+
     for fp in [
         "DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -92,10 +100,10 @@ def _get_font(size=18):
         "times.ttf",
     ]:
         try:
-            return ImageFont.truetype(fp, size=size)
+            return PILImageFont.truetype(fp, size=size)
         except Exception:
             continue
-    return ImageFont.load_default()
+    return PILImageFont.load_default()
 
 
 # =========================================================
@@ -105,12 +113,11 @@ def _get_font(size=18):
 def extract_poly_points(points_field, img_w: int, img_h: int):
     """
     Chuẩn hoá mọi kiểu 'points' của Roboflow về list[(x_pixel, y_pixel)].
-
     Roboflow thường trả:
-      - list dict: [{"x":0.35,"y":58.1}, ...]
+      - list dict: [{"x":..,"y":..}, ...]
       - list pair: [(x,y), ...] (hiếm)
       - dict nhiều segment: {"0":[...], "1":[...]} (tuỳ model)
-    Đồng thời tự nhận biết x/y là normalized (0..1) hay pixel.
+    Tự nhận biết x/y là normalized (0..1) hay pixel.
     """
     pts = []
 
@@ -122,7 +129,7 @@ def extract_poly_points(points_field, img_w: int, img_h: int):
         except Exception:
             return
 
-    # 1) dict nhiều segment
+    # dict nhiều segment
     if isinstance(points_field, dict):
         for k in sorted(points_field.keys(), key=lambda x: str(x)):
             seg = points_field[k]
@@ -133,7 +140,7 @@ def extract_poly_points(points_field, img_w: int, img_h: int):
                     elif isinstance(p, (list, tuple)) and len(p) == 2:
                         _append_xy(p[0], p[1])
 
-    # 2) list trực tiếp
+    # list trực tiếp
     elif isinstance(points_field, list):
         for p in points_field:
             if isinstance(p, dict) and "x" in p and "y" in p:
@@ -149,7 +156,7 @@ def extract_poly_points(points_field, img_w: int, img_h: int):
     max_x = max(xs) if xs else 0
     max_y = max(ys) if ys else 0
 
-    # max_x <= 1.5 coi như normalized (0..1)
+    # Nếu <=1.5 coi như normalized (0..1)
     x_norm = (max_x <= 1.5)
     y_norm = (max_y <= 1.5)
 
@@ -169,26 +176,21 @@ def extract_poly_points(points_field, img_w: int, img_h: int):
 def extract_polygons(points_field, img_w: int, img_h: int):
     """Trả về list polygon; mỗi polygon là list[(x_pixel, y_pixel)]."""
     polys = []
-
     if isinstance(points_field, dict):
         for k in sorted(points_field.keys(), key=lambda x: str(x)):
             seg = points_field[k]
             poly = extract_poly_points(seg, img_w, img_h)
             if len(poly) >= 3:
                 polys.append(poly)
-
     elif isinstance(points_field, list):
         poly = extract_poly_points(points_field, img_w, img_h)
         if len(poly) >= 3:
             polys.append(poly)
-
     return polys
 
 
 def crack_area_from_predictions(predictions, img_w: int, img_h: int):
-    """
-    Tính diện tích vùng nứt theo MASK polygon (pixel^2) bằng cách rasterize.
-    """
+    """Tính diện tích vùng nứt theo MASK polygon (pixel^2) bằng rasterize."""
     if img_w <= 0 or img_h <= 0:
         return 0.0
 
@@ -204,15 +206,14 @@ def crack_area_from_predictions(predictions, img_w: int, img_h: int):
             if len(poly) >= 3:
                 d.polygon(poly, fill=255)
 
-    # đếm pixel trắng
-    return float(sum(1 for v in mask.getdata() if v > 0))
+    # nhanh hơn đếm từng pixel: dùng histogram
+    hist = mask.histogram()
+    white = sum(hist[1:])  # tất cả >0
+    return float(white)
 
 
 def crack_area_ratio_percent(predictions, img_w: int, img_h: int):
-    """
-    Trả về (ratio_percent, area_px2)
-    ratio_percent = diện tích mask / diện tích ảnh * 100
-    """
+    """Trả về (ratio_percent, area_px2)."""
     img_area = float(img_w * img_h) if img_w > 0 and img_h > 0 else 0.0
     area_px2 = crack_area_from_predictions(predictions, img_w, img_h)
     ratio = (area_px2 / img_area) if img_area > 0 else 0.0
@@ -244,8 +245,10 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
             continue
 
         # Roboflow bbox center x,y + width,height
-        x = p.get("x"); y = p.get("y")
-        w = p.get("width"); h = p.get("height")
+        x = p.get("x")
+        y = p.get("y")
+        w = p.get("width")
+        h = p.get("height")
         if None in (x, y, w, h):
             continue
 
@@ -260,18 +263,28 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
         y1 = max(0.0, min(H - 1.0, y1))
 
         r, g, b = _stable_rgb(i)
+
         box_color    = (r, g, b, 255)
         overlay_fill = (r, g, b, 110)
         overlay_edge = (r, g, b, 255)
         text_color   = (r, g, b, 255)
 
         pts_raw = p.get("points", None)
-        poly = extract_poly_points(pts_raw, W, H) if pts_raw is not None else []
+
+        # ✅ polygon/mask
+        poly = []
+        if pts_raw is not None:
+            # nếu points là dict nhiều segment -> lấy polygon đầu tiên để vẽ line đẹp
+            polys = extract_polygons(pts_raw, W, H)
+            if len(polys) > 0:
+                # với crack thường 1 polygon
+                poly = polys[0]
 
         if len(poly) >= 3:
             draw.polygon(poly, fill=overlay_fill)
             draw.line(poly + [poly[0]], fill=overlay_edge, width=1)
         else:
+            # fallback: overlay nhẹ theo bbox
             draw.rectangle([x0, y0, x1, y1], fill=(r, g, b, 60))
 
         # bbox
@@ -290,7 +303,10 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
         if ly < 0:
             ly = y0 + 2
 
-        draw.rectangle([lx, ly, lx + tw + 2 * pad, ly + th + 2 * pad], fill=(0, 0, 0, 200))
+        draw.rectangle(
+            [lx, ly, lx + tw + 2 * pad, ly + th + 2 * pad],
+            fill=(0, 0, 0, 200),
+        )
         draw.text((lx + pad, ly + pad), label, fill=text_color, font=font)
 
     result = Image.alpha_composite(base.convert("RGBA"), overlay)
@@ -302,9 +318,7 @@ def draw_predictions_with_mask(image: Image.Image, predictions, min_conf: float 
 # =========================================================
 
 def estimate_severity_from_ratio(area_ratio_percent: float):
-    """
-    Phân cấp theo % diện tích mask so với ảnh (có thể chỉnh ngưỡng).
-    """
+    """Phân cấp theo % diện tích mask so với ảnh (có thể chỉnh ngưỡng)."""
     r = float(area_ratio_percent)
     if r < 0.2:
         return "Nhỏ"
@@ -332,21 +346,20 @@ def export_pdf(
     - Trang 1: logo + tiêu đề + 2 ảnh + banner kết luận + biểu đồ.
     - Trang 2+: bảng metrics.
     """
-
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
 
     page_w, page_h = A4
-    LEFT   = 20 * mm
-    RIGHT  = 20 * mm
-    TOP    = 20 * mm
+    LEFT = 20 * mm
+    RIGHT = 20 * mm
+    TOP = 20 * mm
     BOTTOM = 20 * mm
     CONTENT_W = page_w - LEFT - RIGHT
 
-    TITLE_FONT      = FONT_NAME
-    TITLE_SIZE      = 18
-    BODY_FONT       = FONT_NAME
-    BODY_SIZE       = 10
+    TITLE_FONT = FONT_NAME
+    TITLE_SIZE = 18
+    BODY_FONT = FONT_NAME
+    BODY_SIZE = 10
     SMALL_FONT_SIZE = 8
 
     def draw_header(page_title, subtitle=None, page_no=None):
@@ -360,7 +373,14 @@ def export_pdf(
                 logo_w = 30 * mm
                 iw, ih = logo.getSize()
                 logo_h = logo_w * ih / iw
-                c.drawImage(logo, LEFT, y_top - logo_h, width=logo_w, height=logo_h, mask="auto")
+                c.drawImage(
+                    logo,
+                    LEFT,
+                    y_top - logo_h,
+                    width=logo_w,
+                    height=logo_h,
+                    mask="auto",
+                )
             except Exception:
                 logo_h = 0
 
@@ -507,7 +527,14 @@ def export_pdf(
         cw = pw * scale_pie
         ch = ph * scale_pie
         pie_bottom = charts_top_y - ch
-        c.drawImage(pie_img, LEFT + chart_slot_w + gap_x, pie_bottom, width=cw, height=ch, mask="auto")
+        c.drawImage(
+            pie_img,
+            LEFT + chart_slot_w + gap_x,
+            pie_bottom,
+            width=cw,
+            height=ch,
+            mask="auto",
+        )
         c.setFont(BODY_FONT, 10)
         c.setFillColor(colors.black)
         c.drawString(LEFT + chart_slot_w + gap_x, pie_bottom - 10, "Tỷ lệ vùng nứt so với toàn ảnh")
@@ -521,13 +548,14 @@ def export_pdf(
 
     rows = []
     skip_keys = {"Crack Length", "Crack Width"}
-    for _, r in metrics_df.iterrows():
-        en_name = str(r.get("en", "")).strip()
-        if en_name in skip_keys:
-            continue
-        label = f"{r.get('vi', '')} ({en_name})"
-        val = str(r.get("value", ""))
-        rows.append((label, val))
+    if metrics_df is not None:
+        for _, r in metrics_df.iterrows():
+            en_name = str(r.get("en", "")).strip()
+            if en_name in skip_keys:
+                continue
+            label = f"{r.get('vi', '')} ({en_name})"
+            val = str(r.get("value", ""))
+            rows.append((label, val))
 
     if not rows:
         c.save()
@@ -538,8 +566,8 @@ def export_pdf(
     col2_w = 95 * mm
     col3_w = CONTENT_W - col1_w - col2_w
 
-    header_h   = 10 * mm
-    base_lead  = 4.0
+    header_h = 10 * mm
+    base_lead = 4.0
     max_body_y = content_top_y - 10 * mm
 
     def start_table_page(page_no):
@@ -589,7 +617,7 @@ def export_pdf(
         c.drawString(x0 + 2, current_y - leading, str(i))
 
         draw_wrapped_cell(label, x1, current_y, col2_w, BODY_FONT, BODY_SIZE, leading)
-        draw_wrapped_cell(val,   x2, current_y, col3_w, BODY_FONT, BODY_SIZE, leading)
+        draw_wrapped_cell(val, x2, current_y, col3_w, BODY_FONT, BODY_SIZE, leading)
 
         current_y -= row_h
 
@@ -607,14 +635,14 @@ def export_pdf_no_crack(original_img):
     c = canvas.Canvas(buf, pagesize=A4)
 
     page_w, page_h = A4
-    LEFT   = 20 * mm
-    RIGHT  = 20 * mm
-    TOP    = 20 * mm
+    LEFT = 20 * mm
+    RIGHT = 20 * mm
+    TOP = 20 * mm
     BOTTOM = 20 * mm
     CONTENT_W = page_w - LEFT - RIGHT
 
     TITLE_FONT = FONT_NAME
-    BODY_FONT  = FONT_NAME
+    BODY_FONT = FONT_NAME
 
     def draw_header_no_crack():
         y_top = page_h - TOP
@@ -669,7 +697,11 @@ def export_pdf_no_crack(original_img):
 
     c.setFillColor(colors.HexColor("#2e7d32"))
     c.setFont(BODY_FONT, 11)
-    c.drawString(LEFT + 4 * mm, banner_y + banner_h / 2 - 4, "Không phát hiện vết nứt rõ ràng trong ảnh theo ngưỡng của mô hình.")
+    c.drawString(
+        LEFT + 4 * mm,
+        banner_y + banner_h / 2 - 4,
+        "Không phát hiện vết nứt rõ ràng trong ảnh theo ngưỡng của mô hình.",
+    )
 
     footer_y = BOTTOM - 6
     c.setFont(BODY_FONT, 8)
@@ -688,9 +720,9 @@ def export_pdf_no_crack(original_img):
 # =========================================================
 
 def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
-    left_margin   = 20 * mm
-    right_margin  = 20 * mm
-    top_margin    = 20 * mm
+    left_margin = 20 * mm
+    right_margin = 20 * mm
+    top_margin = 20 * mm
     bottom_margin = 20 * mm
 
     buf = io.BytesIO()
@@ -950,17 +982,26 @@ def show_stage2_demo(key_prefix="stage2"):
     )
 
     render_component_crack_table(component_crack_data)
-
     st.caption("Bảng 2 – Mapping theo cấu kiện (có hình minh hoạ).")
 
     st.markdown("### 2.3. Xuất báo cáo kiến thức Stage 2")
     csv_bytes = component_crack_data.to_csv(index=False).encode("utf-8-sig")
-    st.download_button("⬇ Tải bảng Stage 2 (CSV)", data=csv_bytes, file_name="BKAI_Stage2_CrackTable.csv",
-                       mime="text/csv", key=f"stage2_csv_{key_prefix}")
+    st.download_button(
+        "⬇ Tải bảng Stage 2 (CSV)",
+        data=csv_bytes,
+        file_name="BKAI_Stage2_CrackTable.csv",
+        mime="text/csv",
+        key=f"stage2_csv_{key_prefix}",
+    )
 
     pdf_buf = export_stage2_pdf(component_crack_data)
-    st.download_button("📄 Tải báo cáo kiến thức Stage 2 (PDF)", data=pdf_buf.getvalue(),
-                       file_name="BKAI_Stage2_Report.pdf", mime="application/pdf", key=f"stage2_pdf_{key_prefix}")
+    st.download_button(
+        "📄 Tải báo cáo kiến thức Stage 2 (PDF)",
+        data=pdf_buf.getvalue(),
+        file_name="BKAI_Stage2_Report.pdf",
+        mime="application/pdf",
+        key=f"stage2_pdf_{key_prefix}",
+    )
 
 
 # =========================================================
@@ -984,8 +1025,7 @@ else:
 
 def run_main_app():
     if not ROBOFLOW_FULL_URL:
-        st.error("❌ Chưa cấu hình ROBOFLOW_API_KEY. Hãy set trong Streamlit secrets hoặc biến môi trường.")
-        st.info("Gợi ý: tạo file .streamlit/secrets.toml với dòng: ROBOFLOW_API_KEY = \"...\"")
+        st.error("❌ Chưa cấu hình ROBOFLOW_API_KEY.")
         st.stop()
 
     col_logo, col_title = st.columns([1, 5])
@@ -1112,7 +1152,13 @@ def run_main_app():
                 st.text(resp.text[:2000])
                 continue
 
-            result = resp.json()
+            try:
+                result = resp.json()
+            except Exception:
+                st.error("Không parse được JSON từ Roboflow.")
+                st.text(resp.text[:2000])
+                continue
+
             predictions = result.get("predictions", [])
             preds_conf = [p for p in predictions if float(p.get("confidence", 0)) >= float(min_conf)]
 
@@ -1156,7 +1202,6 @@ def run_main_app():
                 confs = [float(p.get("confidence", 0)) for p in preds_conf]
                 avg_conf = (sum(confs) / len(confs)) if confs else 0.0
 
-                # ✅ TÍNH % MASK THẬT (không dùng bbox)
                 crack_ratio_percent, crack_area_px2 = crack_area_ratio_percent(preds_conf, img_w, img_h)
                 severity = estimate_severity_from_ratio(crack_ratio_percent)
 
@@ -1180,24 +1225,20 @@ def run_main_app():
                 ]
 
                 metrics_df = pd.DataFrame(metrics)
-                styled_df = metrics_df.style.set_table_styles(
-                    [
-                        {"selector": "th", "props": [("background-color", "#1e88e5"), ("color", "white"), ("font-weight", "bold")]},
-                        {"selector": "td", "props": [("background-color", "#fafafa")]},
-                    ]
-                )
-                st.dataframe(styled_df, use_container_width=True)
+                st.dataframe(metrics_df, use_container_width=True)
 
                 st.subheader("Biểu đồ thống kê")
                 col_chart1, col_chart2 = st.columns(2)
 
+                bar_png = None
+                pie_png = None
 
+                # ---------- BAR CHART (đẹp + cột mảnh, 1 crack không bị to) ----------
                 with col_chart1:
                     fig1, ax = plt.subplots(figsize=(5.2, 3.2), dpi=150)
 
                     xs = list(range(1, len(confs) + 1))
-
-                    ax.bar(xs, confs, width=0.35)  # cột mảnh hơn
+                    ax.bar(xs, confs, width=0.35)  # cột mảnh
 
                     ax.set_ylim(0, 1)
                     ax.set_xticks(xs)
@@ -1209,11 +1250,9 @@ def run_main_app():
                     ax.spines["top"].set_visible(False)
                     ax.spines["right"].set_visible(False)
 
-                    # Nhãn % nhỏ phía trên cột
                     for x, v in zip(xs, confs):
-                       ax.text(x, v + 0.02, f"{v*100:.0f}%", ha="center", va="bottom", fontsize=8)
+                        ax.text(x, v + 0.02, f"{v*100:.0f}%", ha="center", va="bottom", fontsize=8)
 
-                    # Trường hợp chỉ có 1 crack → không bị cột to
                     if len(xs) == 1:
                         ax.set_xlim(0.5, 1.5)
 
@@ -1223,14 +1262,18 @@ def run_main_app():
                     bar_png = fig_to_png(fig1)
                     plt.close(fig1)
 
-                 with col_chart2:
+                # ---------- PIE CHART ----------
+                with col_chart2:
                     labels = ["Vùng nứt (mask)", "Phần ảnh còn lại"]
                     ratio = crack_ratio_percent / 100.0
                     ratio = max(0.0, min(1.0, ratio))
                     sizes = [ratio, 1 - ratio]
-                    fig2 = plt.figure(figsize=(4, 3))
-                    plt.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=140)
-                    plt.title("Tỷ lệ vùng nứt so với toàn ảnh")
+
+                    fig2, ax2 = plt.subplots(figsize=(4.2, 3.2), dpi=150)
+                    ax2.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=140)
+                    ax2.set_title("Tỷ lệ vùng nứt so với toàn ảnh", pad=8)
+                    fig2.tight_layout()
+
                     st.pyplot(fig2)
                     pie_png = fig_to_png(fig2)
                     plt.close(fig2)
@@ -1275,6 +1318,7 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
     st.session_state.username = ""
+
 
 def show_auth_page():
     col_logo, col_header = st.columns([1, 3])
@@ -1351,16 +1395,3 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
-
-
-
-
-
-
-
-
-
-
-
-
-
