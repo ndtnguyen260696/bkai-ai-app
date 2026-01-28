@@ -1217,11 +1217,11 @@ def run_main_app():
                     if len(xs) == 1:
                         ax.set_xlim(0.5, 1.5)
 
-                   fig1.tight_layout()
-                   st.pyplot(fig1)
+                    fig1.tight_layout()
+                    st.pyplot(fig1)
 
-                   bar_png = fig_to_png(fig1)
-                   plt.close(fig1)
+                    bar_png = fig_to_png(fig1)
+                    plt.close(fig1)
 
                  with col_chart2:
                     labels = ["Vùng nứt (mask)", "Phần ảnh còn lại"]
@@ -1351,6 +1351,7 @@ if st.session_state.authenticated:
     run_main_app()
 else:
     show_auth_page()
+
 
 
 
