@@ -74,337 +74,285 @@ def inject_global_styles():
         """
         <style>
         :root{
-            --bkai-primary:#7c5cff;
-            --bkai-primary-dark:#5b3fe0;
-            --bkai-accent:#a78bfa;
-            --bkai-bg-1:#0c0a16;
-            --bkai-bg-2:#17122a;
-            --bkai-bg-3:#241b3f;
-            --bkai-card:rgba(255,255,255,0.06);
-            --bkai-card-2:rgba(255,255,255,0.05);
-            --bkai-border:rgba(255,255,255,0.10);
-            --bkai-text:#ffffff;
-            --bkai-muted:#cbd5e1;
-            --bkai-soft:#e5e7eb;
+            --blue-1:#1d64d6;
+            --blue-2:#2d7df0;
+            --blue-3:#5aa9ff;
+            --blue-4:#87d3ff;
+            --line:#d8d8d8;
+            --text:#1f2937;
+            --muted:#6b7280;
         }
 
         .stApp{
-            background:
-                radial-gradient(circle at 15% 20%, rgba(124,92,255,0.20), transparent 25%),
-                radial-gradient(circle at 85% 80%, rgba(167,139,250,0.18), transparent 30%),
-                linear-gradient(135deg, var(--bkai-bg-1) 0%, var(--bkai-bg-2) 48%, var(--bkai-bg-3) 100%);
-            color: var(--bkai-text);
+            background:#f3f4f6;
         }
 
         html, body, [class*="css"]{
-            font-family: "Segoe UI", Arial, sans-serif;
+            font-family: Arial, Helvetica, sans-serif;
         }
 
         .block-container{
-            padding-top: 1.2rem;
+            max-width: 1180px;
+            padding-top: 0rem;
             padding-bottom: 2rem;
-            max-width: 1380px;
         }
 
-        .bkai-auth-shell{
-            margin-top: 10px;
+        .login-top-wrap{
+            position: relative;
+            height: 300px;
+            border-radius: 0;
+            overflow: hidden;
+            background: linear-gradient(180deg, #3e8df5 0%, #2f79ea 45%, #1d63d6 100%);
+            box-shadow: inset 0 -10px 30px rgba(0,0,0,0.08);
         }
 
-        .bkai-auth-left{
-            min-height: 620px;
-            border-radius: 28px;
-            padding: 28px;
-            display:flex;
-            flex-direction:column;
-            justify-content:space-between;
-            background:
-                linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
-                radial-gradient(circle at top left, rgba(124,92,255,0.30), transparent 38%),
-                linear-gradient(145deg, #2a2250 0%, #1c1734 52%, #141122 100%);
-            border:1px solid rgba(255,255,255,0.10);
-            box-shadow: 0 20px 42px rgba(0,0,0,0.32);
-            overflow:hidden;
-            position:relative;
-        }
-
-        .bkai-auth-left::after{
+        .login-top-wrap::before{
             content:"";
             position:absolute;
-            inset:auto -80px -80px auto;
-            width:240px;
-            height:240px;
-            border-radius:50%;
-            background: radial-gradient(circle, rgba(124,92,255,0.18), transparent 70%);
-            filter: blur(8px);
-            pointer-events:none;
+            left:-5%;
+            right:-5%;
+            bottom:18px;
+            height:42px;
+            background: rgba(113, 197, 255, 0.35);
+            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+            transform: scaleX(1.08);
         }
 
-        .bkai-brand-mini{
-            font-size:0.92rem;
-            font-weight:700;
+        .login-top-wrap::after{
+            content:"";
+            position:absolute;
+            left:-8%;
+            right:-8%;
+            bottom:0;
+            height:54px;
+            background: rgba(125, 214, 255, 0.55);
+            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+            transform: scaleX(1.1);
+        }
+
+        .login-top-inner{
+            position: relative;
+            z-index: 2;
+            height:100%;
+            display:flex;
+            flex-direction:column;
+            justify-content:center;
+            align-items:center;
+            text-align:center;
+        }
+
+        .login-logo-circle{
+            width:78px;
+            height:78px;
+            background:#ffffff;
+            border-radius:50%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+            padding:10px;
+            margin-bottom:14px;
+        }
+
+        .login-system-bar{
+            width:180px;
+            height:14px;
+            border-radius:2px;
+            background: rgba(255,255,255,0.12);
+            margin: 4px auto 8px auto;
+        }
+
+        .login-system-name{
+            color:#ffffff;
+            font-size:10px;
             letter-spacing:0.08em;
             text-transform:uppercase;
-            color:#ddd6fe;
-            margin-bottom:16px;
+            font-weight:normal;
         }
 
-        .bkai-hero-title{
-            font-size:2.15rem;
-            line-height:1.2;
-            font-weight:800;
-            color:#ffffff;
-            margin: 14px 0 12px 0;
-            max-width: 480px;
-        }
-
-        .bkai-hero-desc{
-            font-size:1rem;
-            line-height:1.75;
-            color:#d1d5db;
-            max-width: 510px;
-        }
-
-        .bkai-logo-box{
-            width: 148px;
-            height: 148px;
+        .login-form-shell{
             display:flex;
-            align-items:center;
             justify-content:center;
-            border-radius:22px;
-            background: rgba(255,255,255,0.96);
-            box-shadow: 0 14px 30px rgba(0,0,0,0.28);
-            padding: 14px;
-            margin-bottom: 22px;
+            padding-top:28px;
         }
 
-        .bkai-feature-list{
-            margin-top: 22px;
-            display:grid;
-            gap:12px;
-            max-width: 520px;
-        }
-
-        .bkai-feature-item{
-            background: rgba(255,255,255,0.06);
-            border:1px solid rgba(255,255,255,0.10);
-            border-radius:16px;
-            padding:12px 14px;
-            color:#eef2ff;
-            font-size:0.96rem;
-            line-height:1.55;
-        }
-
-        .bkai-auth-right-wrap{
-            min-height: 620px;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-        }
-
-        .bkai-auth-right{
+        .login-form-box{
             width:100%;
-            max-width: 620px;
-            border-radius: 28px;
-            padding: 30px 28px 22px 28px;
-            background: rgba(255,255,255,0.06);
-            border:1px solid rgba(255,255,255,0.10);
-            box-shadow: 0 20px 42px rgba(0,0,0,0.30);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
+            max-width:320px;
         }
 
-        .bkai-auth-title{
-            font-size:2.15rem;
-            font-weight:800;
-            color:#ffffff;
-            line-height:1.2;
-            margin-bottom:0.35rem;
+        .form-divider{
+            border-top:1px solid #dadada;
+            margin:14px 0;
         }
 
-        .bkai-auth-subtitle{
-            font-size:0.98rem;
-            color:#cbd5e1;
-            line-height:1.6;
-            margin-bottom:1rem;
+        .or-text{
+            text-align:center;
+            color:#9ca3af;
+            font-size:11px;
+            margin-top:-8px;
+            margin-bottom:10px;
+            background:#f3f4f6;
+            width:30px;
+            margin-left:auto;
+            margin-right:auto;
         }
 
-        .bkai-divider{
-            margin-top:10px;
-            margin-bottom:16px;
-            border-top:1px solid rgba(255,255,255,0.10);
-        }
-
-        .bkai-section-title{
-            font-size:1.16rem;
-            font-weight:800;
-            color:#ffffff;
-            margin-bottom:0.3rem;
-        }
-
-        .bkai-section-note{
-            font-size:0.94rem;
-            color:#cbd5e1;
-            margin-bottom:0.9rem;
-            line-height:1.6;
+        .portal-title{
+            text-align:center;
+            font-size:14px;
+            font-weight:700;
+            color:#374151;
+            margin-bottom:12px;
         }
 
         div[data-baseweb="tab-list"]{
-            gap: 8px;
-            margin-bottom: 8px;
+            display:flex;
+            justify-content:center;
+            gap:8px;
+            margin-bottom:12px;
         }
 
         button[data-baseweb="tab"]{
-            border-radius: 12px 12px 0 0 !important;
-            padding: 10px 18px !important;
-            font-weight: 700 !important;
-            color: #e5e7eb !important;
-            background: rgba(255,255,255,0.03) !important;
+            border-radius:4px 4px 0 0 !important;
+            padding:6px 12px !important;
+            font-weight:600 !important;
+            font-size:12px !important;
+            color:#4b5563 !important;
+            background:transparent !important;
+        }
+
+        div[data-testid="stTextInput"] label,
+        div[data-testid="stTextArea"] label,
+        div[data-testid="stSelectbox"] label,
+        div[data-testid="stFileUploader"] label{
+            color:#374151 !important;
+            font-size:12px !important;
+            font-weight:600 !important;
+        }
+
+        div[data-testid="stTextInput"] input{
+            border:none !important;
+            border-bottom:1px solid #888 !important;
+            border-radius:0 !important;
+            background:transparent !important;
+            color:#111827 !important;
+            padding-left:0 !important;
+            padding-right:0 !important;
+            box-shadow:none !important;
+        }
+
+        div[data-testid="stTextInput"] input::placeholder{
+            color:#9ca3af !important;
+        }
+
+        div[data-testid="stTextArea"] textarea,
+        div[data-baseweb="select"] > div{
+            border:1px solid #d1d5db !important;
+            border-radius:6px !important;
+            background:#ffffff !important;
+            color:#111827 !important;
+        }
+
+        div.stCheckbox label{
+            color:#4b5563 !important;
+            font-size:12px !important;
         }
 
         div.stButton > button{
             width:100%;
-            height:46px;
-            border-radius:12px;
-            font-weight:700;
+            height:34px;
+            border-radius:0;
+            font-size:12px;
+            font-weight:500;
             color:#ffffff;
-            border:1px solid rgba(124,92,255,0.80);
-            background:linear-gradient(90deg,#7c5cff 0%, #5b3fe0 100%);
-            box-shadow:0 10px 22px rgba(91,63,224,0.28);
+            background:#4b9be6;
+            border:1px solid #3f89cf;
+            box-shadow:none;
         }
 
         div.stButton > button:hover{
             color:#ffffff;
-            border:1px solid rgba(167,139,250,0.95);
-            background:linear-gradient(90deg,#8a6bff 0%, #6b4df1 100%);
+            background:#3f8edb;
+            border:1px solid #327fc8;
         }
 
-        div[data-testid="stTextInput"] label,
-        div[data-testid="stSelectbox"] label,
-        div[data-testid="stTextArea"] label,
-        div[data-testid="stFileUploader"] label{
-            color:#e5e7eb !important;
-            font-weight:600 !important;
+        .secondary-btn-note{
+            text-align:center;
+            font-size:12px;
+            color:#6b7280;
+            margin-bottom:6px;
         }
 
-        div[data-testid="stTextInput"] input,
-        div[data-testid="stNumberInput"] input,
-        div[data-testid="stTextArea"] textarea{
-            border-radius:12px !important;
-            background:rgba(255,255,255,0.07) !important;
-            color:#ffffff !important;
-            border:1px solid rgba(255,255,255,0.12) !important;
+        .bkai-simple-note{
+            text-align:center;
+            color:#6b7280;
+            font-size:11px;
+            margin-top:8px;
         }
 
-        div[data-testid="stTextInput"] input::placeholder,
-        textarea::placeholder{
-            color:#cbd5e1 !important;
-        }
-
-        div[data-baseweb="select"] > div{
-            border-radius:12px !important;
-            background:rgba(255,255,255,0.07) !important;
-            border:1px solid rgba(255,255,255,0.12) !important;
-            color:#ffffff !important;
-        }
-
-        .bkai-page-title{
-            font-size:2.1rem;
-            font-weight:800;
+        .bkai-main-header{
+            background: linear-gradient(180deg, #2f79ea 0%, #1d63d6 100%);
+            border-radius:10px;
+            padding:18px 22px;
+            margin-top:16px;
+            margin-bottom:18px;
             color:#ffffff;
-            line-height:1.25;
-            margin-bottom:0.25rem;
         }
 
-        .bkai-page-subtitle{
-            font-size:1rem;
-            color:#d1d5db;
-            margin-bottom:0.75rem;
-        }
-
-        .bkai-hero{
-            background: linear-gradient(135deg, rgba(124,92,255,0.16) 0%, rgba(255,255,255,0.04) 55%, rgba(159,122,234,0.10) 100%);
-            border:1px solid rgba(255,255,255,0.10);
-            border-radius:24px;
-            box-shadow: 0 16px 40px rgba(0,0,0,0.28);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            padding: 20px 22px;
-        }
-
-        .bkai-info-grid{
-            display:grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap:12px;
-            margin-top:10px;
-        }
-
-        .bkai-metric-box{
-            background: rgba(255,255,255,0.06);
-            border:1px solid rgba(255,255,255,0.10);
-            border-radius:14px;
-            padding:12px 14px;
-        }
-
-        .bkai-metric-label{
-            font-size:0.86rem;
-            color:#cbd5e1;
+        .bkai-main-title{
+            font-size:28px;
+            font-weight:700;
             margin-bottom:4px;
         }
 
-        .bkai-metric-value{
-            font-size:1rem;
-            font-weight:700;
-            color:#ffffff;
+        .bkai-main-subtitle{
+            font-size:14px;
+            opacity:0.95;
         }
 
         .bkai-card{
-            background: rgba(255,255,255,0.06);
-            border:1px solid rgba(255,255,255,0.10);
-            border-radius:22px;
-            box-shadow: 0 18px 40px rgba(0,0,0,0.30);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            padding: 18px 20px;
+            background:#ffffff;
+            border:1px solid #e5e7eb;
+            border-radius:10px;
+            padding:18px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.04);
         }
 
         .bkai-status-ok{
-            background:rgba(34,197,94,0.12);
-            border:1px solid rgba(34,197,94,0.35);
-            color:#bbf7d0;
+            background:#ecfdf5;
+            border:1px solid #bbf7d0;
+            color:#166534;
             padding:10px 14px;
-            border-radius:12px;
+            border-radius:8px;
             font-weight:600;
         }
 
         .bkai-status-danger{
-            background:rgba(239,68,68,0.12);
-            border:1px solid rgba(239,68,68,0.35);
-            color:#fecaca;
+            background:#fef2f2;
+            border:1px solid #fecaca;
+            color:#991b1b;
             padding:10px 14px;
-            border-radius:12px;
+            border-radius:8px;
             font-weight:600;
         }
 
         .bkai-sidebar-user{
-            background:rgba(124,92,255,0.12);
-            border:1px solid rgba(124,92,255,0.30);
-            border-radius:14px;
-            padding:12px 14px;
-            color:#ddd6fe;
+            background:#eff6ff;
+            border:1px solid #bfdbfe;
+            border-radius:8px;
+            padding:10px 12px;
+            color:#1d4ed8;
             font-weight:700;
             margin-bottom:8px;
         }
 
         [data-testid="stSidebar"]{
-            background: linear-gradient(180deg, #171328 0%, #1f1a34 100%);
-        }
-
-        [data-testid="stSidebar"] *{
-            color:#f8fafc !important;
+            background:#ffffff;
         }
 
         div[data-testid="stDataFrame"]{
-            border-radius:16px;
+            border-radius:8px;
             overflow:hidden;
         }
         </style>
@@ -417,7 +365,7 @@ inject_global_styles()
 
 
 # =========================================================
-# 1. COMMON HELPER FUNCTIONS
+# 1. COMMON HELPERS
 # =========================================================
 
 def fig_to_png(fig) -> io.BytesIO:
@@ -461,7 +409,7 @@ def _get_font(size=18):
 
 
 # =========================================================
-# 1.1 PARSE POLYGON + MASK AREA
+# 1.1 POLYGON / MASK
 # =========================================================
 
 def extract_poly_points(points_field, img_w: int, img_h: int):
@@ -500,8 +448,8 @@ def extract_poly_points(points_field, img_w: int, img_h: int):
     max_x = max(xs) if xs else 0
     max_y = max(ys) if ys else 0
 
-    x_norm = (max_x <= 1.5)
-    y_norm = (max_y <= 1.5)
+    x_norm = max_x <= 1.5
+    y_norm = max_y <= 1.5
 
     out = []
     for x, y in pts:
@@ -559,7 +507,7 @@ def crack_area_ratio_percent(predictions, img_w: int, img_h: int):
 
 
 # =========================================================
-# 1.2 DRAW MASK + BOX
+# 1.2 DRAW RESULT
 # =========================================================
 
 def draw_predictions_with_mask(image: Image.Image, predictions, image_key: str = "", min_conf: float = 0.0):
@@ -652,7 +600,7 @@ def estimate_severity_from_ratio(area_ratio_percent: float):
 
 
 # =========================================================
-# 2. PDF EXPORT - STAGE 1
+# 2. PDF EXPORT
 # =========================================================
 
 def export_pdf(
@@ -1006,7 +954,7 @@ def export_pdf_no_crack(original_img):
 
 
 # =========================================================
-# 3. PDF EXPORT - STAGE 2
+# 3. STAGE 2 PDF
 # =========================================================
 
 def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
@@ -1157,7 +1105,7 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
 
 
 # =========================================================
-# 4. STAGE 2 RENDER
+# 4. STAGE 2 VIEW
 # =========================================================
 
 def render_component_crack_table(component_df: pd.DataFrame):
@@ -1361,59 +1309,22 @@ else:
 
 
 # =========================================================
-# 6. MAIN APP UI
+# 6. MAIN APP
 # =========================================================
 
 def show_top_banner(username=""):
-    st.markdown("<div class='bkai-hero'>", unsafe_allow_html=True)
-
-    col_logo, col_text = st.columns([1, 6], gap="medium")
-    with col_logo:
-        if os.path.exists(LOGO_PATH):
-            st.image(LOGO_PATH, width=140)
-        else:
-            st.markdown("### BKAI")
-
-    with col_text:
-        st.markdown(
-            "<div class='bkai-page-title'>BKAI - AI-Based Concrete Crack Detection and Classification System</div>",
-            unsafe_allow_html=True,
-        )
-        greet = (
-            f"Welcome back, <b>{username}</b>. Upload one or more concrete images for AI-based analysis and reporting."
-            if username else
-            "Upload one or more concrete images for AI-based analysis and reporting."
-        )
-        st.markdown(
-            f"<div class='bkai-page-subtitle'>{greet}</div>",
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            """
-            <div class="bkai-info-grid">
-                <div class="bkai-metric-box">
-                    <div class="bkai-metric-label">AI Service</div>
-                    <div class="bkai-metric-value">Roboflow Inference</div>
-                </div>
-                <div class="bkai-metric-box">
-                    <div class="bkai-metric-label">Output</div>
-                    <div class="bkai-metric-value">Detection + Segmentation + PDF</div>
-                </div>
-                <div class="bkai-metric-box">
-                    <div class="bkai-metric-label">Supported Format</div>
-                    <div class="bkai-metric-value">JPG / JPEG / PNG</div>
-                </div>
-                <div class="bkai-metric-box">
-                    <div class="bkai-metric-label">Mode</div>
-                    <div class="bkai-metric-value">Single / Multi-image Analysis</div>
-                </div>
+    st.markdown(
+        f"""
+        <div class="bkai-main-header">
+            <div class="bkai-main-title">BKAI - AI-Based Concrete Crack Detection and Classification System</div>
+            <div class="bkai-main-subtitle">
+                {"Welcome back, " + username + ". " if username else ""}
+                Upload concrete images for AI-based crack detection, segmentation, and reporting.
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("</div>", unsafe_allow_html=True)
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_profile_form():
@@ -1424,11 +1335,8 @@ def render_profile_form():
         return True
 
     st.markdown("<div class='bkai-card'>", unsafe_allow_html=True)
-    st.markdown("<div class='bkai-section-title'>User Profile Information</div>", unsafe_allow_html=True)
-    st.markdown(
-        "<div class='bkai-section-note'>Please complete the information below before starting the analysis. These details help personalize the exported report and user statistics.</div>",
-        unsafe_allow_html=True,
-    )
+    st.subheader("User Profile Information")
+    st.caption("Please complete the information below before starting the analysis.")
 
     with st.form("user_info_form", clear_on_submit=False):
         col1, col2 = st.columns(2)
@@ -1526,8 +1434,6 @@ def run_main_app():
 
     show_top_banner(st.session_state.get("username", ""))
 
-    st.write("")
-
     if not render_profile_form():
         return
 
@@ -1552,18 +1458,15 @@ def run_main_app():
             st.info("No user statistics available yet.")
 
     st.markdown("<div class='bkai-card'>", unsafe_allow_html=True)
-    st.markdown("<div class='bkai-section-title'>Image Upload and Analysis</div>", unsafe_allow_html=True)
-    st.markdown(
-        "<div class='bkai-section-note'>Upload one or multiple concrete images. The system will perform crack detection, segmentation, and report generation for each uploaded image.</div>",
-        unsafe_allow_html=True,
-    )
+    st.subheader("Image Upload and Analysis")
+    st.caption("Upload one or multiple concrete images. The system will perform crack detection, segmentation, and report generation.")
 
     uploaded_files = st.file_uploader(
         "Upload one or more concrete images (JPG / PNG)",
         type=["jpg", "jpeg", "png"],
         accept_multiple_files=True,
     )
-    analyze_btn = st.button("🔍 Analyze Images")
+    analyze_btn = st.button("Analyze Images")
     st.markdown("</div>", unsafe_allow_html=True)
 
     if analyze_btn:
@@ -1774,161 +1677,129 @@ if "username" not in st.session_state:
 
 
 def show_auth_page():
-    st.markdown("<div class='bkai-auth-shell'>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="login-top-wrap">
+            <div class="login-top-inner">
+        """,
+        unsafe_allow_html=True,
+    )
 
-    col_left, col_right = st.columns([1.08, 0.92], gap="large")
-
-    with col_left:
-        st.markdown("<div class='bkai-auth-left'>", unsafe_allow_html=True)
-
-        st.markdown(
-            """
-            <div>
-                <div class="bkai-brand-mini">BKAI Platform</div>
-                <div class="bkai-hero-title">Concrete crack analysis with a cleaner, smarter, and more professional interface.</div>
-                <div class="bkai-hero-desc">
-                    Intelligent inspection system for crack detection, segmentation, classification, and automated technical reporting.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("<div>", unsafe_allow_html=True)
-
-        st.markdown("<div class='bkai-logo-box'>", unsafe_allow_html=True)
-        if os.path.exists(LOGO_PATH):
-            st.image(LOGO_PATH, width=120)
-        else:
-            st.markdown("## BKAI")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown(
-            """
-            <div class="bkai-feature-list">
-                <div class="bkai-feature-item"><b>AI Detection:</b> Detect crack regions on concrete surfaces from uploaded images.</div>
-                <div class="bkai-feature-item"><b>Segmentation Output:</b> Generate masks, confidence scores, and annotated results.</div>
-                <div class="bkai-feature-item"><b>Technical Reporting:</b> Export structured PDF reports for research and site applications.</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col_right:
-        st.markdown("<div class='bkai-auth-right-wrap'>", unsafe_allow_html=True)
-        st.markdown("<div class='bkai-auth-right'>", unsafe_allow_html=True)
-
-        st.markdown(
-            """
-            <div class="bkai-auth-title">Create your account or sign in</div>
-            <div class="bkai-auth-subtitle">
-                Access the BKAI platform for concrete crack analysis, segmentation, and intelligent report generation.
-            </div>
-            <div class="bkai-divider"></div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        tab_login, tab_register = st.tabs(["🔐 Login", "📝 Register"])
-
-        with tab_login:
-            st.markdown("<div class='bkai-section-title'>Welcome Back</div>", unsafe_allow_html=True)
-            st.markdown(
-                "<div class='bkai-section-note'>Enter your account credentials to continue to the analysis dashboard.</div>",
-                unsafe_allow_html=True,
-            )
-
-            login_user = st.text_input(
-                "Username",
-                key="login_user",
-                placeholder="Enter your username"
-            )
-            login_pass = st.text_input(
-                "Password",
-                type="password",
-                key="login_pass",
-                placeholder="Enter your password"
-            )
-
-            login_btn = st.button("Login", key="login_button")
-
-            if login_btn:
-                if not login_user or not login_pass:
-                    st.warning("Please enter both username and password.")
-                elif login_user in users and users.get(login_user) == login_pass:
-                    st.session_state.authenticated = True
-                    st.session_state.username = login_user
-                    st.success(f"Login successful. Welcome, {login_user}!")
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password.")
-
-        with tab_register:
-            st.markdown("<div class='bkai-section-title'>Create a New Account</div>", unsafe_allow_html=True)
-            st.markdown(
-                "<div class='bkai-section-note'>Register a new account to start using the BKAI intelligent inspection platform.</div>",
-                unsafe_allow_html=True,
-            )
-
-            reg_user = st.text_input(
-                "Username",
-                key="reg_user",
-                placeholder="Choose a username"
-            )
-            reg_email = st.text_input(
-                "Email",
-                key="reg_email",
-                placeholder="Enter your email address"
-            )
-            reg_pass = st.text_input(
-                "Password",
-                type="password",
-                key="reg_pass",
-                placeholder="Create a password"
-            )
-            reg_pass2 = st.text_input(
-                "Confirm Password",
-                type="password",
-                key="reg_pass2",
-                placeholder="Re-enter your password"
-            )
-
-            register_btn = st.button("Create Account", key="register_button")
-
-            if register_btn:
-                if not reg_user or not reg_email or not reg_pass or not reg_pass2:
-                    st.warning("Please complete all required fields.")
-                elif "@" not in reg_email or "." not in reg_email:
-                    st.error("Please enter a valid email address.")
-                elif reg_user in users:
-                    st.error("This username already exists. Please choose another one.")
-                elif reg_pass != reg_pass2:
-                    st.error("Passwords do not match.")
-                elif len(reg_pass) < 6:
-                    st.error("Password must be at least 6 characters long.")
-                else:
-                    users[reg_user] = reg_pass
-                    with open(USERS_FILE, "w", encoding="utf-8") as f:
-                        json.dump(users, f, ensure_ascii=False, indent=2)
-                    st.success("Account created successfully. You can now sign in from the Login tab.")
-
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
+    st.markdown("<div class='login-logo-circle'>", unsafe_allow_html=True)
+    if os.path.exists(LOGO_PATH):
+        st.image(LOGO_PATH, width=48)
+    else:
+        st.markdown("### BKAI")
     st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown(
+        """
+            <div class="login-system-bar"></div>
+            <div class="login-system-name">BKAI Crack Analysis Portal</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("<div class='login-form-shell'><div class='login-form-box'>", unsafe_allow_html=True)
+
+    tab_login, tab_register = st.tabs(["Login", "Register"])
+
+    with tab_login:
+        st.markdown("<div class='portal-title'>Sign in</div>", unsafe_allow_html=True)
+
+        login_user = st.text_input(
+            "Username",
+            key="login_user",
+            placeholder="Enter username"
+        )
+        login_pass = st.text_input(
+            "Password",
+            type="password",
+            key="login_pass",
+            placeholder="Enter password"
+        )
+
+        stay_logged = st.checkbox("Stay logged in", key="stay_logged_in")
+
+        login_btn = st.button("Log in with Credentials", key="login_button")
+
+        st.markdown("<div class='form-divider'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='or-text'>OR</div>", unsafe_allow_html=True)
+
+        badge_btn = st.button("Log in with Badge", key="badge_button")
+
+        if login_btn:
+            if not login_user or not login_pass:
+                st.warning("Please enter both username and password.")
+            elif login_user in users and users.get(login_user) == login_pass:
+                st.session_state.authenticated = True
+                st.session_state.username = login_user
+                st.success(f"Login successful. Welcome, {login_user}!")
+                st.rerun()
+            else:
+                st.error("Invalid username or password.")
+
+        if badge_btn:
+            st.info("Badge login is a placeholder in this demo version.")
+
+    with tab_register:
+        st.markdown("<div class='portal-title'>Create account</div>", unsafe_allow_html=True)
+
+        reg_user = st.text_input(
+            "Username",
+            key="reg_user",
+            placeholder="Choose a username"
+        )
+        reg_email = st.text_input(
+            "Email",
+            key="reg_email",
+            placeholder="Enter your email"
+        )
+        reg_pass = st.text_input(
+            "Password",
+            type="password",
+            key="reg_pass",
+            placeholder="Create a password"
+        )
+        reg_pass2 = st.text_input(
+            "Confirm Password",
+            type="password",
+            key="reg_pass2",
+            placeholder="Re-enter password"
+        )
+
+        register_btn = st.button("Create Account", key="register_button")
+
+        if register_btn:
+            if not reg_user or not reg_email or not reg_pass or not reg_pass2:
+                st.warning("Please complete all required fields.")
+            elif "@" not in reg_email or "." not in reg_email:
+                st.error("Please enter a valid email address.")
+            elif reg_user in users:
+                st.error("This username already exists. Please choose another one.")
+            elif reg_pass != reg_pass2:
+                st.error("Passwords do not match.")
+            elif len(reg_pass) < 6:
+                st.error("Password must be at least 6 characters long.")
+            else:
+                users[reg_user] = reg_pass
+                with open(USERS_FILE, "w", encoding="utf-8") as f:
+                    json.dump(users, f, ensure_ascii=False, indent=2)
+                st.success("Account created successfully. You can now log in.")
+
+    st.markdown("</div></div>", unsafe_allow_html=True)
 
 
 # =========================================================
-# 8. MAIN ENTRY
+# 8. ENTRY
 # =========================================================
 
 if st.session_state.authenticated:
     with st.sidebar:
         if os.path.exists(LOGO_PATH):
-            st.image(LOGO_PATH, width=120)
+            st.image(LOGO_PATH, width=100)
         st.markdown(f"**User:** {st.session_state.username}")
         if st.button("Log out"):
             st.session_state.authenticated = False
