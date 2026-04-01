@@ -76,36 +76,239 @@ def inject_global_styles():
         :root{
             --bkai-primary:#7c5cff;
             --bkai-primary-dark:#5b3fe0;
-            --bkai-secondary:#141122;
-            --bkai-accent:#9f7aea;
-            --bkai-soft:#f8fafc;
+            --bkai-accent:#a78bfa;
+            --bkai-bg-1:#0c0a16;
+            --bkai-bg-2:#17122a;
+            --bkai-bg-3:#241b3f;
+            --bkai-card:rgba(255,255,255,0.06);
+            --bkai-card-2:rgba(255,255,255,0.05);
             --bkai-border:rgba(255,255,255,0.10);
-            --bkai-text:#f8fafc;
+            --bkai-text:#ffffff;
             --bkai-muted:#cbd5e1;
-            --bkai-success:#22c55e;
-            --bkai-warning:#f59e0b;
-            --bkai-danger:#ef4444;
+            --bkai-soft:#e5e7eb;
         }
 
         .stApp{
             background:
-                radial-gradient(circle at top left, rgba(124,92,255,0.28), transparent 28%),
-                radial-gradient(circle at bottom right, rgba(159,122,234,0.22), transparent 30%),
-                linear-gradient(135deg, #191528 0%, #221c38 45%, #141122 100%);
+                radial-gradient(circle at 15% 20%, rgba(124,92,255,0.20), transparent 25%),
+                radial-gradient(circle at 85% 80%, rgba(167,139,250,0.18), transparent 30%),
+                linear-gradient(135deg, var(--bkai-bg-1) 0%, var(--bkai-bg-2) 48%, var(--bkai-bg-3) 100%);
             color: var(--bkai-text);
         }
 
-        html, body, [class*="css"] {
+        html, body, [class*="css"]{
             font-family: "Segoe UI", Arial, sans-serif;
         }
 
-        .block-container {
+        .block-container{
             padding-top: 1.2rem;
             padding-bottom: 2rem;
+            max-width: 1380px;
+        }
+
+        .bkai-auth-shell{
+            margin-top: 10px;
+        }
+
+        .bkai-auth-left{
+            min-height: 620px;
+            border-radius: 28px;
+            padding: 28px;
+            display:flex;
+            flex-direction:column;
+            justify-content:space-between;
+            background:
+                linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
+                radial-gradient(circle at top left, rgba(124,92,255,0.30), transparent 38%),
+                linear-gradient(145deg, #2a2250 0%, #1c1734 52%, #141122 100%);
+            border:1px solid rgba(255,255,255,0.10);
+            box-shadow: 0 20px 42px rgba(0,0,0,0.32);
+            overflow:hidden;
+            position:relative;
+        }
+
+        .bkai-auth-left::after{
+            content:"";
+            position:absolute;
+            inset:auto -80px -80px auto;
+            width:240px;
+            height:240px;
+            border-radius:50%;
+            background: radial-gradient(circle, rgba(124,92,255,0.18), transparent 70%);
+            filter: blur(8px);
+            pointer-events:none;
+        }
+
+        .bkai-brand-mini{
+            font-size:0.92rem;
+            font-weight:700;
+            letter-spacing:0.08em;
+            text-transform:uppercase;
+            color:#ddd6fe;
+            margin-bottom:16px;
+        }
+
+        .bkai-hero-title{
+            font-size:2.15rem;
+            line-height:1.2;
+            font-weight:800;
+            color:#ffffff;
+            margin: 14px 0 12px 0;
+            max-width: 480px;
+        }
+
+        .bkai-hero-desc{
+            font-size:1rem;
+            line-height:1.75;
+            color:#d1d5db;
+            max-width: 510px;
+        }
+
+        .bkai-logo-box{
+            width: 148px;
+            height: 148px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            border-radius:22px;
+            background: rgba(255,255,255,0.96);
+            box-shadow: 0 14px 30px rgba(0,0,0,0.28);
+            padding: 14px;
+            margin-bottom: 22px;
+        }
+
+        .bkai-feature-list{
+            margin-top: 22px;
+            display:grid;
+            gap:12px;
+            max-width: 520px;
+        }
+
+        .bkai-feature-item{
+            background: rgba(255,255,255,0.06);
+            border:1px solid rgba(255,255,255,0.10);
+            border-radius:16px;
+            padding:12px 14px;
+            color:#eef2ff;
+            font-size:0.96rem;
+            line-height:1.55;
+        }
+
+        .bkai-auth-right-wrap{
+            min-height: 620px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+
+        .bkai-auth-right{
+            width:100%;
+            max-width: 620px;
+            border-radius: 28px;
+            padding: 30px 28px 22px 28px;
+            background: rgba(255,255,255,0.06);
+            border:1px solid rgba(255,255,255,0.10);
+            box-shadow: 0 20px 42px rgba(0,0,0,0.30);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+
+        .bkai-auth-title{
+            font-size:2.15rem;
+            font-weight:800;
+            color:#ffffff;
+            line-height:1.2;
+            margin-bottom:0.35rem;
+        }
+
+        .bkai-auth-subtitle{
+            font-size:0.98rem;
+            color:#cbd5e1;
+            line-height:1.6;
+            margin-bottom:1rem;
+        }
+
+        .bkai-divider{
+            margin-top:10px;
+            margin-bottom:16px;
+            border-top:1px solid rgba(255,255,255,0.10);
+        }
+
+        .bkai-section-title{
+            font-size:1.16rem;
+            font-weight:800;
+            color:#ffffff;
+            margin-bottom:0.3rem;
+        }
+
+        .bkai-section-note{
+            font-size:0.94rem;
+            color:#cbd5e1;
+            margin-bottom:0.9rem;
+            line-height:1.6;
+        }
+
+        div[data-baseweb="tab-list"]{
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        button[data-baseweb="tab"]{
+            border-radius: 12px 12px 0 0 !important;
+            padding: 10px 18px !important;
+            font-weight: 700 !important;
+            color: #e5e7eb !important;
+            background: rgba(255,255,255,0.03) !important;
+        }
+
+        div.stButton > button{
+            width:100%;
+            height:46px;
+            border-radius:12px;
+            font-weight:700;
+            color:#ffffff;
+            border:1px solid rgba(124,92,255,0.80);
+            background:linear-gradient(90deg,#7c5cff 0%, #5b3fe0 100%);
+            box-shadow:0 10px 22px rgba(91,63,224,0.28);
+        }
+
+        div.stButton > button:hover{
+            color:#ffffff;
+            border:1px solid rgba(167,139,250,0.95);
+            background:linear-gradient(90deg,#8a6bff 0%, #6b4df1 100%);
+        }
+
+        div[data-testid="stTextInput"] label,
+        div[data-testid="stSelectbox"] label,
+        div[data-testid="stTextArea"] label,
+        div[data-testid="stFileUploader"] label{
+            color:#e5e7eb !important;
+            font-weight:600 !important;
+        }
+
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stNumberInput"] input,
+        div[data-testid="stTextArea"] textarea{
+            border-radius:12px !important;
+            background:rgba(255,255,255,0.07) !important;
+            color:#ffffff !important;
+            border:1px solid rgba(255,255,255,0.12) !important;
+        }
+
+        div[data-testid="stTextInput"] input::placeholder,
+        textarea::placeholder{
+            color:#cbd5e1 !important;
+        }
+
+        div[data-baseweb="select"] > div{
+            border-radius:12px !important;
+            background:rgba(255,255,255,0.07) !important;
+            border:1px solid rgba(255,255,255,0.12) !important;
+            color:#ffffff !important;
         }
 
         .bkai-page-title{
-            font-size:2.2rem;
+            font-size:2.1rem;
             font-weight:800;
             color:#ffffff;
             line-height:1.25;
@@ -116,24 +319,6 @@ def inject_global_styles():
             font-size:1rem;
             color:#d1d5db;
             margin-bottom:0.75rem;
-        }
-
-        .bkai-card{
-            background: rgba(255,255,255,0.06);
-            border:1px solid rgba(255,255,255,0.10);
-            border-radius:22px;
-            box-shadow: 0 18px 40px rgba(0,0,0,0.30);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            padding: 18px 20px;
-        }
-
-        .bkai-soft-card{
-            background: rgba(255,255,255,0.05);
-            border:1px solid rgba(255,255,255,0.08);
-            border-radius:16px;
-            box-shadow:0 12px 26px rgba(0,0,0,0.22);
-            padding:14px 16px;
         }
 
         .bkai-hero{
@@ -172,93 +357,20 @@ def inject_global_styles():
             color:#ffffff;
         }
 
-        .bkai-auth-title{
-            font-size:2.15rem;
-            font-weight:800;
-            color:#ffffff;
-            line-height:1.25;
-            margin-bottom:0.25rem;
-        }
-
-        .bkai-auth-subtitle{
-            font-size:0.98rem;
-            color:#cbd5e1;
-            margin-bottom:1rem;
-        }
-
-        .bkai-auth-card{
+        .bkai-card{
             background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.10);
-            border-radius: 24px;
-            padding: 20px 20px 14px 20px;
-            box-shadow:0 18px 36px rgba(0,0,0,0.32);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-        }
-
-        .bkai-left-panel{
-            min-height: 520px;
-            border-radius: 24px;
-            background:
-                linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)),
-                radial-gradient(circle at top left, rgba(124,92,255,0.30), transparent 35%),
-                linear-gradient(135deg, #2c2350 0%, #1c1733 60%, #171328 100%);
             border:1px solid rgba(255,255,255,0.10);
-            box-shadow:0 18px 36px rgba(0,0,0,0.30);
-            padding:24px 20px;
-            display:flex;
-            flex-direction:column;
-            justify-content:space-between;
-        }
-
-        .bkai-left-title{
-            font-size:1.15rem;
-            font-weight:800;
-            color:#ffffff;
-            margin-top:10px;
-        }
-
-        .bkai-left-desc{
-            font-size:0.96rem;
-            color:#d1d5db;
-            line-height:1.6;
-            margin-top:8px;
-        }
-
-        .bkai-left-footer{
-            font-size:0.95rem;
-            color:#f8fafc;
-            font-weight:600;
-            line-height:1.5;
-            opacity:0.92;
-        }
-
-        .bkai-section-title{
-            font-size:1.25rem;
-            font-weight:800;
-            color:#ffffff;
-            margin-bottom:0.35rem;
-        }
-
-        .bkai-section-note{
-            font-size:0.95rem;
-            color:#cbd5e1;
-            margin-bottom:0.9rem;
+            border-radius:22px;
+            box-shadow: 0 18px 40px rgba(0,0,0,0.30);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            padding: 18px 20px;
         }
 
         .bkai-status-ok{
             background:rgba(34,197,94,0.12);
             border:1px solid rgba(34,197,94,0.35);
             color:#bbf7d0;
-            padding:10px 14px;
-            border-radius:12px;
-            font-weight:600;
-        }
-
-        .bkai-status-warn{
-            background:rgba(245,158,11,0.12);
-            border:1px solid rgba(245,158,11,0.35);
-            color:#fde68a;
             padding:10px 14px;
             border-radius:12px;
             font-weight:600;
@@ -271,82 +383,6 @@ def inject_global_styles():
             padding:10px 14px;
             border-radius:12px;
             font-weight:600;
-        }
-
-        .bkai-logo-wrap{
-            display:flex;
-            align-items:flex-start;
-            justify-content:center;
-            padding-top:6px;
-        }
-
-        div[data-baseweb="tab-list"]{
-            gap: 8px;
-        }
-
-        button[data-baseweb="tab"]{
-            border-radius: 12px 12px 0 0 !important;
-            padding: 10px 16px !important;
-            font-weight: 700 !important;
-            color:#e5e7eb !important;
-            background:rgba(255,255,255,0.03) !important;
-        }
-
-        div.stButton > button{
-            width:100%;
-            border-radius:12px;
-            height:46px;
-            font-weight:700;
-            border:1px solid rgba(124,92,255,0.75);
-            background:linear-gradient(90deg,#7c5cff 0%, #5b3fe0 100%);
-            color:white;
-            box-shadow:0 10px 22px rgba(91,63,224,0.30);
-        }
-
-        div.stButton > button:hover{
-            border:1px solid rgba(159,122,234,0.95);
-            background:linear-gradient(90deg,#8a6bff 0%, #6d4ff0 100%);
-            color:white;
-        }
-
-        div[data-testid="stTextInput"] label,
-        div[data-testid="stTextArea"] label,
-        div[data-testid="stSelectbox"] label,
-        div[data-testid="stFileUploader"] label{
-            color:#e5e7eb !important;
-            font-weight:600 !important;
-        }
-
-        div[data-testid="stTextInput"] input,
-        div[data-testid="stTextArea"] textarea,
-        div[data-testid="stNumberInput"] input{
-            border-radius:12px !important;
-            background:rgba(255,255,255,0.07) !important;
-            color:#ffffff !important;
-            border:1px solid rgba(255,255,255,0.12) !important;
-        }
-
-        div[data-testid="stTextInput"] input::placeholder,
-        textarea::placeholder{
-            color:#cbd5e1 !important;
-        }
-
-        div[data-baseweb="select"] > div{
-            border-radius:12px !important;
-            background:rgba(255,255,255,0.07) !important;
-            border:1px solid rgba(255,255,255,0.12) !important;
-            color:#ffffff !important;
-        }
-
-        .bkai-divider{
-            margin-top:8px;
-            margin-bottom:12px;
-            border-top:1px solid rgba(255,255,255,0.10);
-        }
-
-        .bkai-caption{
-            color:#cbd5e1;
-            font-size:0.92rem;
         }
 
         .bkai-sidebar-user{
@@ -1738,64 +1774,70 @@ if "username" not in st.session_state:
 
 
 def show_auth_page():
-    st.markdown("<div style='padding-top:10px; padding-bottom:16px;'>", unsafe_allow_html=True)
+    st.markdown("<div class='bkai-auth-shell'>", unsafe_allow_html=True)
 
-    col_left, col_right = st.columns([1.15, 1.55], gap="large")
+    col_left, col_right = st.columns([1.08, 0.92], gap="large")
 
     with col_left:
-        st.markdown("<div class='bkai-left-panel'>", unsafe_allow_html=True)
+        st.markdown("<div class='bkai-auth-left'>", unsafe_allow_html=True)
+
+        st.markdown(
+            """
+            <div>
+                <div class="bkai-brand-mini">BKAI Platform</div>
+                <div class="bkai-hero-title">Concrete crack analysis with a cleaner, smarter, and more professional interface.</div>
+                <div class="bkai-hero-desc">
+                    Intelligent inspection system for crack detection, segmentation, classification, and automated technical reporting.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         st.markdown("<div>", unsafe_allow_html=True)
-        st.markdown("<div class='bkai-logo-wrap'>", unsafe_allow_html=True)
+
+        st.markdown("<div class='bkai-logo-box'>", unsafe_allow_html=True)
         if os.path.exists(LOGO_PATH):
-            st.image(LOGO_PATH, width=200)
+            st.image(LOGO_PATH, width=120)
         else:
             st.markdown("## BKAI")
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown(
             """
-            <div class="bkai-left-title">BKAI Intelligent Inspection Platform</div>
-            <div class="bkai-left-desc">
-                AI-powered concrete crack detection, segmentation, classification, and report generation
-                in a modern and professional analysis environment.
+            <div class="bkai-feature-list">
+                <div class="bkai-feature-item"><b>AI Detection:</b> Detect crack regions on concrete surfaces from uploaded images.</div>
+                <div class="bkai-feature-item"><b>Segmentation Output:</b> Generate masks, confidence scores, and annotated results.</div>
+                <div class="bkai-feature-item"><b>Technical Reporting:</b> Export structured PDF reports for research and site applications.</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+
         st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown(
-            """
-            <div class="bkai-left-footer">
-                Detect structural cracks.<br>
-                Generate smart reports.<br>
-                Support research and field inspection.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col_right:
+        st.markdown("<div class='bkai-auth-right-wrap'>", unsafe_allow_html=True)
+        st.markdown("<div class='bkai-auth-right'>", unsafe_allow_html=True)
+
         st.markdown(
             """
             <div class="bkai-auth-title">Create your account or sign in</div>
-            <div class="bkai-auth-subtitle">Access the BKAI platform for concrete crack analysis and intelligent reporting.</div>
+            <div class="bkai-auth-subtitle">
+                Access the BKAI platform for concrete crack analysis, segmentation, and intelligent report generation.
+            </div>
             <div class="bkai-divider"></div>
             """,
             unsafe_allow_html=True,
         )
-
-        st.markdown("<div class='bkai-auth-card'>", unsafe_allow_html=True)
 
         tab_login, tab_register = st.tabs(["🔐 Login", "📝 Register"])
 
         with tab_login:
             st.markdown("<div class='bkai-section-title'>Welcome Back</div>", unsafe_allow_html=True)
             st.markdown(
-                "<div class='bkai-section-note'>Enter your credentials to access the BKAI dashboard.</div>",
+                "<div class='bkai-section-note'>Enter your account credentials to continue to the analysis dashboard.</div>",
                 unsafe_allow_html=True,
             )
 
@@ -1827,7 +1869,7 @@ def show_auth_page():
         with tab_register:
             st.markdown("<div class='bkai-section-title'>Create a New Account</div>", unsafe_allow_html=True)
             st.markdown(
-                "<div class='bkai-section-note'>Register to start using the BKAI intelligent inspection platform.</div>",
+                "<div class='bkai-section-note'>Register a new account to start using the BKAI intelligent inspection platform.</div>",
                 unsafe_allow_html=True,
             )
 
@@ -1873,6 +1915,7 @@ def show_auth_page():
                         json.dump(users, f, ensure_ascii=False, indent=2)
                     st.success("Account created successfully. You can now sign in from the Login tab.")
 
+        st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
