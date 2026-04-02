@@ -84,7 +84,7 @@ def inject_global_styles():
         }
 
         .stApp{
-            background:#f3f4f6;
+            background:#efefef;
         }
 
         html, body, [class*="css"]{
@@ -92,18 +92,18 @@ def inject_global_styles():
         }
 
         .block-container{
-            max-width: 1180px;
+            max-width: 980px;
             padding-top: 0rem;
             padding-bottom: 2rem;
         }
 
+        /* ===== TOP BLUE HEADER ===== */
         .login-top-wrap{
             position: relative;
-            height: 300px;
-            border-radius: 0;
+            height: 250px;
             overflow: hidden;
-            background: linear-gradient(180deg, #3e8df5 0%, #2f79ea 45%, #1d63d6 100%);
-            box-shadow: inset 0 -10px 30px rgba(0,0,0,0.08);
+            background: linear-gradient(180deg, #3f8af3 0%, #2e78e9 52%, #1e65d8 100%);
+            box-shadow: inset 0 -10px 28px rgba(0,0,0,0.07);
         }
 
         .login-top-wrap::before{
@@ -111,91 +111,78 @@ def inject_global_styles():
             position:absolute;
             left:-5%;
             right:-5%;
-            bottom:18px;
-            height:42px;
-            background: rgba(113, 197, 255, 0.35);
+            bottom:20px;
+            height:34px;
+            background: rgba(124, 212, 255, 0.26);
             border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-            transform: scaleX(1.08);
+            transform: scaleX(1.06);
         }
 
         .login-top-wrap::after{
             content:"";
             position:absolute;
-            left:-8%;
-            right:-8%;
+            left:-7%;
+            right:-7%;
             bottom:0;
-            height:54px;
-            background: rgba(125, 214, 255, 0.55);
+            height:42px;
+            background: rgba(129, 215, 255, 0.50);
             border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-            transform: scaleX(1.1);
+            transform: scaleX(1.08);
         }
 
         .login-top-inner{
-            position: relative;
-            z-index: 2;
+            position:relative;
+            z-index:2;
             height:100%;
             display:flex;
-            flex-direction:column;
-            justify-content:center;
             align-items:center;
-            text-align:center;
+            justify-content:center;
         }
 
-        .login-logo-circle{
-            width:78px;
-            height:78px;
-            background:#ffffff;
+        .login-logo-float{
+            position:absolute;
+            left:50%;
+            bottom:-36px;
+            transform:translateX(-50%);
+            width:72px;
+            height:72px;
             border-radius:50%;
+            background:#ffffff;
             display:flex;
             align-items:center;
             justify-content:center;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+            box-shadow:0 8px 18px rgba(0,0,0,0.16);
+            z-index:5;
+            overflow:hidden;
             padding:10px;
-            margin-bottom:14px;
         }
 
-        .login-system-bar{
-            width:180px;
-            height:14px;
-            border-radius:2px;
-            background: rgba(255,255,255,0.12);
-            margin: 4px auto 8px auto;
-        }
-
-        .login-system-name{
+        .login-top-label{
             color:#ffffff;
             font-size:10px;
             letter-spacing:0.08em;
             text-transform:uppercase;
-            font-weight:normal;
+            opacity:0.95;
+            margin-top:18px;
+        }
+
+        /* ===== FORM AREA ===== */
+        .login-page-wrap{
+            position:relative;
+            padding-top:56px;
         }
 
         .login-form-shell{
             display:flex;
             justify-content:center;
-            padding-top:28px;
+            align-items:flex-start;
         }
 
         .login-form-box{
             width:100%;
-            max-width:320px;
-        }
-
-        .form-divider{
-            border-top:1px solid #dadada;
-            margin:14px 0;
-        }
-
-        .or-text{
-            text-align:center;
-            color:#9ca3af;
-            font-size:11px;
-            margin-top:-8px;
-            margin-bottom:10px;
-            background:#f3f4f6;
-            width:30px;
-            margin-left:auto;
-            margin-right:auto;
+            max-width:420px;
+            background:#f7f7f7;
+            padding:18px 18px 14px 18px;
         }
 
         .portal-title{
@@ -206,17 +193,43 @@ def inject_global_styles():
             margin-bottom:12px;
         }
 
+        .portal-subtitle{
+            text-align:center;
+            font-size:10px;
+            color:#8b8b8b;
+            letter-spacing:0.07em;
+            text-transform:uppercase;
+            margin-bottom:18px;
+        }
+
+        .form-divider{
+            border-top:1px solid #d4d4d4;
+            margin:14px 0;
+        }
+
+        .or-text{
+            text-align:center;
+            color:#9ca3af;
+            font-size:11px;
+            margin-top:-8px;
+            margin-bottom:10px;
+            background:#f7f7f7;
+            width:30px;
+            margin-left:auto;
+            margin-right:auto;
+        }
+
         div[data-baseweb="tab-list"]{
             display:flex;
             justify-content:center;
-            gap:8px;
-            margin-bottom:12px;
+            gap:14px;
+            margin-bottom:14px;
         }
 
         button[data-baseweb="tab"]{
-            border-radius:4px 4px 0 0 !important;
-            padding:6px 12px !important;
-            font-weight:600 !important;
+            border-radius:0 !important;
+            padding:6px 8px !important;
+            font-weight:500 !important;
             font-size:12px !important;
             color:#4b5563 !important;
             background:transparent !important;
@@ -228,12 +241,12 @@ def inject_global_styles():
         div[data-testid="stFileUploader"] label{
             color:#374151 !important;
             font-size:12px !important;
-            font-weight:600 !important;
+            font-weight:500 !important;
         }
 
         div[data-testid="stTextInput"] input{
             border:none !important;
-            border-bottom:1px solid #888 !important;
+            border-bottom:1px solid #8f8f8f !important;
             border-radius:0 !important;
             background:transparent !important;
             color:#111827 !important;
@@ -275,20 +288,6 @@ def inject_global_styles():
             color:#ffffff;
             background:#3f8edb;
             border:1px solid #327fc8;
-        }
-
-        .secondary-btn-note{
-            text-align:center;
-            font-size:12px;
-            color:#6b7280;
-            margin-bottom:6px;
-        }
-
-        .bkai-simple-note{
-            text-align:center;
-            color:#6b7280;
-            font-size:11px;
-            margin-top:8px;
         }
 
         .bkai-main-header{
@@ -1681,28 +1680,30 @@ def show_auth_page():
         """
         <div class="login-top-wrap">
             <div class="login-top-inner">
+                <div class="login-top-label">BKAI Crack Analysis Portal</div>
+            </div>
+            <div class="login-logo-float">
         """,
         unsafe_allow_html=True,
     )
 
-    st.markdown("<div class='login-logo-circle'>", unsafe_allow_html=True)
     if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, width=48)
+        st.image(LOGO_PATH, width=46)
     else:
-        st.markdown("### BKAI")
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("BKAI")
 
     st.markdown(
         """
-            <div class="login-system-bar"></div>
-            <div class="login-system-name">BKAI Crack Analysis Portal</div>
             </div>
         </div>
+        <div class="login-page-wrap">
         """,
         unsafe_allow_html=True,
     )
 
     st.markdown("<div class='login-form-shell'><div class='login-form-box'>", unsafe_allow_html=True)
+
+    st.markdown("<div class='portal-subtitle'>Access Portal</div>", unsafe_allow_html=True)
 
     tab_login, tab_register = st.tabs(["Login", "Register"])
 
@@ -1721,7 +1722,7 @@ def show_auth_page():
             placeholder="Enter password"
         )
 
-        stay_logged = st.checkbox("Stay logged in", key="stay_logged_in")
+        st.checkbox("Stay logged in", key="stay_logged_in")
 
         login_btn = st.button("Log in with Credentials", key="login_button")
 
@@ -1789,7 +1790,7 @@ def show_auth_page():
                     json.dump(users, f, ensure_ascii=False, indent=2)
                 st.success("Account created successfully. You can now log in.")
 
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    st.markdown("</div></div></div>", unsafe_allow_html=True)
 
 
 # =========================================================
