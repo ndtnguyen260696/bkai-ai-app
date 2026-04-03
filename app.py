@@ -3,6 +3,7 @@ import requests
 from PIL import Image, ImageDraw
 import colorsys
 import hashlib
+import base64
 import io
 import time
 import datetime
@@ -113,142 +114,164 @@ def inject_global_styles():
 
         /* ===== AUTH PAGE ===== */
         .auth-shell{
-            margin: 26px auto 12px auto;
-            border-radius: 22px;
-            overflow: hidden;
-            border: 1px solid rgba(202, 214, 228, 0.92);
-            background: linear-gradient(180deg, rgba(255,255,255,0.84), rgba(255,255,255,0.90));
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(6px);
+            margin: 24px auto 18px auto;
+            max-width: 980px;
+            border-radius: 30px;
+            overflow: visible;
+            background: transparent;
+            box-shadow: none;
         }
 
         .auth-header{
             position:relative;
-            min-height:320px;
-            background: linear-gradient(180deg, #3f88f2 0%, #2f78e6 50%, #2a6fdd 100%);
-            border-bottom:1px solid rgba(255,255,255,0.22);
+            min-height:355px;
+            background: linear-gradient(180deg, #478ef6 0%, #337eea 52%, #286ddc 100%);
+            border-radius: 30px 30px 0 0;
             overflow:hidden;
+            box-shadow: 0 18px 50px rgba(20, 57, 112, 0.18);
         }
 
         .auth-header::before{
             content:"";
             position:absolute;
-            left:-10%;
-            width:120%;
-            height:72px;
-            bottom:38px;
-            background: rgba(152, 223, 255, 0.12);
+            left:-8%;
+            width:116%;
+            height:88px;
+            bottom:54px;
+            background: rgba(158, 223, 255, 0.12);
             border-radius: 50%;
         }
 
         .auth-header::after{
             content:"";
             position:absolute;
-            left:-10%;
-            width:120%;
-            height:86px;
-            bottom:-14px;
-            background: rgba(157, 226, 255, 0.22);
+            left:-8%;
+            width:116%;
+            height:108px;
+            bottom:-12px;
+            background: rgba(165, 228, 255, 0.20);
             border-radius: 50%;
         }
 
         .auth-header-glow{
             position:absolute;
-            inset:auto -10% 58px -10%;
-            height:52px;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent);
+            left:10%;
+            right:10%;
+            bottom:76px;
+            height:34px;
+            border-radius:999px;
+            background: rgba(255,255,255,0.08);
+            filter: blur(0.4px);
             z-index:1;
         }
 
         .auth-brand{
             position:relative;
             z-index:2;
-            min-height:320px;
+            min-height:355px;
             display:flex;
             align-items:center;
             justify-content:center;
-            padding:28px 32px 44px 32px;
+            padding:36px 36px 112px 36px;
         }
 
         .auth-logo-box{
             position:absolute;
-            left:22px;
+            left:28px;
             top:22px;
-            width:96px;
-            height:96px;
-            background:#ffffff;
-            border:1px solid #d8e1eb;
-            border-radius:18px;
+            width:108px;
+            height:108px;
+            background: rgba(255,255,255,0.97);
+            border: 1px solid rgba(221,231,243,0.95);
+            border-radius: 22px;
             display:flex;
             align-items:center;
             justify-content:center;
             overflow:hidden;
-            box-shadow:0 12px 26px rgba(11, 39, 84, 0.16);
+            box-shadow: 0 16px 36px rgba(13, 43, 91, 0.18);
+            padding: 14px;
+        }
+
+        .auth-logo-box img{
+            width:100%;
+            height:100%;
+            object-fit:contain;
+            display:block;
         }
 
         .auth-brand-copy{
             text-align:center;
             color:#fff;
-            max-width:640px;
-            margin-top:26px;
+            max-width:680px;
+            margin: 0 auto;
         }
 
         .auth-overline{
             font-size:11px;
             font-weight:700;
-            letter-spacing:0.18em;
+            letter-spacing:0.24em;
             text-transform:uppercase;
-            opacity:0.90;
-            margin-bottom:12px;
+            opacity:0.92;
+            margin-bottom:14px;
         }
 
         .auth-hero-title{
-            font-size:26px;
+            font-size:42px;
             font-weight:800;
-            letter-spacing:0.01em;
-            line-height:1.20;
-            margin:0 0 10px 0;
+            letter-spacing:-0.02em;
+            line-height:1.14;
+            margin:0 0 14px 0;
+            text-shadow: 0 2px 12px rgba(16, 49, 101, 0.18);
         }
 
         .auth-hero-subtitle{
-            font-size:13px;
-            line-height:1.65;
-            opacity:0.94;
-            max-width:560px;
+            font-size:15px;
+            line-height:1.75;
+            color: rgba(255,255,255,0.93);
+            max-width:620px;
             margin:0 auto;
         }
 
         .auth-form-area{
             position:relative;
-            background: linear-gradient(180deg, #f7f9fc 0%, #f1f4f8 100%);
-            padding:26px 28px 30px 28px;
+            margin-top:-72px;
+            padding:0 28px 34px 28px;
+            z-index:5;
+            background: transparent;
         }
 
         .auth-form-box{
             width:100%;
-            max-width:520px;
+            max-width:560px;
             margin:0 auto;
-            background:rgba(255,255,255,0.88);
-            border:1px solid #e4ebf3;
-            border-radius:20px;
-            box-shadow:0 10px 28px rgba(34, 61, 102, 0.08);
-            padding:12px 24px 22px 24px;
+            background:rgba(255,255,255,0.97);
+            border:1px solid rgba(224,232,242,0.96);
+            border-radius:24px;
+            box-shadow:0 20px 48px rgba(24, 49, 92, 0.16);
+            padding:22px 30px 26px 30px;
+            animation: authFadeUp 0.45s ease;
+        }
+
+        @keyframes authFadeUp{
+            from{opacity:0;transform:translateY(14px)}
+            to{opacity:1;transform:translateY(0)}
         }
 
         .portal-title{
             text-align:center;
-            font-size:24px;
+            font-size:28px;
             font-weight:800;
             color:#1f2a37;
-            margin:12px 0 24px 0;
-            letter-spacing:0.01em;
+            margin:14px 0 26px 0;
+            letter-spacing:-0.01em;
         }
 
         .portal-caption{
             text-align:center;
-            color:#7f8da0;
+            color:#8a96a7;
             font-size:12px;
-            margin:4px 0 6px 0;
+            margin:2px 0 8px 0;
+            letter-spacing:0.04em;
         }
 
         div[data-baseweb="tab-list"]{
@@ -477,6 +500,30 @@ def inject_global_styles():
                 font-size:24px;
             }
         }
+        
+
+        @media (max-width: 900px){
+            .auth-header{min-height:310px;}
+            .auth-brand{min-height:310px;padding:34px 22px 104px 22px;}
+            .auth-hero-title{font-size:34px;}
+            .auth-hero-subtitle{font-size:14px;max-width:560px;}
+            .auth-logo-box{width:94px;height:94px;}
+        }
+
+        @media (max-width: 640px){
+            .block-container{padding-left:0.75rem;padding-right:0.75rem;}
+            .auth-shell{margin-top:12px;}
+            .auth-header{min-height:280px;border-radius:24px 24px 0 0;}
+            .auth-brand{min-height:280px;padding:108px 18px 98px 18px;}
+            .auth-logo-box{left:50%;top:18px;transform:translateX(-50%);width:86px;height:86px;border-radius:20px;}
+            .auth-overline{font-size:10px;letter-spacing:0.18em;}
+            .auth-hero-title{font-size:26px;}
+            .auth-hero-subtitle{font-size:13px;line-height:1.65;}
+            .auth-form-area{margin-top:-54px;padding:0 14px 24px 14px;}
+            .auth-form-box{border-radius:20px;padding:18px 18px 22px 18px;}
+            div[data-baseweb="tab-list"]{gap:18px;}
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
@@ -484,6 +531,19 @@ def inject_global_styles():
 
 
 inject_global_styles()
+
+
+def get_logo_data_uri(path: str) -> str:
+    if not path or not os.path.exists(path):
+        return ""
+    try:
+        ext = os.path.splitext(path)[1].lower()
+        mime = "image/png" if ext == ".png" else "image/jpeg" if ext in [".jpg", ".jpeg"] else "image/png"
+        with open(path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("utf-8")
+        return f"data:{mime};base64,{b64}"
+    except Exception:
+        return ""
 
 
 # =========================================================
@@ -1802,39 +1862,33 @@ if "username" not in st.session_state:
 
 
 def show_auth_page():
-    st.markdown("<div class='auth-shell'>", unsafe_allow_html=True)
-
-    st.markdown(
-        """
-        <div class="auth-header">
-            <div class="auth-header-glow"></div>
-            <div class="auth-logo-box">
-        """,
-        unsafe_allow_html=True,
+    logo_uri = get_logo_data_uri(LOGO_PATH)
+    logo_html = (
+        f'<img src="{logo_uri}" alt="BKAI Logo" />'
+        if logo_uri
+        else "<div style='font-weight:800;color:#2463d8;font-size:24px;'>BKAI</div>"
     )
 
-    if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, width=76)
-    else:
-        st.markdown("<div style='font-weight:800;color:#2463d8;font-size:20px;'>BKAI</div>", unsafe_allow_html=True)
-
     st.markdown(
-        """
-            </div>
-            <div class="auth-brand">
-                <div class="auth-brand-copy">
-                    <div class="auth-overline">BKAI Crack Analysis Portal</div>
-                    <div class="auth-hero-title">AI-Based Concrete Crack Detection Platform</div>
-                    <div class="auth-hero-subtitle">
-                        Secure access to image-based crack detection, segmentation, reporting,
-                        and structural crack classification in one integrated interface.
+        f"""
+        <div class="auth-shell">
+            <div class="auth-header">
+                <div class="auth-header-glow"></div>
+                <div class="auth-brand">
+                    <div class="auth-logo-box">{logo_html}</div>
+                    <div class="auth-brand-copy">
+                        <div class="auth-overline">BKAI Crack Analysis Portal</div>
+                        <div class="auth-hero-title">AI-Based Concrete Crack Detection Platform</div>
+                        <div class="auth-hero-subtitle">
+                            Secure access to image-based crack detection, segmentation, reporting,
+                            and structural crack classification in one integrated interface.
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="auth-form-area">
-            <div class="auth-form-box">
-                <div class="portal-caption">Welcome to the system</div>
+            <div class="auth-form-area">
+                <div class="auth-form-box">
+                    <div class="portal-caption">Welcome to the system</div>
         """,
         unsafe_allow_html=True,
     )
@@ -1859,7 +1913,8 @@ def show_auth_page():
         st.checkbox("Stay logged in", key="stay_logged_in")
         login_btn = st.button("Log in with Credentials", key="login_button")
 
-        st.markdown("<div class='auth-divider'><span>or</span></div>", unsafe_allow_html=True)
+        st.markdown("<div class='form-divider'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='or-text'>OR</div>", unsafe_allow_html=True)
         badge_btn = st.button("Log in with Badge", key="badge_button")
 
         if login_btn:
@@ -1875,11 +1930,6 @@ def show_auth_page():
 
         if badge_btn:
             st.info("Badge login is a placeholder in this demo version.")
-
-        st.markdown(
-            "<div class='auth-footnote'>Use your registered account to access the BKAI analysis workspace.</div>",
-            unsafe_allow_html=True,
-        )
 
     with tab_register:
         st.markdown("<div class='portal-title'>Create account</div>", unsafe_allow_html=True)
@@ -1925,11 +1975,6 @@ def show_auth_page():
                 with open(USERS_FILE, "w", encoding="utf-8") as f:
                     json.dump(users, f, ensure_ascii=False, indent=2)
                 st.success("Account created successfully. You can now log in.")
-
-        st.markdown(
-            "<div class='auth-footnote'>Create an account to save your access credentials and start using the BKAI system.</div>",
-            unsafe_allow_html=True,
-        )
 
     st.markdown("</div></div></div>", unsafe_allow_html=True)
 
