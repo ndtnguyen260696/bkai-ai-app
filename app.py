@@ -8,6 +8,7 @@ import time
 import datetime
 import os
 import json
+import base64
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -173,7 +174,7 @@ def inject_global_styles():
             letter-spacing:.04em;
         }
 
-        .hero-copy{color:#fff;}
+        .hero-copy{color:#fff; flex:1; min-width:0;}
         .hero-kicker{
             font-size:13px;
             letter-spacing:.24em;
@@ -1766,31 +1767,31 @@ if "username" not in st.session_state:
 def show_auth_page():
     st.markdown('<div class="app-shell">', unsafe_allow_html=True)
 
-    st.markdown('<div class="hero">', unsafe_allow_html=True)
-    st.markdown('<div class="hero-flex">', unsafe_allow_html=True)
-
+    logo_html = '<div class="hero-logo"><div class="hero-logo-fallback">BKAI</div></div>'
     if os.path.exists(LOGO_PATH):
-        st.markdown('<div class="hero-logo">', unsafe_allow_html=True)
-        st.image(LOGO_PATH, width=108)
-        st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="hero-logo"><div class="hero-logo-fallback">BKAI</div></div>', unsafe_allow_html=True)
+        try:
+            with open(LOGO_PATH, 'rb') as f:
+                logo_b64 = base64.b64encode(f.read()).decode('utf-8')
+            logo_html = f'<div class="hero-logo"><img src="data:image/png;base64,{logo_b64}" alt="BKAI Logo" style="width:92px;height:auto;display:block;" /></div>'
+        except Exception:
+            pass
 
-    st.markdown(
-        """
-        <div class="hero-copy">
-            <div class="hero-kicker">BKAI CRACK ANALYSIS PORTAL</div>
-            <h1 class="hero-title">AI-Based Concrete Crack Detection Platform</h1>
-            <div class="hero-subtitle">
-                Secure access to image-based crack detection, segmentation, reporting, and structural crack classification in one integrated interface.
+    hero_html = f"""
+    <div class="hero">
+        <div class="hero-flex">
+            {logo_html}
+            <div class="hero-copy">
+                <div class="hero-kicker">BKAI CRACK ANALYSIS PORTAL</div>
+                <h1 class="hero-title">AI-Based Concrete Crack Detection Platform</h1>
+                <div class="hero-subtitle">
+                    Secure access to image-based crack detection, segmentation, reporting, and structural crack classification in one integrated interface.
+                </div>
+                <div class="hero-badge">Welcome to the system</div>
             </div>
-            <div class="hero-badge">Welcome to the system</div>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    </div>
+    """
+    st.markdown(hero_html, unsafe_allow_html=True)
 
     st.markdown('<div class="login-card-wrap"><div class="login-card"><div class="login-card-inner">', unsafe_allow_html=True)
 
