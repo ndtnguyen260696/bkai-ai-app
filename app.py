@@ -116,19 +116,23 @@ def inject_global_styles():
         .auth-shell{
             margin: 24px auto 18px auto;
             max-width: 980px;
-            border-radius: 30px;
+            border-radius: 34px;
             overflow: visible;
-            background: transparent;
-            box-shadow: none;
+            background: linear-gradient(180deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.88) 100%);
+            border: 1px solid rgba(129, 160, 204, 0.42);
+            box-shadow: 0 22px 55px rgba(18, 45, 92, 0.14), inset 0 0 0 1px rgba(255,255,255,0.45);
+            padding: 10px;
+            position: relative;
         }
 
         .auth-header{
             position:relative;
             min-height:355px;
             background: linear-gradient(180deg, #478ef6 0%, #337eea 52%, #286ddc 100%);
-            border-radius: 30px 30px 0 0;
+            border-radius: 26px 26px 0 0;
             overflow:hidden;
             box-shadow: 0 18px 50px rgba(20, 57, 112, 0.18);
+            border: 1px solid rgba(255,255,255,0.18);
         }
 
         .auth-header::before{
@@ -238,6 +242,24 @@ def inject_global_styles():
             padding:0 28px 34px 28px;
             z-index:5;
             background: transparent;
+        }
+
+        .welcome-text{
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            margin: 8px auto 0 auto;
+            font-size:28px;
+            font-weight:800;
+            color:#ffffff;
+            letter-spacing:-0.02em;
+            text-shadow:0 10px 28px rgba(18,52,102,0.30), 0 2px 8px rgba(0,0,0,0.12);
+            animation: welcomeFadeIn 0.55s ease;
+        }
+
+        @keyframes welcomeFadeIn{
+            from{opacity:0;transform:translateY(10px);}
+            to{opacity:1;transform:translateY(0);}
         }
 
         .auth-form-box{
@@ -512,13 +534,14 @@ def inject_global_styles():
 
         @media (max-width: 640px){
             .block-container{padding-left:0.75rem;padding-right:0.75rem;}
-            .auth-shell{margin-top:12px;}
-            .auth-header{min-height:280px;border-radius:24px 24px 0 0;}
+            .auth-shell{margin-top:12px;padding:8px;border-radius:24px;}
+            .auth-header{min-height:280px;border-radius:20px 20px 0 0;}
             .auth-brand{min-height:280px;padding:108px 18px 98px 18px;}
             .auth-logo-box{left:50%;top:18px;transform:translateX(-50%);width:86px;height:86px;border-radius:20px;}
             .auth-overline{font-size:10px;letter-spacing:0.18em;}
             .auth-hero-title{font-size:26px;}
             .auth-hero-subtitle{font-size:13px;line-height:1.65;}
+            .welcome-text{font-size:22px;}
             .auth-form-area{margin-top:-54px;padding:0 14px 24px 14px;}
             .auth-form-box{border-radius:20px;padding:18px 18px 22px 18px;}
             div[data-baseweb="tab-list"]{gap:18px;}
@@ -1885,10 +1908,10 @@ def show_auth_page():
                         </div>
                     </div>
                 </div>
+                <div class="welcome-text">Welcome to the system</div>
             </div>
             <div class="auth-form-area">
                 <div class="auth-form-box">
-                    <div class="portal-caption">Welcome to the system</div>
         """,
         unsafe_allow_html=True,
     )
