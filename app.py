@@ -124,8 +124,8 @@ def inject_global_styles():
 
         .auth-header{
             position:relative;
-            min-height:250px;
-            background: linear-gradient(180deg, #3f88f2 0%, #2f78e6 48%, #2a6fdd 100%);
+            min-height:320px;
+            background: linear-gradient(180deg, #3f88f2 0%, #2f78e6 50%, #2a6fdd 100%);
             border-bottom:1px solid rgba(255,255,255,0.22);
             overflow:hidden;
         }
@@ -133,11 +133,11 @@ def inject_global_styles():
         .auth-header::before{
             content:"";
             position:absolute;
-            left:-6%;
-            width:112%;
-            height:78px;
-            bottom:24px;
-            background: rgba(152, 223, 255, 0.14);
+            left:-10%;
+            width:120%;
+            height:72px;
+            bottom:38px;
+            background: rgba(152, 223, 255, 0.12);
             border-radius: 50%;
         }
 
@@ -146,36 +146,36 @@ def inject_global_styles():
             position:absolute;
             left:-10%;
             width:120%;
-            height:96px;
-            bottom:-22px;
-            background: rgba(157, 226, 255, 0.28);
+            height:86px;
+            bottom:-14px;
+            background: rgba(157, 226, 255, 0.22);
             border-radius: 50%;
         }
 
         .auth-header-glow{
             position:absolute;
-            inset:auto -10% 40px -10%;
-            height:60px;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.13), transparent);
+            inset:auto -10% 58px -10%;
+            height:52px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent);
             z-index:1;
         }
 
         .auth-brand{
             position:relative;
             z-index:2;
-            height:100%;
+            min-height:320px;
             display:flex;
             align-items:center;
             justify-content:center;
-            padding:26px 24px 70px 24px;
+            padding:28px 32px 44px 32px;
         }
 
         .auth-logo-box{
             position:absolute;
             left:22px;
             top:22px;
-            width:98px;
-            height:98px;
+            width:96px;
+            height:96px;
             background:#ffffff;
             border:1px solid #d8e1eb;
             border-radius:18px;
@@ -190,6 +190,7 @@ def inject_global_styles():
             text-align:center;
             color:#fff;
             max-width:640px;
+            margin-top:26px;
         }
 
         .auth-overline{
@@ -202,17 +203,17 @@ def inject_global_styles():
         }
 
         .auth-hero-title{
-            font-size:30px;
+            font-size:26px;
             font-weight:800;
-            letter-spacing:0.02em;
-            line-height:1.15;
-            margin:0 0 8px 0;
+            letter-spacing:0.01em;
+            line-height:1.20;
+            margin:0 0 10px 0;
         }
 
         .auth-hero-subtitle{
             font-size:13px;
-            line-height:1.6;
-            opacity:0.92;
+            line-height:1.65;
+            opacity:0.94;
             max-width:560px;
             margin:0 auto;
         }
@@ -220,7 +221,7 @@ def inject_global_styles():
         .auth-form-area{
             position:relative;
             background: linear-gradient(180deg, #f7f9fc 0%, #f1f4f8 100%);
-            padding:30px 28px 30px 28px;
+            padding:26px 28px 30px 28px;
         }
 
         .auth-form-box{
