@@ -27,7 +27,6 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 
-
 # =========================================================
 # 0. GLOBAL CONFIGURATION
 # =========================================================
@@ -40,7 +39,6 @@ ROBOFLOW_FULL_URL = os.getenv(
 )
 
 LOGO_PATH = "BKAI_Logo.png"
-
 FONT_PATH = "times.ttf"
 FONT_NAME = "TimesVN"
 
@@ -69,278 +67,366 @@ st.set_page_config(
 # 0.1 GLOBAL STYLES
 # =========================================================
 
+
 def inject_global_styles():
     st.markdown(
         """
         <style>
         :root{
-            --blue-1:#1d64d6;
-            --blue-2:#2d7df0;
-            --blue-3:#5aa9ff;
-            --blue-4:#87d3ff;
-            --line:#d8d8d8;
-            --text:#1f2937;
-            --muted:#6b7280;
+            --bg:#edf2f8;
+            --panel:#ffffff;
+            --soft:#f8fbff;
+            --text:#1f2a37;
+            --muted:#708095;
+            --line:#dbe4ef;
+            --blue-1:#2b78e4;
+            --blue-2:#3f8cf5;
+            --blue-3:#6dc6ff;
+            --accent:#ff6b6b;
+            --btn:#4f9df0;
+            --btn-hover:#3f8fe6;
+            --btn-border:#3c8bdf;
+            --shadow:0 14px 36px rgba(21, 52, 98, 0.10);
+            --radius:18px;
         }
 
         .stApp{
-            background:#efefef;
+            background:
+                radial-gradient(circle at top left, rgba(129, 199, 255, 0.18), transparent 30%),
+                linear-gradient(180deg, #eef4fb 0%, #e9eff7 100%);
         }
 
         html, body, [class*="css"]{
             font-family: Arial, Helvetica, sans-serif;
+            color: var(--text);
         }
 
         .block-container{
-            max-width: 980px;
-            padding-top: 0rem;
+            max-width: 1080px;
+            padding-top: 0 !important;
             padding-bottom: 2rem;
         }
 
-        /* ===== TOP BLUE HEADER ===== */
-        .login-top-wrap{
-            position: relative;
-            height: 250px;
+        div[data-testid="stAppViewContainer"] > .main {
+            padding-top: 0rem;
+        }
+
+        /* ===== AUTH PAGE ===== */
+        .auth-shell{
+            margin: 26px auto 12px auto;
+            border-radius: 22px;
             overflow: hidden;
-            background: linear-gradient(180deg, #3f8af3 0%, #2e78e9 52%, #1e65d8 100%);
-            box-shadow: inset 0 -10px 28px rgba(0,0,0,0.07);
+            border: 1px solid rgba(202, 214, 228, 0.92);
+            background: linear-gradient(180deg, rgba(255,255,255,0.84), rgba(255,255,255,0.90));
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(6px);
         }
 
-        .login-top-wrap::before{
+        .auth-header{
+            position:relative;
+            min-height:250px;
+            background: linear-gradient(180deg, #3f88f2 0%, #2f78e6 48%, #2a6fdd 100%);
+            border-bottom:1px solid rgba(255,255,255,0.22);
+            overflow:hidden;
+        }
+
+        .auth-header::before{
             content:"";
             position:absolute;
-            left:-5%;
-            right:-5%;
-            bottom:20px;
-            height:34px;
-            background: rgba(124, 212, 255, 0.26);
-            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-            transform: scaleX(1.06);
+            left:-6%;
+            width:112%;
+            height:78px;
+            bottom:24px;
+            background: rgba(152, 223, 255, 0.14);
+            border-radius: 50%;
         }
 
-        .login-top-wrap::after{
+        .auth-header::after{
             content:"";
             position:absolute;
-            left:-7%;
-            right:-7%;
-            bottom:0;
-            height:42px;
-            background: rgba(129, 215, 255, 0.50);
-            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-            transform: scaleX(1.08);
+            left:-10%;
+            width:120%;
+            height:96px;
+            bottom:-22px;
+            background: rgba(157, 226, 255, 0.28);
+            border-radius: 50%;
         }
 
-        .login-top-inner{
+        .auth-header-glow{
+            position:absolute;
+            inset:auto -10% 40px -10%;
+            height:60px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.13), transparent);
+            z-index:1;
+        }
+
+        .auth-brand{
             position:relative;
             z-index:2;
             height:100%;
             display:flex;
             align-items:center;
             justify-content:center;
+            padding:26px 24px 70px 24px;
         }
 
-        .login-logo-float{
+        .auth-logo-box{
             position:absolute;
-            left:50%;
-            bottom:-36px;
-            transform:translateX(-50%);
-            width:72px;
-            height:72px;
-            border-radius:50%;
+            left:22px;
+            top:22px;
+            width:98px;
+            height:98px;
             background:#ffffff;
+            border:1px solid #d8e1eb;
+            border-radius:18px;
             display:flex;
             align-items:center;
             justify-content:center;
-            box-shadow:0 8px 18px rgba(0,0,0,0.16);
-            z-index:5;
             overflow:hidden;
-            padding:10px;
+            box-shadow:0 12px 26px rgba(11, 39, 84, 0.16);
         }
 
-        .login-top-label{
-            color:#ffffff;
-            font-size:10px;
-            letter-spacing:0.08em;
+        .auth-brand-copy{
+            text-align:center;
+            color:#fff;
+            max-width:640px;
+        }
+
+        .auth-overline{
+            font-size:11px;
+            font-weight:700;
+            letter-spacing:0.18em;
             text-transform:uppercase;
-            opacity:0.95;
-            margin-top:18px;
+            opacity:0.90;
+            margin-bottom:12px;
         }
 
-        /* ===== FORM AREA ===== */
-        .login-page-wrap{
+        .auth-hero-title{
+            font-size:30px;
+            font-weight:800;
+            letter-spacing:0.02em;
+            line-height:1.15;
+            margin:0 0 8px 0;
+        }
+
+        .auth-hero-subtitle{
+            font-size:13px;
+            line-height:1.6;
+            opacity:0.92;
+            max-width:560px;
+            margin:0 auto;
+        }
+
+        .auth-form-area{
             position:relative;
-            padding-top:56px;
+            background: linear-gradient(180deg, #f7f9fc 0%, #f1f4f8 100%);
+            padding:30px 28px 30px 28px;
         }
 
-        .login-form-shell{
-            display:flex;
-            justify-content:center;
-            align-items:flex-start;
-        }
-
-        .login-form-box{
+        .auth-form-box{
             width:100%;
-            max-width:420px;
-            background:#f7f7f7;
-            padding:18px 18px 14px 18px;
+            max-width:520px;
+            margin:0 auto;
+            background:rgba(255,255,255,0.88);
+            border:1px solid #e4ebf3;
+            border-radius:20px;
+            box-shadow:0 10px 28px rgba(34, 61, 102, 0.08);
+            padding:12px 24px 22px 24px;
         }
 
         .portal-title{
             text-align:center;
-            font-size:14px;
-            font-weight:700;
-            color:#374151;
-            margin-bottom:12px;
+            font-size:24px;
+            font-weight:800;
+            color:#1f2a37;
+            margin:12px 0 24px 0;
+            letter-spacing:0.01em;
         }
 
-        .portal-subtitle{
+        .portal-caption{
             text-align:center;
-            font-size:10px;
-            color:#8b8b8b;
-            letter-spacing:0.07em;
-            text-transform:uppercase;
-            margin-bottom:18px;
-        }
-
-        .form-divider{
-            border-top:1px solid #d4d4d4;
-            margin:14px 0;
-        }
-
-        .or-text{
-            text-align:center;
-            color:#9ca3af;
-            font-size:11px;
-            margin-top:-8px;
-            margin-bottom:10px;
-            background:#f7f7f7;
-            width:30px;
-            margin-left:auto;
-            margin-right:auto;
+            color:#7f8da0;
+            font-size:12px;
+            margin:4px 0 6px 0;
         }
 
         div[data-baseweb="tab-list"]{
             display:flex;
             justify-content:center;
-            gap:14px;
-            margin-bottom:14px;
+            gap:28px;
+            background:transparent;
+            border-bottom:1px solid #e4ebf3;
+            margin:0 0 18px 0;
         }
 
         button[data-baseweb="tab"]{
-            border-radius:0 !important;
-            padding:6px 8px !important;
-            font-weight:500 !important;
-            font-size:12px !important;
-            color:#4b5563 !important;
             background:transparent !important;
+            border:none !important;
+            border-radius:0 !important;
+            padding:14px 2px 14px 2px !important;
+            color:#7a8798 !important;
+            font-size:13px !important;
+            font-weight:600 !important;
+        }
+
+        button[data-baseweb="tab"][aria-selected="true"]{
+            color:#233144 !important;
+            font-weight:700 !important;
+            border-bottom:3px solid var(--accent) !important;
         }
 
         div[data-testid="stTextInput"] label,
         div[data-testid="stTextArea"] label,
         div[data-testid="stSelectbox"] label,
         div[data-testid="stFileUploader"] label{
-            color:#374151 !important;
+            color:#556171 !important;
             font-size:12px !important;
-            font-weight:500 !important;
+            font-weight:700 !important;
         }
 
         div[data-testid="stTextInput"] input{
             border:none !important;
-            border-bottom:1px solid #8f8f8f !important;
+            border-bottom:1px solid #b8c3d1 !important;
             border-radius:0 !important;
             background:transparent !important;
-            color:#111827 !important;
+            box-shadow:none !important;
+            color:#0f1722 !important;
+            padding:10px 0 !important;
             padding-left:0 !important;
             padding-right:0 !important;
-            box-shadow:none !important;
+            font-size:14px !important;
+        }
+
+        div[data-testid="stTextInput"] input:focus{
+            border-bottom:2px solid #4f9df0 !important;
         }
 
         div[data-testid="stTextInput"] input::placeholder{
-            color:#9ca3af !important;
+            color:#9aa7b6 !important;
         }
 
-        div[data-testid="stTextArea"] textarea,
-        div[data-baseweb="select"] > div{
-            border:1px solid #d1d5db !important;
-            border-radius:6px !important;
-            background:#ffffff !important;
-            color:#111827 !important;
+        div.stCheckbox{
+            margin-top: 2px;
+            margin-bottom: 10px;
         }
 
         div.stCheckbox label{
-            color:#4b5563 !important;
+            color:#607084 !important;
             font-size:12px !important;
+        }
+
+        .auth-divider{
+            position:relative;
+            margin:22px 0 18px 0;
+            height:18px;
+        }
+
+        .auth-divider::before{
+            content:"";
+            position:absolute;
+            left:0;
+            right:0;
+            top:50%;
+            border-top:1px solid #dfe7f0;
+            transform:translateY(-50%);
+        }
+
+        .auth-divider span{
+            position:absolute;
+            left:50%;
+            top:50%;
+            transform:translate(-50%,-50%);
+            background:#ffffff;
+            color:#93a0af;
+            font-size:11px;
+            padding:0 12px;
+            text-transform:lowercase;
         }
 
         div.stButton > button{
             width:100%;
-            height:34px;
-            border-radius:0;
-            font-size:12px;
-            font-weight:500;
-            color:#ffffff;
-            background:#4b9be6;
-            border:1px solid #3f89cf;
-            box-shadow:none;
+            height:40px;
+            border-radius:12px !important;
+            background:linear-gradient(180deg, #5aa7f1 0%, #4697ea 100%) !important;
+            border:1px solid var(--btn-border) !important;
+            color:#ffffff !important;
+            font-size:13px !important;
+            font-weight:700 !important;
+            box-shadow:0 8px 20px rgba(79, 157, 240, 0.18) !important;
         }
 
         div.stButton > button:hover{
-            color:#ffffff;
-            background:#3f8edb;
-            border:1px solid #327fc8;
+            background:linear-gradient(180deg, #4e9bf0 0%, #3f8fe6 100%) !important;
+            border:1px solid #3582d6 !important;
+            color:#ffffff !important;
         }
 
+        .auth-footnote{
+            text-align:center;
+            color:#8c98a7;
+            font-size:11px;
+            margin-top:12px;
+            line-height:1.5;
+        }
+
+        /* regular app area */
         .bkai-main-header{
-            background: linear-gradient(180deg, #2f79ea 0%, #1d63d6 100%);
-            border-radius:10px;
-            padding:18px 22px;
-            margin-top:16px;
-            margin-bottom:18px;
+            background:
+                radial-gradient(circle at right top, rgba(122, 210, 255, 0.30), transparent 30%),
+                linear-gradient(135deg, #2169dd 0%, #2f79ea 55%, #4197f3 100%);
+            border-radius:18px;
+            padding:24px 26px;
+            margin-top:18px;
+            margin-bottom:20px;
             color:#ffffff;
+            box-shadow:0 14px 28px rgba(44, 92, 172, 0.16);
         }
 
         .bkai-main-title{
-            font-size:28px;
-            font-weight:700;
-            margin-bottom:4px;
+            font-size:30px;
+            font-weight:800;
+            margin-bottom:6px;
+            line-height:1.18;
         }
 
         .bkai-main-subtitle{
             font-size:14px;
-            opacity:0.95;
+            opacity:0.96;
+            line-height:1.6;
+            max-width:760px;
         }
 
         .bkai-card{
             background:#ffffff;
-            border:1px solid #e5e7eb;
-            border-radius:10px;
-            padding:18px;
-            box-shadow:0 2px 8px rgba(0,0,0,0.04);
+            border:1px solid #e4ebf3;
+            border-radius:16px;
+            padding:20px;
+            box-shadow:0 8px 22px rgba(24, 48, 88, 0.05);
         }
 
         .bkai-status-ok{
             background:#ecfdf5;
             border:1px solid #bbf7d0;
             color:#166534;
-            padding:10px 14px;
-            border-radius:8px;
-            font-weight:600;
+            padding:12px 14px;
+            border-radius:12px;
+            font-weight:700;
         }
 
         .bkai-status-danger{
             background:#fef2f2;
             border:1px solid #fecaca;
             color:#991b1b;
-            padding:10px 14px;
-            border-radius:8px;
-            font-weight:600;
+            padding:12px 14px;
+            border-radius:12px;
+            font-weight:700;
         }
 
         .bkai-sidebar-user{
             background:#eff6ff;
             border:1px solid #bfdbfe;
-            border-radius:8px;
-            padding:10px 12px;
+            border-radius:12px;
+            padding:12px 14px;
             color:#1d4ed8;
             font-weight:700;
             margin-bottom:8px;
@@ -350,9 +436,45 @@ def inject_global_styles():
             background:#ffffff;
         }
 
+        div[data-testid="stTextArea"] textarea,
+        div[data-baseweb="select"] > div{
+            border:1px solid #d6e0eb !important;
+            border-radius:10px !important;
+            background:#ffffff !important;
+            color:#111827 !important;
+        }
+
         div[data-testid="stDataFrame"]{
-            border-radius:8px;
+            border-radius:12px;
             overflow:hidden;
+        }
+
+        @media (max-width: 900px){
+            .auth-header{
+                min-height:220px;
+            }
+            .auth-logo-box{
+                width:82px;
+                height:82px;
+                border-radius:14px;
+            }
+            .auth-brand{
+                padding:88px 20px 56px 20px;
+            }
+            .auth-hero-title{
+                font-size:22px;
+            }
+            .auth-form-area{
+                padding:20px 14px 22px 14px;
+            }
+            .auth-form-box{
+                max-width:100%;
+                padding:10px 16px 18px 16px;
+                border-radius:16px;
+            }
+            .bkai-main-title{
+                font-size:24px;
+            }
         }
         </style>
         """,
@@ -1311,6 +1433,7 @@ else:
 # 6. MAIN APP
 # =========================================================
 
+
 def show_top_banner(username=""):
     st.markdown(
         f"""
@@ -1318,12 +1441,13 @@ def show_top_banner(username=""):
             <div class="bkai-main-title">BKAI - AI-Based Concrete Crack Detection and Classification System</div>
             <div class="bkai-main-subtitle">
                 {"Welcome back, " + username + ". " if username else ""}
-                Upload concrete images for AI-based crack detection, segmentation, and reporting.
+                Upload concrete images for AI-based crack detection, segmentation, classification, and automated PDF reporting in a cleaner, more modern workspace.
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
 
 
 def render_profile_form():
@@ -1675,35 +1799,44 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 
+
 def show_auth_page():
+    st.markdown("<div class='auth-shell'>", unsafe_allow_html=True)
+
     st.markdown(
         """
-        <div class="login-top-wrap">
-            <div class="login-top-inner">
-                <div class="login-top-label">BKAI Crack Analysis Portal</div>
-            </div>
-            <div class="login-logo-float">
+        <div class="auth-header">
+            <div class="auth-header-glow"></div>
+            <div class="auth-logo-box">
         """,
         unsafe_allow_html=True,
     )
 
     if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, width=46)
+        st.image(LOGO_PATH, width=76)
     else:
-        st.markdown("BKAI")
+        st.markdown("<div style='font-weight:800;color:#2463d8;font-size:20px;'>BKAI</div>", unsafe_allow_html=True)
 
     st.markdown(
         """
             </div>
+            <div class="auth-brand">
+                <div class="auth-brand-copy">
+                    <div class="auth-overline">BKAI Crack Analysis Portal</div>
+                    <div class="auth-hero-title">AI-Based Concrete Crack Detection Platform</div>
+                    <div class="auth-hero-subtitle">
+                        Secure access to image-based crack detection, segmentation, reporting,
+                        and structural crack classification in one integrated interface.
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="login-page-wrap">
+        <div class="auth-form-area">
+            <div class="auth-form-box">
+                <div class="portal-caption">Welcome to the system</div>
         """,
         unsafe_allow_html=True,
     )
-
-    st.markdown("<div class='login-form-shell'><div class='login-form-box'>", unsafe_allow_html=True)
-
-    st.markdown("<div class='portal-subtitle'>Access Portal</div>", unsafe_allow_html=True)
 
     tab_login, tab_register = st.tabs(["Login", "Register"])
 
@@ -1723,12 +1856,9 @@ def show_auth_page():
         )
 
         st.checkbox("Stay logged in", key="stay_logged_in")
-
         login_btn = st.button("Log in with Credentials", key="login_button")
 
-        st.markdown("<div class='form-divider'></div>", unsafe_allow_html=True)
-        st.markdown("<div class='or-text'>OR</div>", unsafe_allow_html=True)
-
+        st.markdown("<div class='auth-divider'><span>or</span></div>", unsafe_allow_html=True)
         badge_btn = st.button("Log in with Badge", key="badge_button")
 
         if login_btn:
@@ -1744,6 +1874,11 @@ def show_auth_page():
 
         if badge_btn:
             st.info("Badge login is a placeholder in this demo version.")
+
+        st.markdown(
+            "<div class='auth-footnote'>Use your registered account to access the BKAI analysis workspace.</div>",
+            unsafe_allow_html=True,
+        )
 
     with tab_register:
         st.markdown("<div class='portal-title'>Create account</div>", unsafe_allow_html=True)
@@ -1789,6 +1924,11 @@ def show_auth_page():
                 with open(USERS_FILE, "w", encoding="utf-8") as f:
                     json.dump(users, f, ensure_ascii=False, indent=2)
                 st.success("Account created successfully. You can now log in.")
+
+        st.markdown(
+            "<div class='auth-footnote'>Create an account to save your access credentials and start using the BKAI system.</div>",
+            unsafe_allow_html=True,
+        )
 
     st.markdown("</div></div></div>", unsafe_allow_html=True)
 
