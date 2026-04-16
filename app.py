@@ -444,6 +444,76 @@ def inject_global_styles():
                 max-width: 98%;
             }
         }
+
+        .metric-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+            gap:14px;
+            margin:10px 0 18px 0;
+        }
+
+        .metric-card{
+            background:linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+            border:1px solid #dbe7f5;
+            border-radius:18px;
+            padding:16px 16px 14px 16px;
+            box-shadow:0 12px 28px rgba(31,58,120,.08);
+            min-height:112px;
+        }
+
+        .metric-label{
+            font-size:12px;
+            font-weight:700;
+            text-transform:uppercase;
+            letter-spacing:.08em;
+            color:#6b7a90;
+            margin-bottom:8px;
+        }
+
+        .metric-value{
+            font-size:24px;
+            line-height:1.2;
+            font-weight:800;
+            color:#162033;
+            margin-bottom:8px;
+            word-break:break-word;
+        }
+
+        .metric-desc{
+            font-size:13px;
+            line-height:1.5;
+            color:#6c7a92;
+        }
+
+        .metric-card.severity-minor{
+            border:1px solid #bfe7cd;
+            background:linear-gradient(180deg, #f4fff7 0%, #ecfbf1 100%);
+        }
+
+        .metric-card.severity-moderate{
+            border:1px solid #ffd59c;
+            background:linear-gradient(180deg, #fffaf2 0%, #fff3df 100%);
+        }
+
+        .metric-card.severity-severe{
+            border:1px solid #f3b4b4;
+            background:linear-gradient(180deg, #fff6f6 0%, #ffebeb 100%);
+        }
+
+        .metric-card.summary-card{
+            grid-column:1 / -1;
+            min-height:auto;
+        }
+
+        .metric-card.summary-card .metric-value{
+            font-size:18px;
+            font-weight:700;
+        }
+
+        .metrics-table-wrap{
+            margin-top:8px;
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
@@ -687,6 +757,74 @@ def estimate_severity_from_ratio(area_ratio_percent: float):
         return "Severe"
 
 
+def render_metrics_dashboard(metrics_df: pd.DataFrame):
+    if metrics_df is None or metrics_df.empty:
+        st.info("No metrics available.")
+        return
+
+    severity_value = ""
+    summary_row = None
+    normal_rows = []
+
+    for _, row in metrics_df.iterrows():
+        metric = str(row.get("Metric", "")).strip()
+        value = str(row.get("Value", "")).strip()
+
+        if metric == "Severity Level":
+            severity_value = value
+        elif metric == "Summary":
+            summary_row = row
+        else:
+            normal_rows.append(row)
+
+    severity_class = ""
+    sv = severity_value.lower()
+    if "minor" in sv:
+        severity_class = "severity-minor"
+    elif "moderate" in sv:
+        severity_class = "severity-moderate"
+    elif "severe" in sv:
+        severity_class = "severity-severe"
+
+    html = '<div class="metric-grid">'
+
+    for row in normal_rows:
+        metric = str(row.get("Metric", "")).strip()
+        value = str(row.get("Value", "")).strip()
+        desc = str(row.get("Description", "")).strip()
+
+        html += f"""
+        <div class="metric-card">
+            <div class="metric-label">{metric}</div>
+            <div class="metric-value">{value}</div>
+            <div class="metric-desc">{desc}</div>
+        </div>
+        """
+
+    if severity_value:
+        html += f"""
+        <div class="metric-card {severity_class}">
+            <div class="metric-label">Severity Level</div>
+            <div class="metric-value">{severity_value}</div>
+            <div class="metric-desc">Severity estimated by crack ratio</div>
+        </div>
+        """
+
+    if summary_row is not None:
+        summary_value = str(summary_row.get("Value", "")).strip()
+        summary_desc = str(summary_row.get("Description", "")).strip()
+        html += f"""
+        <div class="metric-card summary-card {severity_class}">
+            <div class="metric-label">Summary</div>
+            <div class="metric-value">{summary_value}</div>
+            <div class="metric-desc">{summary_desc}</div>
+        </div>
+        """
+
+    html += "</div>"
+    st.markdown(html, unsafe_allow_html=True)
+
+
 # =========================================================
 # 2. PDF EXPORT
 # =========================================================
@@ -792,11 +930,11 @@ def export_pdf(
     summary_val = ""
     if metrics_df is not None:
         for _, row in metrics_df.iterrows():
-            en = str(row.get("en", "")).strip()
+            en = str(row.get("Metric", "")).strip()
             if en.lower() == "severity level":
-                severity_val = str(row.get("value", ""))
+                severity_val = str(row.get("Value", ""))
             if en.lower() == "summary":
-                summary_val = str(row.get("value", ""))
+                summary_val = str(row.get("Value", ""))
 
     if not summary_val:
         summary_val = "Conclusion: Concrete cracks are present and should be further inspected."
@@ -881,11 +1019,11 @@ def export_pdf(
     skip_keys = {"Crack Length", "Crack Width"}
     if metrics_df is not None:
         for _, r in metrics_df.iterrows():
-            en_name = str(r.get("en", "")).strip()
+            en_name = str(r.get("Metric", "")).strip()
             if en_name in skip_keys:
                 continue
-            label = f"{r.get('vi', '')} ({en_name})"
-            val = str(r.get("value", ""))
+            label = en_name
+            val = str(r.get("Value", ""))
             rows.append((label, val))
 
     if not rows:
@@ -1286,75 +1424,187 @@ def show_stage2_demo(key_prefix="stage2"):
     component_crack_data = pd.DataFrame(
         [
             {
-                "Component":"Beam",
-                "Crack Type":"Flexural Crack",
-                "Cause":"Caused by bending moment exceeding the allowable limit; inadequate flexural reinforcement or insufficient section capacity.",
-                "Shape Characteristics":"Usually appears at mid-span and is widest in the tension zone.",
-                "Image Path":"images/stage2/beam_uon.png"
+                "Component": "Beam",
+                "Crack Type": "Flexural Crack",
+                "Cause": "Caused by bending moment exceeding the allowable limit; inadequate flexural reinforcement or insufficient section capacity.",
+                "Shape Characteristics": "Usually appears at mid-span and is widest in the tension zone.",
+                "Image Path": "images/stage2/beam_uon.png"
             },
             {
-                "Component":"Beam",
-                "Crack Type":"Shear Crack",
-                "Cause":"High shear force; inadequate concrete shear capacity or insufficient stirrups.",
-                "Shape Characteristics":"Inclined crack, often around 45° relative to the beam axis.",
-                "Image Path":"images/stage2/beam_cat.png"
+                "Component": "Beam",
+                "Crack Type": "Shear Crack",
+                "Cause": "High shear force; inadequate concrete shear capacity or insufficient stirrups.",
+                "Shape Characteristics": "Inclined crack, often around 45° relative to the beam axis.",
+                "Image Path": "images/stage2/beam_cat.png"
             },
             {
-                "Component":"Beam",
-                "Crack Type":"Torsional Crack",
-                "Cause":"Insufficient torsional reinforcement or unsuitable cross-section design.",
-                "Shape Characteristics":"Diagonal or zigzag pattern around the beam surface.",
-                "Image Path":"images/stage2/beam_xoan.png"
+                "Component": "Beam",
+                "Crack Type": "Torsional Crack",
+                "Cause": "Insufficient torsional reinforcement or unsuitable cross-section design.",
+                "Shape Characteristics": "Diagonal or zigzag pattern around the beam surface.",
+                "Image Path": "images/stage2/beam_xoan.png"
             },
             {
-                "Component":"Beam",
-                "Crack Type":"Corrosion-Induced Crack",
-                "Cause":"Aggressive environment, thin cover depth, and expansion due to steel corrosion.",
-                "Shape Characteristics":"Runs along reinforcement lines and may be accompanied by rust staining or cover spalling.",
-                "Image Path":"images/stage2/beam_anmon.png"
+                "Component": "Beam",
+                "Crack Type": "Tensile Crack",
+                "Cause": "Direct tensile stress exceeds the tensile strength of concrete.",
+                "Shape Characteristics": "Mostly vertical cracks distributed within the tension zone.",
+                "Image Path": "images/stage2/beam_keo.png"
             },
             {
-                "Component":"Column",
-                "Crack Type":"Diagonal Crack",
-                "Cause":"Column subjected to high combined compression, bending, or shear; insufficient material or structural capacity.",
-                "Shape Characteristics":"Inclined cracks appear on the surface when the load approaches or exceeds capacity.",
-                "Image Path":"images/stage2/column_cheo.png"
+                "Component": "Beam",
+                "Crack Type": "Sliding Crack",
+                "Cause": "Weak bonding or sliding along an interface in the member.",
+                "Shape Characteristics": "Long horizontal crack near the interface zone.",
+                "Image Path": "images/stage2/beam_truot.png"
             },
             {
-                "Component":"Column",
-                "Crack Type":"Splitting / Longitudinal Crack",
-                "Cause":"High compressive stress causing longitudinal splitting; weak concrete; insufficient longitudinal reinforcement.",
-                "Shape Characteristics":"Multiple parallel vertical cracks.",
-                "Image Path":"images/stage2/column_tach.png"
+                "Component": "Beam",
+                "Crack Type": "Corrosion-Induced Crack",
+                "Cause": "Aggressive environment, thin cover depth, and expansion due to steel corrosion.",
+                "Shape Characteristics": "Runs along reinforcement lines and may be accompanied by rust staining or cover spalling.",
+                "Image Path": "images/stage2/beam_anmon.png"
             },
             {
-                "Component":"Slab",
-                "Crack Type":"Plastic Shrinkage Crack",
-                "Cause":"Rapid moisture evaporation while concrete is still plastic due to wind, heat, or dry conditions.",
-                "Shape Characteristics":"Shallow and small cracks, often forming a polygonal pattern.",
-                "Image Path":"images/stage2/slab_congot_deo.png"
+                "Component": "Column",
+                "Crack Type": "Diagonal Crack",
+                "Cause": "Column subjected to high combined compression, bending, or shear; insufficient material or structural capacity.",
+                "Shape Characteristics": "Inclined cracks appear on the surface when the load approaches or exceeds capacity.",
+                "Image Path": "images/stage2/column_cheo.png"
             },
             {
-                "Component":"Slab",
-                "Crack Type":"Drying Shrinkage Crack",
-                "Cause":"Shrinkage after hardening in dry or hot environments.",
-                "Shape Characteristics":"Map cracking or relatively straight crack lines.",
-                "Image Path":"images/stage2/slab_congot_kho.png"
+                "Component": "Column",
+                "Crack Type": "Horizontal Crack",
+                "Cause": "Transverse tensile stress or confinement-related failure under loading.",
+                "Shape Characteristics": "Horizontal cracks crossing the column width.",
+                "Image Path": "images/stage2/column_ngang.png"
             },
             {
-                "Component":"Concrete Wall",
-                "Crack Type":"Shrinkage Crack",
-                "Cause":"Rapid moisture loss; shrinkage stress exceeds tensile capacity.",
-                "Shape Characteristics":"Random, polygonal, or intersecting crack pattern.",
-                "Image Path":"images/stage2/wall_congot.png"
+                "Component": "Column",
+                "Crack Type": "Shrinkage Crack",
+                "Cause": "Volume reduction due to moisture loss after hardening.",
+                "Shape Characteristics": "Random fine cracks on the concrete surface.",
+                "Image Path": "images/stage2/column_congot.png"
             },
             {
-                "Component":"Concrete Wall",
-                "Crack Type":"Thermal Crack",
-                "Cause":"Temperature difference through the wall thickness.",
-                "Shape Characteristics":"Often vertical and wider in the thermal tension zone.",
-                "Image Path":"images/stage2/wall_nhiet.png"
+                "Component": "Column",
+                "Crack Type": "Splitting / Longitudinal Crack",
+                "Cause": "High compressive stress causing longitudinal splitting; weak concrete; insufficient longitudinal reinforcement.",
+                "Shape Characteristics": "Multiple parallel vertical cracks.",
+                "Image Path": "images/stage2/column_tach.png"
             },
+            {
+                "Component": "Column",
+                "Crack Type": "Corrosion-Induced Crack",
+                "Cause": "Expansion of reinforcement due to corrosion.",
+                "Shape Characteristics": "Vertical cracking along reinforcement lines, often with rust staining.",
+                "Image Path": "images/stage2/column_anmon.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Plastic Shrinkage Crack",
+                "Cause": "Rapid moisture evaporation while concrete is still plastic due to wind, heat, or dry conditions.",
+                "Shape Characteristics": "Shallow and small cracks, often forming a polygonal pattern.",
+                "Image Path": "images/stage2/slab_congot_deo.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Drying Shrinkage Crack",
+                "Cause": "Shrinkage after hardening in dry or hot environments.",
+                "Shape Characteristics": "Map cracking or relatively straight crack lines.",
+                "Image Path": "images/stage2/slab_congot_kho.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Thermal Crack",
+                "Cause": "Temperature variation and restraint within the slab.",
+                "Shape Characteristics": "One or more dominant cracks, often wider at the surface.",
+                "Image Path": "images/stage2/slab_nhiet.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Flexural Crack",
+                "Cause": "Bending stress exceeds slab tensile capacity.",
+                "Shape Characteristics": "Cracks develop in the tension zone, usually from the bottom surface.",
+                "Image Path": "images/stage2/slab_uon.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Shear Crack",
+                "Cause": "Punching or shear stress exceeds local capacity.",
+                "Shape Characteristics": "Inclined cracks or local failure region near load points.",
+                "Image Path": "images/stage2/slab_cat.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Torsional Crack",
+                "Cause": "Torsional action or edge restraint.",
+                "Shape Characteristics": "Diagonal or twisting crack pattern near slab corners or edges.",
+                "Image Path": "images/stage2/slab_xoan.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Concentrated Load Crack",
+                "Cause": "Local stress concentration under point loads.",
+                "Shape Characteristics": "Radial cracks spreading from the loaded area.",
+                "Image Path": "images/stage2/slab_taptrung.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Distributed Load Crack",
+                "Cause": "Distributed load causing flexural distress over a wider area.",
+                "Shape Characteristics": "Multiple cracks distributed across the slab panel.",
+                "Image Path": "images/stage2/slab_phanbo.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Corrosion-Induced Crack",
+                "Cause": "Steel corrosion and expansion of reinforcement.",
+                "Shape Characteristics": "Cracks follow reinforcement layout and may lead to cover delamination.",
+                "Image Path": "images/stage2/slab_anmon.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Shrinkage Crack",
+                "Cause": "Rapid moisture loss; shrinkage stress exceeds tensile capacity.",
+                "Shape Characteristics": "Random, polygonal, or intersecting crack pattern.",
+                "Image Path": "images/stage2/wall_congot.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Thermal Crack",
+                "Cause": "Temperature difference through the wall thickness.",
+                "Shape Characteristics": "Often vertical and wider in the thermal tension zone.",
+                "Image Path": "images/stage2/wall_nhiet.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Vertical Load Crack",
+                "Cause": "Axial or gravity load exceeding local tensile resistance.",
+                "Shape Characteristics": "Mostly vertical cracks extending along wall height.",
+                "Image Path": "images/stage2/wall_doc_taitrong.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Horizontal Load Crack",
+                "Cause": "Lateral action or bending causing horizontal tension zones.",
+                "Shape Characteristics": "Horizontal cracking across the wall face.",
+                "Image Path": "images/stage2/wall_ngang_taitrong.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Diagonal Load Crack",
+                "Cause": "Combined shear and bending due to lateral loading.",
+                "Shape Characteristics": "Inclined diagonal cracking across the wall panel.",
+                "Image Path": "images/stage2/wall_cheo_taitrong.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Corrosion-Induced Crack",
+                "Cause": "Corrosion of embedded reinforcement causing expansion.",
+                "Shape Characteristics": "Longitudinal cracking following reinforcement positions.",
+                "Image Path": "images/stage2/wall_anmon.png"
+            }
         ]
     )
 
@@ -1658,21 +1908,24 @@ def run_main_app():
                 )
 
                 metrics = [
-                    {"vi": "Tên ảnh", "en": "Image Name", "value": uploaded_file.name, "desc": "Uploaded image filename"},
-                    {"vi": "Thời gian xử lý", "en": "Total Processing Time", "value": f"{total_time:.2f} s", "desc": "Total execution time"},
-                    {"vi": "Tốc độ mô hình AI", "en": "Inference Speed", "value": f"{total_time:.2f} s/image", "desc": "Processing time per image"},
-                    {"vi": "Độ tin cậy trung bình", "en": "Average Confidence", "value": f"{avg_conf:.2f}", "desc": "Average confidence score"},
-                    {"vi": "Diện tích vùng nứt", "en": "Crack Area (px^2)", "value": f"{crack_area_px2:.0f}", "desc": "Mask area in pixels"},
-                    {"vi": "Phần trăm vùng nứt", "en": "Crack Area Ratio", "value": f"{crack_ratio_percent:.2f} %", "desc": "Crack mask area ratio"},
-                    {"vi": "Chiều dài vết nứt", "en": "Crack Length", "value": "—", "desc": "Estimated if real scale is available"},
-                    {"vi": "Chiều rộng vết nứt", "en": "Crack Width", "value": "—", "desc": "Requires calibrated scale"},
-                    {"vi": "Mức độ nguy hiểm", "en": "Severity Level", "value": severity, "desc": "Severity estimated by crack ratio"},
-                    {"vi": "Thời gian phân tích", "en": "Timestamp", "value": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "desc": "Execution timestamp"},
-                    {"vi": "Nhận xét tổng quan", "en": "Summary", "value": summary_text, "desc": "Automatic system conclusion"},
+                    {"Metric": "Image Name", "Value": uploaded_file.name, "Description": "Uploaded image filename"},
+                    {"Metric": "Total Processing Time", "Value": f"{total_time:.2f} s", "Description": "Total execution time"},
+                    {"Metric": "Inference Speed", "Value": f"{total_time:.2f} s/image", "Description": "Processing time per image"},
+                    {"Metric": "Average Confidence", "Value": f"{avg_conf:.2f}", "Description": "Average confidence score"},
+                    {"Metric": "Crack Area (px²)", "Value": f"{crack_area_px2:.0f}", "Description": "Mask area in pixels"},
+                    {"Metric": "Crack Area Ratio (%)", "Value": f"{crack_ratio_percent:.2f} %", "Description": "Crack mask area ratio"},
+                    {"Metric": "Crack Length", "Value": "—", "Description": "Estimated if real scale is available"},
+                    {"Metric": "Crack Width", "Value": "—", "Description": "Requires calibrated scale"},
+                    {"Metric": "Severity Level", "Value": severity, "Description": "Severity estimated by crack ratio"},
+                    {"Metric": "Timestamp", "Value": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Description": "Execution timestamp"},
+                    {"Metric": "Summary", "Value": summary_text, "Description": "Automatic system conclusion"},
                 ]
 
                 metrics_df = pd.DataFrame(metrics)
-                st.dataframe(metrics_df, use_container_width=True)
+                render_metrics_dashboard(metrics_df)
+
+                with st.expander("View Metrics Table", expanded=False):
+                    st.dataframe(metrics_df, use_container_width=True)
 
                 st.subheader("Statistical Charts")
                 col_chart1, col_chart2 = st.columns(2)
