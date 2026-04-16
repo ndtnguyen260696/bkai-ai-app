@@ -7,7 +7,7 @@ reportlab
 opencv-python-headless
 numpy
 scipy
-
+scikit-image
 
 
 
