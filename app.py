@@ -960,7 +960,7 @@ def measure_crack_geometry_from_mask(mask):
     }
 
 def create_measurement_visualization(
-    pil_image,
+    analyzed_pil_image,
     predictions,
     length_value,
     avg_width_value,
@@ -968,7 +968,7 @@ def create_measurement_visualization(
     unit_text="px",
     panel_ratio=0.36,
 ):
-    img_rgb = np.array(pil_image.convert("RGB"))
+    img_rgb = np.array(analyzed_pil_image.convert("RGB"))
     img = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
     h, w = img.shape[:2]
 
@@ -2158,7 +2158,7 @@ def run_main_app():
                 )
 
                 measurement_visual_img = create_measurement_visualization(
-                    pil_image=orig_img,
+                    analyzed_pil_image=analyzed_img,
                     predictions=preds_conf,
                     length_value=length_value,
                     avg_width_value=avg_width_value,
