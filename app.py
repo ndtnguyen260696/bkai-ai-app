@@ -11,6 +11,9 @@ import json
 import base64
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+from scipy.ndimage import distance_transform_edt
+from skimage.morphology import skeletonize
 
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -445,6 +448,76 @@ def inject_global_styles():
             }
         }
 
+        .metric-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+            gap:14px;
+            margin:10px 0 18px 0;
+        }
+
+        .metric-card{
+            background:linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+            border:1px solid #dbe7f5;
+            border-radius:18px;
+            padding:16px 16px 14px 16px;
+            box-shadow:0 12px 28px rgba(31,58,120,.08);
+            min-height:112px;
+        }
+
+        .metric-label{
+            font-size:12px;
+            font-weight:700;
+            text-transform:uppercase;
+            letter-spacing:.08em;
+            color:#6b7a90;
+            margin-bottom:8px;
+        }
+
+        .metric-value{
+            font-size:24px;
+            line-height:1.2;
+            font-weight:800;
+            color:#162033;
+            margin-bottom:8px;
+            word-break:break-word;
+        }
+
+        .metric-desc{
+            font-size:13px;
+            line-height:1.5;
+            color:#6c7a92;
+        }
+
+        .metric-card.severity-minor{
+            border:1px solid #bfe7cd;
+            background:linear-gradient(180deg, #f4fff7 0%, #ecfbf1 100%);
+        }
+
+        .metric-card.severity-moderate{
+            border:1px solid #ffd59c;
+            background:linear-gradient(180deg, #fffaf2 0%, #fff3df 100%);
+        }
+
+        .metric-card.severity-severe{
+            border:1px solid #f3b4b4;
+            background:linear-gradient(180deg, #fff6f6 0%, #ffebeb 100%);
+        }
+
+        .metric-card.summary-card{
+            grid-column:1 / -1;
+            min-height:auto;
+        }
+
+        .metric-card.summary-card .metric-value{
+            font-size:18px;
+            font-weight:700;
+        }
+
+        .metrics-table-wrap{
+            margin-top:8px;
+        }
+
+
         /* ===== METRICS DASHBOARD FIXED ===== */
         .metric-box{
             background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
@@ -686,6 +759,83 @@ def crack_area_ratio_percent(predictions, img_w: int, img_h: int):
     return (ratio * 100.0, area_px2)
 
 
+def predictions_to_binary_mask(predictions, img_w: int, img_h: int):
+    if img_w <= 0 or img_h <= 0:
+        return np.zeros((0, 0), dtype=bool)
+
+    mask = Image.new("L", (img_w, img_h), 0)
+    draw = ImageDraw.Draw(mask)
+
+    for p in predictions:
+        pts_raw = p.get("points", None)
+        if pts_raw is not None:
+            polys = extract_polygons(pts_raw, img_w, img_h)
+            for poly in polys:
+                if len(poly) >= 3:
+                    draw.polygon(poly, fill=255)
+            continue
+
+        x = p.get("x")
+        y = p.get("y")
+        w = p.get("width")
+        h = p.get("height")
+        if None in (x, y, w, h):
+            continue
+
+        x0 = max(0.0, float(x) - float(w) / 2.0)
+        y0 = max(0.0, float(y) - float(h) / 2.0)
+        x1 = min(float(img_w - 1), float(x) + float(w) / 2.0)
+        y1 = min(float(img_h - 1), float(y) + float(h) / 2.0)
+        draw.rectangle([x0, y0, x1, y1], fill=255)
+
+    return np.array(mask, dtype=np.uint8) > 0
+
+
+def skeleton_length_px(skeleton_mask: np.ndarray) -> float:
+    if skeleton_mask.size == 0:
+        return 0.0
+
+    sk = skeleton_mask.astype(np.uint8)
+    right = np.logical_and(sk[:, :-1], sk[:, 1:]).sum()
+    down = np.logical_and(sk[:-1, :], sk[1:, :]).sum()
+    diag1 = np.logical_and(sk[:-1, :-1], sk[1:, 1:]).sum()
+    diag2 = np.logical_and(sk[:-1, 1:], sk[1:, :-1]).sum()
+    return float(right + down + (diag1 + diag2) * np.sqrt(2.0))
+
+
+def compute_crack_geometry(predictions, img_w: int, img_h: int):
+    binary_mask = predictions_to_binary_mask(predictions, img_w, img_h)
+    if binary_mask.size == 0 or not binary_mask.any():
+        return {
+            "mask": binary_mask,
+            "area_px2": 0.0,
+            "length_px": 0.0,
+            "avg_width_px": 0.0,
+            "max_width_px": 0.0,
+        }
+
+    area_px2 = float(binary_mask.sum())
+    skeleton = skeletonize(binary_mask)
+    length_px = skeleton_length_px(skeleton)
+
+    if skeleton.any():
+        dist_map = distance_transform_edt(binary_mask)
+        local_widths = dist_map[skeleton] * 2.0
+        avg_width_px = float(np.mean(local_widths)) if local_widths.size else 0.0
+        max_width_px = float(np.max(local_widths)) if local_widths.size else 0.0
+    else:
+        avg_width_px = 0.0
+        max_width_px = 0.0
+
+    return {
+        "mask": binary_mask,
+        "area_px2": area_px2,
+        "length_px": float(length_px),
+        "avg_width_px": avg_width_px,
+        "max_width_px": max_width_px,
+    }
+
+
 # =========================================================
 # 1.2 DRAW RESULT
 # =========================================================
@@ -803,7 +953,7 @@ def render_metrics_dashboard(metrics_df: pd.DataFrame):
             normal_rows.append({
                 "Metric": metric,
                 "Value": value,
-                "Description": desc
+                "Description": desc,
             })
 
     severity_class = ""
@@ -817,16 +967,17 @@ def render_metrics_dashboard(metrics_df: pd.DataFrame):
 
     cols_per_row = 3
     for i in range(0, len(normal_rows), cols_per_row):
-        row_items = normal_rows[i:i+cols_per_row]
+        row_items = normal_rows[i:i + cols_per_row]
         cols = st.columns(cols_per_row)
 
         for j in range(cols_per_row):
             with cols[j]:
                 if j < len(row_items):
                     item = row_items[j]
+                    extra = severity_class if item["Metric"] == "Severity Level" else ""
                     st.markdown(
                         f"""
-                        <div class="metric-box">
+                        <div class="metric-box {extra}">
                             <div class="metric-name">{item['Metric']}</div>
                             <div class="metric-number">{item['Value']}</div>
                             <div class="metric-help">{item['Description']}</div>
@@ -1052,12 +1203,9 @@ def export_pdf(
     content_top_y = draw_header("ANALYSIS REPORT", subtitle=subtitle, page_no=page_no)
 
     rows = []
-    skip_keys = {"Crack Length", "Crack Width"}
     if metrics_df is not None:
         for _, r in metrics_df.iterrows():
             en_name = str(r.get("Metric", "")).strip()
-            if en_name in skip_keys:
-                continue
             label = en_name
             val = str(r.get("Value", ""))
             rows.append((label, val))
@@ -1091,7 +1239,7 @@ def export_pdf(
         c.setFont(BODY_FONT, 10)
         c.setFillColor(colors.white)
         c.drawString(x0 + 2, top_y - header_h + 3, "No.")
-        c.drawString(x1 + 2, top_y - header_h + 3, "Metric")
+        c.drawString(x1 + 2, top_y - header_h + 3, "Metric (VI / EN)")
         c.drawString(x2 + 2, top_y - header_h + 3, "Value")
         return top_y - header_h
 
@@ -1460,75 +1608,187 @@ def show_stage2_demo(key_prefix="stage2"):
     component_crack_data = pd.DataFrame(
         [
             {
-                "Component":"Beam",
-                "Crack Type":"Flexural Crack",
-                "Cause":"Caused by bending moment exceeding the allowable limit; inadequate flexural reinforcement or insufficient section capacity.",
-                "Shape Characteristics":"Usually appears at mid-span and is widest in the tension zone.",
-                "Image Path":"images/stage2/beam_uon.png"
+                "Component": "Beam",
+                "Crack Type": "Flexural Crack",
+                "Cause": "Caused by bending moment exceeding the allowable limit; inadequate flexural reinforcement or insufficient section capacity.",
+                "Shape Characteristics": "Usually appears at mid-span and is widest in the tension zone.",
+                "Image Path": "images/stage2/beam_uon.png"
             },
             {
-                "Component":"Beam",
-                "Crack Type":"Shear Crack",
-                "Cause":"High shear force; inadequate concrete shear capacity or insufficient stirrups.",
-                "Shape Characteristics":"Inclined crack, often around 45° relative to the beam axis.",
-                "Image Path":"images/stage2/beam_cat.png"
+                "Component": "Beam",
+                "Crack Type": "Shear Crack",
+                "Cause": "High shear force; inadequate concrete shear capacity or insufficient stirrups.",
+                "Shape Characteristics": "Inclined crack, often around 45° relative to the beam axis.",
+                "Image Path": "images/stage2/beam_cat.png"
             },
             {
-                "Component":"Beam",
-                "Crack Type":"Torsional Crack",
-                "Cause":"Insufficient torsional reinforcement or unsuitable cross-section design.",
-                "Shape Characteristics":"Diagonal or zigzag pattern around the beam surface.",
-                "Image Path":"images/stage2/beam_xoan.png"
+                "Component": "Beam",
+                "Crack Type": "Torsional Crack",
+                "Cause": "Insufficient torsional reinforcement or unsuitable cross-section design.",
+                "Shape Characteristics": "Diagonal or zigzag pattern around the beam surface.",
+                "Image Path": "images/stage2/beam_xoan.png"
             },
             {
-                "Component":"Beam",
-                "Crack Type":"Corrosion-Induced Crack",
-                "Cause":"Aggressive environment, thin cover depth, and expansion due to steel corrosion.",
-                "Shape Characteristics":"Runs along reinforcement lines and may be accompanied by rust staining or cover spalling.",
-                "Image Path":"images/stage2/beam_anmon.png"
+                "Component": "Beam",
+                "Crack Type": "Tensile Crack",
+                "Cause": "Direct tensile stress exceeds the tensile strength of concrete.",
+                "Shape Characteristics": "Mostly vertical cracks distributed within the tension zone.",
+                "Image Path": "images/stage2/beam_keo.png"
             },
             {
-                "Component":"Column",
-                "Crack Type":"Diagonal Crack",
-                "Cause":"Column subjected to high combined compression, bending, or shear; insufficient material or structural capacity.",
-                "Shape Characteristics":"Inclined cracks appear on the surface when the load approaches or exceeds capacity.",
-                "Image Path":"images/stage2/column_cheo.png"
+                "Component": "Beam",
+                "Crack Type": "Sliding Crack",
+                "Cause": "Weak bonding or sliding along an interface in the member.",
+                "Shape Characteristics": "Long horizontal crack near the interface zone.",
+                "Image Path": "images/stage2/beam_truot.png"
             },
             {
-                "Component":"Column",
-                "Crack Type":"Splitting / Longitudinal Crack",
-                "Cause":"High compressive stress causing longitudinal splitting; weak concrete; insufficient longitudinal reinforcement.",
-                "Shape Characteristics":"Multiple parallel vertical cracks.",
-                "Image Path":"images/stage2/column_tach.png"
+                "Component": "Beam",
+                "Crack Type": "Corrosion-Induced Crack",
+                "Cause": "Aggressive environment, thin cover depth, and expansion due to steel corrosion.",
+                "Shape Characteristics": "Runs along reinforcement lines and may be accompanied by rust staining or cover spalling.",
+                "Image Path": "images/stage2/beam_anmon.png"
             },
             {
-                "Component":"Slab",
-                "Crack Type":"Plastic Shrinkage Crack",
-                "Cause":"Rapid moisture evaporation while concrete is still plastic due to wind, heat, or dry conditions.",
-                "Shape Characteristics":"Shallow and small cracks, often forming a polygonal pattern.",
-                "Image Path":"images/stage2/slab_congot_deo.png"
+                "Component": "Column",
+                "Crack Type": "Diagonal Crack",
+                "Cause": "Column subjected to high combined compression, bending, or shear; insufficient material or structural capacity.",
+                "Shape Characteristics": "Inclined cracks appear on the surface when the load approaches or exceeds capacity.",
+                "Image Path": "images/stage2/column_cheo.png"
             },
             {
-                "Component":"Slab",
-                "Crack Type":"Drying Shrinkage Crack",
-                "Cause":"Shrinkage after hardening in dry or hot environments.",
-                "Shape Characteristics":"Map cracking or relatively straight crack lines.",
-                "Image Path":"images/stage2/slab_congot_kho.png"
+                "Component": "Column",
+                "Crack Type": "Horizontal Crack",
+                "Cause": "Transverse tensile stress or confinement-related failure under loading.",
+                "Shape Characteristics": "Horizontal cracks crossing the column width.",
+                "Image Path": "images/stage2/column_ngang.png"
             },
             {
-                "Component":"Concrete Wall",
-                "Crack Type":"Shrinkage Crack",
-                "Cause":"Rapid moisture loss; shrinkage stress exceeds tensile capacity.",
-                "Shape Characteristics":"Random, polygonal, or intersecting crack pattern.",
-                "Image Path":"images/stage2/wall_congot.png"
+                "Component": "Column",
+                "Crack Type": "Shrinkage Crack",
+                "Cause": "Volume reduction due to moisture loss after hardening.",
+                "Shape Characteristics": "Random fine cracks on the concrete surface.",
+                "Image Path": "images/stage2/column_congot.png"
             },
             {
-                "Component":"Concrete Wall",
-                "Crack Type":"Thermal Crack",
-                "Cause":"Temperature difference through the wall thickness.",
-                "Shape Characteristics":"Often vertical and wider in the thermal tension zone.",
-                "Image Path":"images/stage2/wall_nhiet.png"
+                "Component": "Column",
+                "Crack Type": "Splitting / Longitudinal Crack",
+                "Cause": "High compressive stress causing longitudinal splitting; weak concrete; insufficient longitudinal reinforcement.",
+                "Shape Characteristics": "Multiple parallel vertical cracks.",
+                "Image Path": "images/stage2/column_tach.png"
             },
+            {
+                "Component": "Column",
+                "Crack Type": "Corrosion-Induced Crack",
+                "Cause": "Expansion of reinforcement due to corrosion.",
+                "Shape Characteristics": "Vertical cracking along reinforcement lines, often with rust staining.",
+                "Image Path": "images/stage2/column_anmon.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Plastic Shrinkage Crack",
+                "Cause": "Rapid moisture evaporation while concrete is still plastic due to wind, heat, or dry conditions.",
+                "Shape Characteristics": "Shallow and small cracks, often forming a polygonal pattern.",
+                "Image Path": "images/stage2/slab_congot_deo.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Drying Shrinkage Crack",
+                "Cause": "Shrinkage after hardening in dry or hot environments.",
+                "Shape Characteristics": "Map cracking or relatively straight crack lines.",
+                "Image Path": "images/stage2/slab_congot_kho.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Thermal Crack",
+                "Cause": "Temperature variation and restraint within the slab.",
+                "Shape Characteristics": "One or more dominant cracks, often wider at the surface.",
+                "Image Path": "images/stage2/slab_nhiet.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Flexural Crack",
+                "Cause": "Bending stress exceeds slab tensile capacity.",
+                "Shape Characteristics": "Cracks develop in the tension zone, usually from the bottom surface.",
+                "Image Path": "images/stage2/slab_uon.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Shear Crack",
+                "Cause": "Punching or shear stress exceeds local capacity.",
+                "Shape Characteristics": "Inclined cracks or local failure region near load points.",
+                "Image Path": "images/stage2/slab_cat.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Torsional Crack",
+                "Cause": "Torsional action or edge restraint.",
+                "Shape Characteristics": "Diagonal or twisting crack pattern near slab corners or edges.",
+                "Image Path": "images/stage2/slab_xoan.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Concentrated Load Crack",
+                "Cause": "Local stress concentration under point loads.",
+                "Shape Characteristics": "Radial cracks spreading from the loaded area.",
+                "Image Path": "images/stage2/slab_taptrung.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Distributed Load Crack",
+                "Cause": "Distributed load causing flexural distress over a wider area.",
+                "Shape Characteristics": "Multiple cracks distributed across the slab panel.",
+                "Image Path": "images/stage2/slab_phanbo.png"
+            },
+            {
+                "Component": "Slab",
+                "Crack Type": "Corrosion-Induced Crack",
+                "Cause": "Steel corrosion and expansion of reinforcement.",
+                "Shape Characteristics": "Cracks follow reinforcement layout and may lead to cover delamination.",
+                "Image Path": "images/stage2/slab_anmon.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Shrinkage Crack",
+                "Cause": "Rapid moisture loss; shrinkage stress exceeds tensile capacity.",
+                "Shape Characteristics": "Random, polygonal, or intersecting crack pattern.",
+                "Image Path": "images/stage2/wall_congot.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Thermal Crack",
+                "Cause": "Temperature difference through the wall thickness.",
+                "Shape Characteristics": "Often vertical and wider in the thermal tension zone.",
+                "Image Path": "images/stage2/wall_nhiet.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Vertical Load Crack",
+                "Cause": "Axial or gravity load exceeding local tensile resistance.",
+                "Shape Characteristics": "Mostly vertical cracks extending along wall height.",
+                "Image Path": "images/stage2/wall_doc_taitrong.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Horizontal Load Crack",
+                "Cause": "Lateral action or bending causing horizontal tension zones.",
+                "Shape Characteristics": "Horizontal cracking across the wall face.",
+                "Image Path": "images/stage2/wall_ngang_taitrong.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Diagonal Load Crack",
+                "Cause": "Combined shear and bending due to lateral loading.",
+                "Shape Characteristics": "Inclined diagonal cracking across the wall panel.",
+                "Image Path": "images/stage2/wall_cheo_taitrong.png"
+            },
+            {
+                "Component": "Concrete Wall",
+                "Crack Type": "Corrosion-Induced Crack",
+                "Cause": "Corrosion of embedded reinforcement causing expansion.",
+                "Shape Characteristics": "Longitudinal cracking following reinforcement positions.",
+                "Image Path": "images/stage2/wall_anmon.png"
+            }
         ]
     )
 
@@ -1704,6 +1964,14 @@ def run_main_app():
     st.sidebar.header("Analysis Settings")
     min_conf = st.sidebar.slider("Minimum confidence threshold", 0.0, 1.0, 0.30, 0.05)
     st.sidebar.caption("Only crack regions with confidence greater than or equal to this threshold will be displayed.")
+    mm_per_pixel = st.sidebar.number_input(
+        "Scale calibration (mm per pixel, optional)",
+        min_value=0.0,
+        value=0.0,
+        step=0.001,
+        format="%.4f",
+    )
+    st.sidebar.caption("Set a non-zero scale only if your image has a reliable calibration reference.")
 
     with st.sidebar.expander("📊 User Statistics Manager", expanded=False):
         if user_stats:
@@ -1822,7 +2090,12 @@ def run_main_app():
                 confs = [float(p.get("confidence", 0)) for p in preds_conf]
                 avg_conf = (sum(confs) / len(confs)) if confs else 0.0
 
-                crack_ratio_percent, crack_area_px2 = crack_area_ratio_percent(preds_conf, img_w, img_h)
+                geometry = compute_crack_geometry(preds_conf, img_w, img_h)
+                crack_area_px2 = geometry["area_px2"]
+                crack_ratio_percent = (crack_area_px2 / float(img_w * img_h) * 100.0) if img_w > 0 and img_h > 0 else 0.0
+                crack_length_px = geometry["length_px"]
+                crack_width_avg_px = geometry["avg_width_px"]
+                crack_width_max_px = geometry["max_width_px"]
                 severity = estimate_severity_from_ratio(crack_ratio_percent)
 
                 summary_text = (
@@ -1836,14 +2109,30 @@ def run_main_app():
                     {"Metric": "Total Processing Time", "Value": f"{total_time:.2f} s", "Description": "Total execution time"},
                     {"Metric": "Inference Speed", "Value": f"{total_time:.2f} s/image", "Description": "Processing time per image"},
                     {"Metric": "Average Confidence", "Value": f"{avg_conf:.2f}", "Description": "Average confidence score"},
-                    {"Metric": "Crack Area (px²)", "Value": f"{crack_area_px2:.0f}", "Description": "Mask area in pixels"},
-                    {"Metric": "Crack Area Ratio (%)", "Value": f"{crack_ratio_percent:.2f} %", "Description": "Crack mask area ratio"},
-                    {"Metric": "Crack Length", "Value": "—", "Description": "Estimated if real scale is available"},
-                    {"Metric": "Crack Width", "Value": "—", "Description": "Requires calibrated scale"},
+                    {"Metric": "Crack Area (px²)", "Value": f"{crack_area_px2:.0f}", "Description": "Segmented crack mask area in pixels"},
+                    {"Metric": "Crack Area Ratio (%)", "Value": f"{crack_ratio_percent:.2f} %", "Description": "Crack mask area ratio relative to full image"},
+                    {"Metric": "Crack Length (px)", "Value": f"{crack_length_px:.2f}", "Description": "Estimated from the crack skeleton centerline"},
+                    {"Metric": "Average Crack Width (px)", "Value": f"{crack_width_avg_px:.2f}", "Description": "Average width estimated from distance transform on the crack mask"},
+                    {"Metric": "Maximum Crack Width (px)", "Value": f"{crack_width_max_px:.2f}", "Description": "Maximum local width estimated from the crack mask"},
+                ]
+
+                if mm_per_pixel > 0:
+                    metrics.extend([
+                        {"Metric": "Scale Calibration", "Value": f"{mm_per_pixel:.4f} mm/pixel", "Description": "User-provided scale conversion"},
+                        {"Metric": "Crack Length (mm)", "Value": f"{crack_length_px * mm_per_pixel:.2f}", "Description": "Skeleton-based crack length converted to millimeters"},
+                        {"Metric": "Average Crack Width (mm)", "Value": f"{crack_width_avg_px * mm_per_pixel:.3f}", "Description": "Average crack width converted to millimeters"},
+                        {"Metric": "Maximum Crack Width (mm)", "Value": f"{crack_width_max_px * mm_per_pixel:.3f}", "Description": "Maximum crack width converted to millimeters"},
+                    ])
+                else:
+                    metrics.append(
+                        {"Metric": "Scale Calibration", "Value": "Not provided", "Description": "Millimeter values require a reliable calibration reference in the image"}
+                    )
+
+                metrics.extend([
                     {"Metric": "Severity Level", "Value": severity, "Description": "Severity estimated by crack ratio"},
                     {"Metric": "Timestamp", "Value": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Description": "Execution timestamp"},
                     {"Metric": "Summary", "Value": summary_text, "Description": "Automatic system conclusion"},
-                ]
+                ])
 
                 metrics_df = pd.DataFrame(metrics)
                 render_metrics_dashboard(metrics_df)
