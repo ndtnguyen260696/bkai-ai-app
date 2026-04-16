@@ -11,6 +11,9 @@ import json
 import base64
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+from scipy.ndimage import distance_transform_edt
+from skimage.morphology import skeletonize
 
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -445,7 +448,7 @@ def inject_global_styles():
             }
         }
 
-        /* ===== METRICS DASHBOARD FIXED ===== */
+        /* ===== METRICS DASHBOARD ===== */
         .metric-box{
             background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
             border: 1px solid #dbe7f5;
@@ -455,22 +458,18 @@ def inject_global_styles():
             min-height: 120px;
             margin-bottom: 12px;
         }
-
         .metric-box.metric-minor{
             border: 1px solid #bfe7cd;
             background: linear-gradient(180deg, #f4fff7 0%, #ecfbf1 100%);
         }
-
         .metric-box.metric-moderate{
             border: 1px solid #ffd59c;
             background: linear-gradient(180deg, #fffaf2 0%, #fff3df 100%);
         }
-
         .metric-box.metric-severe{
             border: 1px solid #f3b4b4;
             background: linear-gradient(180deg, #fff6f6 0%, #ffebeb 100%);
         }
-
         .metric-name{
             font-size: 12px;
             font-weight: 800;
@@ -479,7 +478,6 @@ def inject_global_styles():
             color: #64748b;
             margin-bottom: 8px;
         }
-
         .metric-number{
             font-size: 24px;
             font-weight: 800;
@@ -488,13 +486,11 @@ def inject_global_styles():
             margin-bottom: 6px;
             word-break: break-word;
         }
-
         .metric-help{
             font-size: 13px;
             line-height: 1.5;
             color: #64748b;
         }
-
         .metric-summary{
             background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
             border: 1px solid #dbe7f5;
@@ -504,22 +500,18 @@ def inject_global_styles():
             margin-top: 8px;
             margin-bottom: 12px;
         }
-
         .metric-summary.metric-minor{
             border: 1px solid #bfe7cd;
             background: linear-gradient(180deg, #f4fff7 0%, #ecfbf1 100%);
         }
-
         .metric-summary.metric-moderate{
             border: 1px solid #ffd59c;
             background: linear-gradient(180deg, #fffaf2 0%, #fff3df 100%);
         }
-
         .metric-summary.metric-severe{
             border: 1px solid #f3b4b4;
             background: linear-gradient(180deg, #fff6f6 0%, #ffebeb 100%);
         }
-
         .metric-summary-title{
             font-size: 13px;
             font-weight: 800;
@@ -528,7 +520,6 @@ def inject_global_styles():
             color: #64748b;
             margin-bottom: 8px;
         }
-
         .metric-summary-text{
             font-size: 18px;
             font-weight: 700;
@@ -779,6 +770,164 @@ def estimate_severity_from_ratio(area_ratio_percent: float):
         return "Severe"
 
 
+def predictions_to_binary_mask(predictions, img_w: int, img_h: int):
+    mask_img = Image.new("L", (img_w, img_h), 0)
+    d = ImageDraw.Draw(mask_img)
+
+    for p in predictions:
+        pts_raw = p.get("points", None)
+        polys = extract_polygons(pts_raw, img_w, img_h) if pts_raw is not None else []
+        if polys:
+            for poly in polys:
+                if len(poly) >= 3:
+                    d.polygon(poly, fill=255)
+        else:
+            x = p.get("x")
+            y = p.get("y")
+            w = p.get("width")
+            h = p.get("height")
+            if None not in (x, y, w, h):
+                x0 = max(0, int(round(float(x) - float(w) / 2)))
+                y0 = max(0, int(round(float(y) - float(h) / 2)))
+                x1 = min(img_w - 1, int(round(float(x) + float(w) / 2)))
+                y1 = min(img_h - 1, int(round(float(y) + float(h) / 2)))
+                d.rectangle([x0, y0, x1, y1], fill=255)
+
+    return np.array(mask_img, dtype=np.uint8)
+
+
+def compute_crack_measurements(predictions, img_w: int, img_h: int, mm_per_pixel: float | None = None):
+    if img_w <= 0 or img_h <= 0:
+        return {}
+
+    mask = predictions_to_binary_mask(predictions, img_w, img_h)
+    binary = mask > 0
+
+    area_px2 = float(binary.sum())
+    if area_px2 <= 0:
+        return {
+            "mask": mask,
+            "skeleton": np.zeros_like(binary, dtype=bool),
+            "length_px": 0.0,
+            "avg_width_px": 0.0,
+            "max_width_px": 0.0,
+            "max_width_line": None,
+            "max_width_center": None,
+            "area_px2": 0.0,
+            "ratio_percent": 0.0,
+        }
+
+    skeleton = skeletonize(binary)
+    skel_points = np.argwhere(skeleton)
+
+    if len(skel_points) >= 2:
+        length_px = 0.0
+        pts = skel_points[np.lexsort((skel_points[:, 1], skel_points[:, 0]))]
+        for i in range(1, len(pts)):
+            y0, x0 = pts[i - 1]
+            y1, x1 = pts[i]
+            dy = float(y1 - y0)
+            dx = float(x1 - x0)
+            step = (dx * dx + dy * dy) ** 0.5
+            if step <= 2.0:
+                length_px += step
+        if length_px <= 0:
+            length_px = float(skeleton.sum())
+    else:
+        length_px = float(skeleton.sum())
+
+    dist_map = distance_transform_edt(binary)
+    local_half_widths = dist_map[skeleton]
+    if local_half_widths.size > 0:
+        local_widths = local_half_widths * 2.0
+        avg_width_px = float(local_widths.mean())
+        max_width_px = float(local_widths.max())
+        max_idx = int(local_widths.argmax())
+        cy, cx = skel_points[max_idx]
+    else:
+        avg_width_px = float(area_px2 / max(length_px, 1.0))
+        max_width_px = avg_width_px
+        cy, cx = None, None
+
+    max_width_line = None
+    max_width_center = None
+    if cy is not None and cx is not None and max_width_px > 0:
+        radius = max(1, int(round(max_width_px / 2.0)))
+        x0 = max(0, int(cx - radius))
+        x1 = min(img_w - 1, int(cx + radius))
+        y0 = int(cy)
+        y1 = int(cy)
+        max_width_line = ((x0, y0), (x1, y1))
+        max_width_center = (int(cx), int(cy))
+
+    ratio_percent = (area_px2 / float(img_w * img_h)) * 100.0 if img_w > 0 and img_h > 0 else 0.0
+
+    out = {
+        "mask": mask,
+        "skeleton": skeleton,
+        "length_px": float(length_px),
+        "avg_width_px": float(avg_width_px),
+        "max_width_px": float(max_width_px),
+        "max_width_line": max_width_line,
+        "max_width_center": max_width_center,
+        "area_px2": float(area_px2),
+        "ratio_percent": float(ratio_percent),
+    }
+
+    if mm_per_pixel is not None and mm_per_pixel > 0:
+        out["length_mm"] = out["length_px"] * mm_per_pixel
+        out["avg_width_mm"] = out["avg_width_px"] * mm_per_pixel
+        out["max_width_mm"] = out["max_width_px"] * mm_per_pixel
+
+    return out
+
+
+def draw_measurement_overlay(image: Image.Image, measurements: dict):
+    if image is None:
+        return None
+
+    base = image.convert("RGBA")
+    overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    font = _get_font(20)
+
+    skeleton = measurements.get("skeleton", None)
+    if skeleton is not None:
+        ys, xs = np.where(skeleton)
+        for x, y in zip(xs, ys):
+            draw.point((int(x), int(y)), fill=(255, 215, 0, 255))
+
+    max_width_line = measurements.get("max_width_line")
+    max_width_center = measurements.get("max_width_center")
+    if max_width_line:
+        draw.line([max_width_line[0], max_width_line[1]], fill=(255, 80, 80, 255), width=3)
+    if max_width_center:
+        cx, cy = max_width_center
+        r = 4
+        draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=(255, 255, 255, 255), outline=(255, 80, 80, 255))
+
+    lines = [
+        f"Length: {measurements.get('length_px', 0.0):.1f} px",
+        f"Avg Width: {measurements.get('avg_width_px', 0.0):.2f} px",
+        f"Max Width: {measurements.get('max_width_px', 0.0):.2f} px",
+    ]
+    if "length_mm" in measurements:
+        lines.append(f"Length: {measurements.get('length_mm', 0.0):.2f} mm")
+        lines.append(f"Avg Width: {measurements.get('avg_width_mm', 0.0):.3f} mm")
+        lines.append(f"Max Width: {measurements.get('max_width_mm', 0.0):.3f} mm")
+
+    panel_x, panel_y = 18, 18
+    panel_w = 280
+    line_h = 24
+    panel_h = 14 + len(lines) * line_h
+    draw.rounded_rectangle([panel_x, panel_y, panel_x + panel_w, panel_y + panel_h], radius=14, fill=(10, 25, 48, 185))
+    for i, line in enumerate(lines):
+        draw.text((panel_x + 14, panel_y + 8 + i * line_h), line, fill=(255, 255, 255, 255), font=font)
+
+    result = Image.alpha_composite(base, overlay)
+    return result.convert("RGB")
+
+
 def render_metrics_dashboard(metrics_df: pd.DataFrame):
     if metrics_df is None or metrics_df.empty:
         st.info("No metrics available.")
@@ -800,11 +949,7 @@ def render_metrics_dashboard(metrics_df: pd.DataFrame):
             summary_value = value
             summary_desc = desc
         else:
-            normal_rows.append({
-                "Metric": metric,
-                "Value": value,
-                "Description": desc
-            })
+            normal_rows.append({"Metric": metric, "Value": value, "Description": desc})
 
     severity_class = ""
     sv = severity_value.lower()
@@ -817,9 +962,8 @@ def render_metrics_dashboard(metrics_df: pd.DataFrame):
 
     cols_per_row = 3
     for i in range(0, len(normal_rows), cols_per_row):
-        row_items = normal_rows[i:i+cols_per_row]
+        row_items = normal_rows[i:i + cols_per_row]
         cols = st.columns(cols_per_row)
-
         for j in range(cols_per_row):
             with cols[j]:
                 if j < len(row_items):
@@ -827,15 +971,13 @@ def render_metrics_dashboard(metrics_df: pd.DataFrame):
                     st.markdown(
                         f"""
                         <div class="metric-box">
-                            <div class="metric-name">{item['Metric']}</div>
-                            <div class="metric-number">{item['Value']}</div>
-                            <div class="metric-help">{item['Description']}</div>
+                            <div class="metric-name">{item["Metric"]}</div>
+                            <div class="metric-number">{item["Value"]}</div>
+                            <div class="metric-help">{item["Description"]}</div>
                         </div>
                         """,
                         unsafe_allow_html=True,
                     )
-                else:
-                    st.empty()
 
     if severity_value:
         st.markdown(
@@ -859,6 +1001,7 @@ def render_metrics_dashboard(metrics_df: pd.DataFrame):
             """,
             unsafe_allow_html=True,
         )
+
 
 
 # =========================================================
@@ -1091,7 +1234,7 @@ def export_pdf(
         c.setFont(BODY_FONT, 10)
         c.setFillColor(colors.white)
         c.drawString(x0 + 2, top_y - header_h + 3, "No.")
-        c.drawString(x1 + 2, top_y - header_h + 3, "Metric")
+        c.drawString(x1 + 2, top_y - header_h + 3, "Metric (VI / EN)")
         c.drawString(x2 + 2, top_y - header_h + 3, "Value")
         return top_y - header_h
 
@@ -1704,6 +1847,11 @@ def run_main_app():
     st.sidebar.header("Analysis Settings")
     min_conf = st.sidebar.slider("Minimum confidence threshold", 0.0, 1.0, 0.30, 0.05)
     st.sidebar.caption("Only crack regions with confidence greater than or equal to this threshold will be displayed.")
+    use_scale = st.sidebar.checkbox("Use scale calibration (mm/pixel)", value=False)
+    mm_per_pixel = None
+    if use_scale:
+        mm_per_pixel = st.sidebar.number_input("Scale value (mm per pixel)", min_value=0.0001, value=0.1000, step=0.0001, format="%.4f")
+        st.sidebar.caption("Example: if 1 pixel = 0.10 mm, enter 0.1000.")
 
     with st.sidebar.expander("📊 User Statistics Manager", expanded=False):
         if user_stats:
@@ -1817,12 +1965,23 @@ def run_main_app():
             tab_stage1, tab_stage2 = st.tabs(["Stage 1 – Detailed Analysis Report", "Stage 2 – Crack Classification"])
 
             with tab_stage1:
-                st.subheader("Crack Information Table")
+                st.subheader("Crack Information Dashboard")
 
                 confs = [float(p.get("confidence", 0)) for p in preds_conf]
                 avg_conf = (sum(confs) / len(confs)) if confs else 0.0
 
-                crack_ratio_percent, crack_area_px2 = crack_area_ratio_percent(preds_conf, img_w, img_h)
+                measurements = compute_crack_measurements(
+                    preds_conf,
+                    img_w,
+                    img_h,
+                    mm_per_pixel=mm_per_pixel if use_scale else None,
+                )
+
+                crack_area_px2 = measurements.get("area_px2", 0.0)
+                crack_ratio_percent = measurements.get("ratio_percent", 0.0)
+                length_px = measurements.get("length_px", 0.0)
+                avg_width_px = measurements.get("avg_width_px", 0.0)
+                max_width_px = measurements.get("max_width_px", 0.0)
                 severity = estimate_severity_from_ratio(crack_ratio_percent)
 
                 summary_text = (
@@ -1831,19 +1990,36 @@ def run_main_app():
                     else "Detected cracks are minor or moderate; continuous monitoring is recommended."
                 )
 
+                analyzed_img_measured = draw_measurement_overlay(analyzed_img, measurements)
+
+                st.subheader("Annotated Measurement View")
+                st.image(analyzed_img_measured, use_container_width=True)
+
                 metrics = [
                     {"Metric": "Image Name", "Value": uploaded_file.name, "Description": "Uploaded image filename"},
                     {"Metric": "Total Processing Time", "Value": f"{total_time:.2f} s", "Description": "Total execution time"},
                     {"Metric": "Inference Speed", "Value": f"{total_time:.2f} s/image", "Description": "Processing time per image"},
                     {"Metric": "Average Confidence", "Value": f"{avg_conf:.2f}", "Description": "Average confidence score"},
                     {"Metric": "Crack Area (px²)", "Value": f"{crack_area_px2:.0f}", "Description": "Mask area in pixels"},
-                    {"Metric": "Crack Area Ratio (%)", "Value": f"{crack_ratio_percent:.2f} %", "Description": "Crack mask area ratio"},
-                    {"Metric": "Crack Length", "Value": "—", "Description": "Estimated if real scale is available"},
-                    {"Metric": "Crack Width", "Value": "—", "Description": "Requires calibrated scale"},
-                    {"Metric": "Severity Level", "Value": severity, "Description": "Severity estimated by crack ratio"},
+                    {"Metric": "Crack Area Ratio (%)", "Value": f"{crack_ratio_percent:.2f} %", "Description": "Crack mask area ratio relative to the full image"},
+                    {"Metric": "Crack Length (px)", "Value": f"{length_px:.1f}", "Description": "Estimated crack centerline length in pixels"},
+                    {"Metric": "Average Crack Width (px)", "Value": f"{avg_width_px:.2f}", "Description": "Average width estimated from the crack mask"},
+                    {"Metric": "Maximum Crack Width (px)", "Value": f"{max_width_px:.2f}", "Description": "Maximum local crack width from the mask"},
+                ]
+
+                if use_scale and mm_per_pixel:
+                    metrics.extend([
+                        {"Metric": "Scale (mm/pixel)", "Value": f"{mm_per_pixel:.4f}", "Description": "Calibration value used to convert pixels to millimeters"},
+                        {"Metric": "Crack Length (mm)", "Value": f"{measurements.get('length_mm', 0.0):.2f}", "Description": "Estimated crack centerline length in millimeters"},
+                        {"Metric": "Average Crack Width (mm)", "Value": f"{measurements.get('avg_width_mm', 0.0):.3f}", "Description": "Average width converted to millimeters"},
+                        {"Metric": "Maximum Crack Width (mm)", "Value": f"{measurements.get('max_width_mm', 0.0):.3f}", "Description": "Maximum local crack width converted to millimeters"},
+                    ])
+
+                metrics.extend([
+                    {"Metric": "Severity Level", "Value": severity, "Description": "Severity estimated by crack area ratio"},
                     {"Metric": "Timestamp", "Value": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Description": "Execution timestamp"},
                     {"Metric": "Summary", "Value": summary_text, "Description": "Automatic system conclusion"},
-                ]
+                ])
 
                 metrics_df = pd.DataFrame(metrics)
                 render_metrics_dashboard(metrics_df)
@@ -1889,10 +2065,9 @@ def run_main_app():
                     labels = ["Crack region (mask)", "Remaining image area"]
                     ratio = crack_ratio_percent / 100.0
                     ratio = max(0.0, min(1.0, ratio))
-                    sizes = [ratio, 1 - ratio]
 
                     fig2, ax2 = plt.subplots(figsize=(4.2, 3.2), dpi=150)
-                    ax2.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=140)
+                    ax2.pie([ratio, 1 - ratio], labels=labels, autopct="%1.1f%%", startangle=140)
                     ax2.set_title("Crack area ratio relative to full image", pad=8)
                     fig2.tight_layout()
 
@@ -1902,7 +2077,7 @@ def run_main_app():
 
                 pdf_buf = export_pdf(
                     original_img=orig_img,
-                    analyzed_img=analyzed_img,
+                    analyzed_img=analyzed_img_measured,
                     metrics_df=metrics_df,
                     chart_bar_png=bar_png,
                     chart_pie_png=pie_png,
