@@ -6,7 +6,7 @@ pandas
 reportlab
 opencv-python-headless
 numpy
-
+scipy
 
 
 
