@@ -1,3 +1,4 @@
+
 import streamlit as st
 import requests
 from PIL import Image, ImageDraw
@@ -9,11 +10,13 @@ import datetime
 import os
 import json
 import base64
+import math
+import tempfile
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
-import math
 
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -113,7 +116,6 @@ def inject_global_styles():
             border-right:1px solid #d9e3f0;
         }
 
-        /* ===== LOGIN PAGE ===== */
         .app-shell{
             border:1.5px solid var(--shell-border);
             border-radius:30px;
@@ -349,7 +351,6 @@ def inject_global_styles():
             color:#7a879f;
         }
 
-        /* ===== APP CONTENT ===== */
         .bkai-main-header{
             background: linear-gradient(135deg, #4f8cff 0%, #2563eb 55%, #1e4fc4 100%);
             border-radius:24px;
@@ -410,45 +411,6 @@ def inject_global_styles():
             margin-bottom:8px;
         }
 
-        div[data-testid="stDataFrame"]{
-            border-radius:12px;
-            overflow:hidden;
-        }
-
-        .stAlert{
-            border-radius:12px !important;
-        }
-
-        @media (max-width: 900px){
-            .hero{
-                padding:26px 22px 96px;
-            }
-            .hero-flex{
-                flex-direction:column;
-                align-items:flex-start;
-            }
-            .hero-title{
-                font-size:40px;
-            }
-            .hero-subtitle{
-                font-size:16px;
-            }
-            .hero-badge{
-                font-size:18px;
-            }
-            .login-card-wrap{
-                padding:0 14px 20px;
-                margin-top:-64px;
-            }
-            .login-card-inner{
-                padding:18px 18px 22px;
-            }
-            .block-container{
-                max-width: 98%;
-            }
-        }
-
-        /* ===== METRICS DASHBOARD ===== */
         .metric-box{
             background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
             border: 1px solid #dbe7f5;
@@ -458,18 +420,22 @@ def inject_global_styles():
             min-height: 120px;
             margin-bottom: 12px;
         }
+
         .metric-box.metric-minor{
             border: 1px solid #bfe7cd;
             background: linear-gradient(180deg, #f4fff7 0%, #ecfbf1 100%);
         }
+
         .metric-box.metric-moderate{
             border: 1px solid #ffd59c;
             background: linear-gradient(180deg, #fffaf2 0%, #fff3df 100%);
         }
+
         .metric-box.metric-severe{
             border: 1px solid #f3b4b4;
             background: linear-gradient(180deg, #fff6f6 0%, #ffebeb 100%);
         }
+
         .metric-name{
             font-size: 12px;
             font-weight: 800;
@@ -478,6 +444,7 @@ def inject_global_styles():
             color: #64748b;
             margin-bottom: 8px;
         }
+
         .metric-number{
             font-size: 24px;
             font-weight: 800;
@@ -486,11 +453,13 @@ def inject_global_styles():
             margin-bottom: 6px;
             word-break: break-word;
         }
+
         .metric-help{
             font-size: 13px;
             line-height: 1.5;
             color: #64748b;
         }
+
         .metric-summary{
             background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
             border: 1px solid #dbe7f5;
@@ -500,18 +469,22 @@ def inject_global_styles():
             margin-top: 8px;
             margin-bottom: 12px;
         }
+
         .metric-summary.metric-minor{
             border: 1px solid #bfe7cd;
             background: linear-gradient(180deg, #f4fff7 0%, #ecfbf1 100%);
         }
+
         .metric-summary.metric-moderate{
             border: 1px solid #ffd59c;
             background: linear-gradient(180deg, #fffaf2 0%, #fff3df 100%);
         }
+
         .metric-summary.metric-severe{
             border: 1px solid #f3b4b4;
             background: linear-gradient(180deg, #fff6f6 0%, #ffebeb 100%);
         }
+
         .metric-summary-title{
             font-size: 13px;
             font-weight: 800;
@@ -520,6 +493,7 @@ def inject_global_styles():
             color: #64748b;
             margin-bottom: 8px;
         }
+
         .metric-summary-text{
             font-size: 18px;
             font-weight: 700;
@@ -527,6 +501,157 @@ def inject_global_styles():
             color: #0f172a;
         }
 
+        .stage2-wrap{
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            border: 1px solid #d9e6f5;
+            border-radius: 24px;
+            padding: 22px 22px 18px 22px;
+            box-shadow: 0 16px 34px rgba(31,58,120,.08);
+            margin-top: 10px;
+            margin-bottom: 18px;
+        }
+
+        .stage2-title{
+            font-size: 30px;
+            font-weight: 800;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .stage2-subtitle{
+            font-size: 15px;
+            line-height: 1.7;
+            color: #64748b;
+            margin-bottom: 18px;
+            max-width: 920px;
+        }
+
+        .stage2-section-box{
+            background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+            border: 1px solid #d8e5f3;
+            border-radius: 20px;
+            padding: 18px 18px 16px 18px;
+            box-shadow: 0 10px 24px rgba(31,58,120,.06);
+            margin-bottom: 18px;
+        }
+
+        .stage2-section-title{
+            font-size: 22px;
+            font-weight: 800;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+
+        .stage2-section-note{
+            font-size: 14px;
+            line-height: 1.6;
+            color: #64748b;
+            margin-bottom: 14px;
+        }
+
+        .stage2-component-block{
+            margin-top: 14px;
+            margin-bottom: 18px;
+            border: 1px solid #d9e6f5;
+            border-radius: 18px;
+            overflow: hidden;
+            background: #ffffff;
+            box-shadow: 0 8px 20px rgba(31,58,120,.05);
+        }
+
+        .stage2-component-header{
+            background: linear-gradient(135deg, #4f8cff 0%, #2b6ee9 60%, #1d5ddb 100%);
+            color: white;
+            padding: 12px 16px;
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        .stage2-table-header{
+            display:grid;
+            grid-template-columns: 1.15fr 1.45fr 2.4fr 2.4fr 1.45fr;
+            gap: 0;
+            background: #eaf4ff;
+            border-bottom: 1px solid #d6e5f5;
+        }
+
+        .stage2-table-header div{
+            padding: 12px 12px;
+            font-size: 13px;
+            font-weight: 800;
+            color: #1e293b;
+            border-right: 1px solid #d6e5f5;
+        }
+
+        .stage2-table-header div:last-child{ border-right:none; }
+
+        .stage2-row{
+            display:grid;
+            grid-template-columns: 1.15fr 1.45fr 2.4fr 2.4fr 1.45fr;
+            gap:0;
+            border-bottom:1px solid #e6edf6;
+            align-items:stretch;
+            background:#ffffff;
+        }
+
+        .stage2-row:nth-child(even){ background:#fbfdff; }
+
+        .stage2-cell{
+            padding:14px 12px;
+            border-right:1px solid #e6edf6;
+            font-size:14px;
+            line-height:1.7;
+            color:#334155;
+            display:flex;
+            align-items:flex-start;
+            min-height:132px;
+        }
+
+        .stage2-cell:last-child{ border-right:none; }
+        .stage2-cell.component-name{ font-weight:800; color:#1e293b; }
+        .stage2-cell.crack-name{ font-weight:700; color:#2563eb; }
+
+        .stage2-imgbox{
+            width:100%;
+            min-height:104px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            border:1px solid #dbe6f3;
+            border-radius:14px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:8px;
+        }
+
+        .stage2-imgbox img{
+            max-width:100%;
+            max-height:96px;
+            object-fit:contain;
+            display:block;
+            border-radius:8px;
+        }
+
+        .stage2-empty{
+            color:#94a3b8;
+            font-style:italic;
+            font-size:13px;
+        }
+
+        @media (max-width: 980px){
+            .stage2-table-header,
+            .stage2-row{ grid-template-columns:1fr; }
+
+            .stage2-table-header div,
+            .stage2-cell{
+                border-right:none;
+                border-bottom:1px solid #e6edf6;
+                min-height:auto;
+            }
+            .stage2-cell{ padding:10px 12px; }
+            .stage2-imgbox{ min-height:90px; }
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -545,13 +670,11 @@ def fig_to_png(fig) -> io.BytesIO:
     buf.seek(0)
     return buf
 
-
 def _hue_from_key(key: str) -> float:
     if not key:
         key = "default"
     h_int = int(hashlib.md5(key.encode("utf-8")).hexdigest()[:8], 16)
     return (h_int % 360) / 360.0
-
 
 def stable_rgb(image_key: str, instance_key: str):
     base_h = _hue_from_key("IMG|" + (image_key or "noimage"))
@@ -565,7 +688,6 @@ def stable_rgb(image_key: str, instance_key: str):
 @st.cache_resource
 def _get_font(size=18):
     from PIL import ImageFont as PILImageFont
-
     for fp in [
         "DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -618,7 +740,6 @@ def extract_poly_points(points_field, img_w: int, img_h: int):
     ys = [y for _, y in pts]
     max_x = max(xs) if xs else 0
     max_y = max(ys) if ys else 0
-
     x_norm = max_x <= 1.5
     y_norm = max_y <= 1.5
 
@@ -633,7 +754,6 @@ def extract_poly_points(points_field, img_w: int, img_h: int):
         out.append((x, y))
     return out
 
-
 def extract_polygons(points_field, img_w: int, img_h: int):
     polys = []
     if isinstance(points_field, dict):
@@ -647,7 +767,6 @@ def extract_polygons(points_field, img_w: int, img_h: int):
         if len(poly) >= 3:
             polys.append(poly)
     return polys
-
 
 def crack_area_from_predictions(predictions, img_w: int, img_h: int):
     if img_w <= 0 or img_h <= 0:
@@ -668,7 +787,6 @@ def crack_area_from_predictions(predictions, img_w: int, img_h: int):
     hist = mask.histogram()
     white = sum(hist[1:])
     return float(white)
-
 
 def crack_area_ratio_percent(predictions, img_w: int, img_h: int):
     img_area = float(img_w * img_h) if img_w > 0 and img_h > 0 else 0.0
@@ -716,7 +834,6 @@ def draw_predictions_with_mask(image: Image.Image, predictions, image_key: str =
             instance_key = f"{p.get('class','')}|{x}|{y}|{w}|{h}|{i}"
 
         r, g, b = stable_rgb(image_key, instance_key)
-
         box_color = (r, g, b, 255)
         overlay_fill = (r, g, b, 110)
         overlay_edge = (r, g, b, 255)
@@ -731,11 +848,11 @@ def draw_predictions_with_mask(image: Image.Image, predictions, image_key: str =
 
         if len(poly) >= 3:
             draw.polygon(poly, fill=overlay_fill)
-            draw.line(poly + [poly[0]], fill=overlay_edge, width=1)
+            draw.line(poly + [poly[0]], fill=overlay_edge, width=2)
         else:
             draw.rectangle([x0, y0, x1, y1], fill=(r, g, b, 60))
 
-        draw.rectangle([x0, y0, x1, y1], outline=box_color, width=2)
+        draw.rectangle([x0, y0, x1, y1], outline=box_color, width=3)
 
         cls = p.get("class", "crack")
         label = f"{cls} {int(round(conf * 100))}%"
@@ -757,7 +874,240 @@ def draw_predictions_with_mask(image: Image.Image, predictions, image_key: str =
 
 
 # =========================================================
-# 1.3 SEVERITY
+# 1.3 GEOMETRY MEASUREMENT WITHOUT SCIPY / SKIMAGE
+# =========================================================
+
+def build_union_mask_from_predictions(predictions, img_w, img_h):
+    mask = np.zeros((img_h, img_w), dtype=np.uint8)
+    for p in predictions:
+        pts_raw = p.get("points", None)
+        if pts_raw is None:
+            continue
+
+        polys = []
+        if isinstance(pts_raw, dict):
+            for k in sorted(pts_raw.keys(), key=lambda z: str(z)):
+                seg = pts_raw[k]
+                poly = []
+                if isinstance(seg, list):
+                    for pt in seg:
+                        if isinstance(pt, dict) and "x" in pt and "y" in pt:
+                            poly.append([int(float(pt["x"])), int(float(pt["y"]))])
+                        elif isinstance(pt, (list, tuple)) and len(pt) == 2:
+                            poly.append([int(float(pt[0])), int(float(pt[1]))])
+                if len(poly) >= 3:
+                    polys.append(np.array(poly, dtype=np.int32))
+        elif isinstance(pts_raw, list):
+            poly = []
+            for pt in pts_raw:
+                if isinstance(pt, dict) and "x" in pt and "y" in pt:
+                    poly.append([int(float(pt["x"])), int(float(pt["y"]))])
+                elif isinstance(pt, (list, tuple)) and len(pt) == 2:
+                    poly.append([int(float(pt[0])), int(float(pt[1]))])
+            if len(poly) >= 3:
+                polys.append(np.array(poly, dtype=np.int32))
+
+        for poly in polys:
+            cv2.fillPoly(mask, [poly], 255)
+
+    return mask
+
+def morphological_skeleton(binary_mask):
+    thin = binary_mask.copy()
+    skel = np.zeros_like(thin)
+    element = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
+    while True:
+        eroded = cv2.erode(thin, element)
+        opened = cv2.dilate(eroded, element)
+        temp = cv2.subtract(thin, opened)
+        skel = cv2.bitwise_or(skel, temp)
+        thin = eroded.copy()
+        if cv2.countNonZero(thin) == 0:
+            break
+    return skel
+
+def measure_crack_geometry_from_mask(mask):
+    if mask is None or mask.size == 0 or cv2.countNonZero(mask) == 0:
+        return {
+            "length_px": 0.0,
+            "avg_width_px": 0.0,
+            "max_width_px": 0.0,
+            "skeleton": np.zeros_like(mask),
+            "dist_map": np.zeros(mask.shape, dtype=np.float32),
+            "max_point": (0, 0),
+        }
+
+    skeleton = morphological_skeleton(mask)
+    length_px = float(cv2.countNonZero(skeleton))
+    dist_map = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
+
+    skeleton_values = dist_map[skeleton > 0]
+    if len(skeleton_values) > 0:
+        avg_width_px = float(np.mean(skeleton_values) * 2.0)
+    else:
+        avg_width_px = 0.0
+
+    _, max_val, _, max_loc = cv2.minMaxLoc(dist_map)
+    max_width_px = float(max_val * 2.0)
+
+    return {
+        "length_px": length_px,
+        "avg_width_px": avg_width_px,
+        "max_width_px": max_width_px,
+        "skeleton": skeleton,
+        "dist_map": dist_map,
+        "max_point": max_loc,
+    }
+
+def create_measurement_visualization(
+    pil_image,
+    predictions,
+    length_value,
+    avg_width_value,
+    max_width_value,
+    unit_text="px",
+    panel_ratio=0.36,
+):
+    img_rgb = np.array(pil_image.convert("RGB"))
+    img = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+    h, w = img.shape[:2]
+
+    left_w = int(w * (1.0 - panel_ratio))
+    right_w = w - left_w
+    crack_view = img.copy()
+
+    box_color = (118, 52, 255)
+    mask_fill = (145, 88, 255)
+    center_color = (40, 195, 255)
+    width_line_color = (90, 110, 255)
+    point_color = (255, 255, 255)
+
+    union_mask = np.zeros((h, w), dtype=np.uint8)
+    first_label_done = False
+
+    for p in predictions:
+        x = p.get("x")
+        y = p.get("y")
+        bw = p.get("width")
+        bh = p.get("height")
+        if None in (x, y, bw, bh):
+            continue
+
+        x0 = max(0, int(float(x) - float(bw) / 2))
+        y0 = max(0, int(float(y) - float(bh) / 2))
+        x1 = min(w - 1, int(float(x) + float(bw) / 2))
+        y1 = min(h - 1, int(float(y) + float(bh) / 2))
+        cv2.rectangle(crack_view, (x0, y0), (x1, y1), box_color, 3)
+
+        pts_raw = p.get("points", None)
+        polys = []
+        if isinstance(pts_raw, dict):
+            for k in sorted(pts_raw.keys(), key=lambda z: str(z)):
+                seg = pts_raw[k]
+                poly = []
+                if isinstance(seg, list):
+                    for pt in seg:
+                        if isinstance(pt, dict) and "x" in pt and "y" in pt:
+                            poly.append([int(float(pt["x"])), int(float(pt["y"]))])
+                        elif isinstance(pt, (list, tuple)) and len(pt) == 2:
+                            poly.append([int(float(pt[0])), int(float(pt[1]))])
+                if len(poly) >= 3:
+                    polys.append(np.array(poly, dtype=np.int32))
+        elif isinstance(pts_raw, list):
+            poly = []
+            for pt in pts_raw:
+                if isinstance(pt, dict) and "x" in pt and "y" in pt:
+                    poly.append([int(float(pt["x"])), int(float(pt["y"]))])
+                elif isinstance(pt, (list, tuple)) and len(pt) == 2:
+                    poly.append([int(float(pt[0])), int(float(pt[1]))])
+            if len(poly) >= 3:
+                polys.append(np.array(poly, dtype=np.int32))
+
+        if polys:
+            overlay = crack_view.copy()
+            cv2.fillPoly(overlay, polys, mask_fill)
+            crack_view = cv2.addWeighted(overlay, 0.34, crack_view, 0.66, 0)
+            for poly in polys:
+                cv2.polylines(crack_view, [poly], True, box_color, 3)
+                cv2.fillPoly(union_mask, [poly], 255)
+
+        if not first_label_done:
+            conf = float(p.get("confidence", 0.0))
+            label = f"crack {conf:.2f}"
+            cv2.rectangle(crack_view, (10, 10), (128, 46), box_color, -1)
+            cv2.putText(
+                crack_view, label, (18, 34),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.60,
+                (255, 255, 255), 2, cv2.LINE_AA
+            )
+            first_label_done = True
+
+    if cv2.countNonZero(union_mask) > 0:
+        skeleton = morphological_skeleton(union_mask)
+        crack_view[skeleton > 0] = center_color
+
+        dist_map = cv2.distanceTransform(union_mask, cv2.DIST_L2, 5)
+        _, max_val, _, max_loc = cv2.minMaxLoc(dist_map)
+        cx, cy = int(max_loc[0]), int(max_loc[1])
+        radius = int(max_val)
+
+        x0 = max(0, cx - radius)
+        x1 = min(w - 1, cx + radius)
+        cv2.line(crack_view, (x0, cy), (x1, cy), width_line_color, 3)
+        cv2.circle(crack_view, (cx, cy), 5, point_color, -1)
+        cv2.circle(crack_view, (cx, cy), 8, width_line_color, 2)
+
+    crack_view = cv2.resize(crack_view, (left_w, h))
+
+    panel = np.zeros((h, right_w, 3), dtype=np.uint8)
+    panel[:] = (58, 86, 132)
+
+    title_fs = 0.54
+    value_fs = 0.88
+    title_th = 1
+    value_th = 2
+
+    rows_y = [int(h * 0.22), int(h * 0.50), int(h * 0.78)]
+    labels = ["Length", "Avg Width", "Max Width"]
+    values = [
+        f"{length_value:.1f} {unit_text}",
+        f"{avg_width_value:.2f} {unit_text}",
+        f"{max_width_value:.2f} {unit_text}",
+    ]
+    colors_row = [
+        (255, 170, 80),
+        (120, 220, 120),
+        (110, 120, 255),
+    ]
+
+    for i, ymid in enumerate(rows_y):
+        c = colors_row[i]
+        cv2.line(panel, (24, ymid - 8), (56, ymid - 8), c, 3)
+        cv2.circle(panel, (24, ymid - 8), 4, c, -1)
+        cv2.circle(panel, (56, ymid - 8), 4, c, -1)
+
+        cv2.putText(
+            panel, labels[i], (78, ymid - 8),
+            cv2.FONT_HERSHEY_SIMPLEX, title_fs,
+            (255, 255, 255), title_th, cv2.LINE_AA
+        )
+        cv2.putText(
+            panel, values[i], (78, ymid + 22),
+            cv2.FONT_HERSHEY_SIMPLEX, value_fs,
+            c, value_th, cv2.LINE_AA
+        )
+
+        if i < 2:
+            cv2.line(panel, (18, ymid + 46), (right_w - 18, ymid + 46), (108, 125, 156), 1)
+
+    cv2.rectangle(panel, (0, 0), (right_w - 1, h - 1), (72, 98, 145), 2)
+    final = np.concatenate([crack_view, panel], axis=1)
+    final = cv2.cvtColor(final, cv2.COLOR_BGR2RGB)
+    return Image.fromarray(final)
+
+
+# =========================================================
+# 1.4 SEVERITY
 # =========================================================
 
 def estimate_severity_from_ratio(area_ratio_percent: float):
@@ -766,247 +1116,12 @@ def estimate_severity_from_ratio(area_ratio_percent: float):
         return "Minor"
     elif r < 1.0:
         return "Moderate"
-    else:
-        return "Severe"
+    return "Severe"
 
 
-def predictions_to_binary_mask(predictions, img_w: int, img_h: int):
-    mask_img = Image.new("L", (img_w, img_h), 0)
-    d = ImageDraw.Draw(mask_img)
-
-    for p in predictions:
-        pts_raw = p.get("points", None)
-        polys = extract_polygons(pts_raw, img_w, img_h) if pts_raw is not None else []
-        if polys:
-            for poly in polys:
-                if len(poly) >= 3:
-                    d.polygon(poly, fill=255)
-        else:
-            x = p.get("x")
-            y = p.get("y")
-            w = p.get("width")
-            h = p.get("height")
-            if None not in (x, y, w, h):
-                x0 = max(0, int(round(float(x) - float(w) / 2)))
-                y0 = max(0, int(round(float(y) - float(h) / 2)))
-                x1 = min(img_w - 1, int(round(float(x) + float(w) / 2)))
-                y1 = min(img_h - 1, int(round(float(y) + float(h) / 2)))
-                d.rectangle([x0, y0, x1, y1], fill=255)
-
-    return np.array(mask_img, dtype=np.uint8)
-
-
-def cv2_skeletonize(binary: np.ndarray) -> np.ndarray:
-    img = (binary.astype(np.uint8) * 255).copy()
-    skeleton = np.zeros_like(img)
-    kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
-
-    while True:
-        eroded = cv2.erode(img, kernel)
-        temp = cv2.dilate(eroded, kernel)
-        temp = cv2.subtract(img, temp)
-        skeleton = cv2.bitwise_or(skeleton, temp)
-        img = eroded.copy()
-        if cv2.countNonZero(img) == 0:
-            break
-
-    return skeleton > 0
-
-
-def estimate_local_normal(skeleton_bool: np.ndarray, center_xy: tuple[int, int]) -> tuple[float, float]:
-    ys, xs = np.where(skeleton_bool)
-    if len(xs) < 3:
-        return (0.0, 1.0)
-
-    cx, cy = center_xy
-    pts = np.column_stack([xs, ys]).astype(np.float32)
-    d2 = (pts[:, 0] - cx) ** 2 + (pts[:, 1] - cy) ** 2
-    idx = np.argsort(d2)[: min(25, len(pts))]
-    local = pts[idx]
-    if len(local) < 2:
-        return (0.0, 1.0)
-
-    mean = local.mean(axis=0)
-    centered = local - mean
-    cov = np.cov(centered.T)
-    vals, vecs = np.linalg.eigh(cov)
-    tangent = vecs[:, np.argmax(vals)]
-    tx, ty = float(tangent[0]), float(tangent[1])
-    norm = math.hypot(tx, ty)
-    if norm == 0:
-        return (0.0, 1.0)
-    tx, ty = tx / norm, ty / norm
-    nx, ny = -ty, tx
-    return (nx, ny)
-
-
-def trace_width_line(binary: np.ndarray, center_xy: tuple[int, int], normal_xy: tuple[float, float], half_width_px: float):
-    h, w = binary.shape[:2]
-    cx, cy = center_xy
-    nx, ny = normal_xy
-    max_steps = max(3, int(round(half_width_px * 2.2)) + 2)
-
-    def walk(sign: int):
-        last = (int(cx), int(cy))
-        for step in range(1, max_steps + 1):
-            x = int(round(cx + sign * nx * step))
-            y = int(round(cy + sign * ny * step))
-            if x < 0 or x >= w or y < 0 or y >= h or not binary[y, x]:
-                break
-            last = (x, y)
-        return last
-
-    p1 = walk(-1)
-    p2 = walk(1)
-    return p1, p2
-
-
-def compute_crack_measurements(predictions, img_w: int, img_h: int, mm_per_pixel: float | None = None):
-    if img_w <= 0 or img_h <= 0:
-        return {}
-
-    mask = predictions_to_binary_mask(predictions, img_w, img_h)
-    binary = mask > 0
-    area_px2 = float(binary.sum())
-
-    if area_px2 <= 0:
-        return {
-            "mask": mask,
-            "skeleton": np.zeros_like(binary, dtype=bool),
-            "length_px": 0.0,
-            "avg_width_px": 0.0,
-            "max_width_px": 0.0,
-            "max_width_line": None,
-            "max_width_center": None,
-            "area_px2": 0.0,
-            "ratio_percent": 0.0,
-        }
-
-    skeleton = cv2_skeletonize(binary)
-    length_px = float(skeleton.sum())
-    if length_px <= 0:
-        length_px = float(area_px2)
-
-    dist_map = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
-    local_half_widths = dist_map[skeleton]
-
-    if local_half_widths.size > 0:
-        local_widths = local_half_widths * 2.0
-        avg_width_px = float(local_widths.mean())
-        max_width_px = float(local_widths.max())
-
-        ys, xs = np.where(skeleton)
-        max_idx = int(local_widths.argmax())
-        cy, cx = int(ys[max_idx]), int(xs[max_idx])
-        normal = estimate_local_normal(skeleton, (cx, cy))
-        p1, p2 = trace_width_line(binary, (cx, cy), normal, float(local_half_widths[max_idx]))
-        max_width_line = (p1, p2)
-        max_width_center = (cx, cy)
-    else:
-        avg_width_px = float(area_px2 / max(length_px, 1.0))
-        max_width_px = avg_width_px
-        max_width_line = None
-        max_width_center = None
-
-    ratio_percent = (area_px2 / float(img_w * img_h)) * 100.0 if img_w > 0 and img_h > 0 else 0.0
-
-    out = {
-        "mask": mask,
-        "skeleton": skeleton,
-        "length_px": float(length_px),
-        "avg_width_px": float(avg_width_px),
-        "max_width_px": float(max_width_px),
-        "max_width_line": max_width_line,
-        "max_width_center": max_width_center,
-        "area_px2": float(area_px2),
-        "ratio_percent": float(ratio_percent),
-    }
-
-    if mm_per_pixel is not None and mm_per_pixel > 0:
-        out["length_mm"] = out["length_px"] * mm_per_pixel
-        out["avg_width_mm"] = out["avg_width_px"] * mm_per_pixel
-        out["max_width_mm"] = out["max_width_px"] * mm_per_pixel
-
-    return out
-
-
-def draw_measurement_overlay(image: Image.Image, measurements: dict):
-    if image is None:
-        return None
-
-    base = np.array(image.convert("RGB"))
-    h, w = base.shape[:2]
-    mask = measurements.get("mask")
-    skeleton = measurements.get("skeleton")
-
-    left = base.copy()
-    if mask is not None:
-        mask_u8 = (mask > 0).astype(np.uint8)
-        contours, _ = cv2.findContours(mask_u8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        fill = np.zeros_like(left)
-        fill[mask_u8 > 0] = (120, 70, 220)
-        left = cv2.addWeighted(left, 1.0, fill, 0.45, 0)
-        cv2.drawContours(left, contours, -1, (103, 47, 214), 2)
-
-    if skeleton is not None:
-        ys, xs = np.where(skeleton)
-        left[ys, xs] = (255, 196, 64)
-
-    max_width_line = measurements.get("max_width_line")
-    max_width_center = measurements.get("max_width_center")
-    if max_width_line:
-        cv2.line(left, max_width_line[0], max_width_line[1], (255, 92, 92), 3, cv2.LINE_AA)
-    if max_width_center:
-        cv2.circle(left, max_width_center, 6, (255, 255, 255), -1, cv2.LINE_AA)
-        cv2.circle(left, max_width_center, 9, (255, 92, 92), 2, cv2.LINE_AA)
-
-    # border frame
-    cv2.rectangle(left, (8, 8), (w - 8, h - 8), (88, 45, 210), 3, cv2.LINE_AA)
-
-    # label badge
-    badge_w, badge_h = 120, 34
-    badge = left.copy()
-    cv2.rectangle(badge, (10, 10), (10 + badge_w, 10 + badge_h), (103, 47, 214), -1)
-    left = cv2.addWeighted(badge, 0.55, left, 0.45, 0)
-    cv2.putText(left, 'crack 0.92', (18, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (245, 245, 255), 2, cv2.LINE_AA)
-
-    panel_w = max(260, int(w * 0.36))
-    gap = 14
-    canvas = np.zeros((h, w + gap + panel_w, 3), dtype=np.uint8)
-    canvas[:] = (247, 248, 251)
-    canvas[:, :w] = left
-
-    px = w + gap
-    py = 8
-    ph = h - 16
-    panel = canvas.copy()
-    cv2.rectangle(panel, (px, py), (px + panel_w - 8, py + ph), (38, 63, 104), -1)
-    canvas = cv2.addWeighted(panel, 0.92, canvas, 0.08, 0)
-
-    def stat_line(y, title, value, color):
-        icon_x = px + 28
-        cv2.line(canvas, (icon_x, y), (icon_x + 34, y), color, 3, cv2.LINE_AA)
-        cv2.circle(canvas, (icon_x, y), 5, color, -1, cv2.LINE_AA)
-        cv2.circle(canvas, (icon_x + 34, y), 5, color, -1, cv2.LINE_AA)
-        cv2.putText(canvas, title, (px + 78, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (236, 241, 248), 2, cv2.LINE_AA)
-        cv2.putText(canvas, value, (px + 78, y + 28), cv2.FONT_HERSHEY_SIMPLEX, 1.15, color, 3, cv2.LINE_AA)
-
-    length_text = f"{measurements.get('length_px', 0.0):.1f} px"
-    avg_width_text = f"{measurements.get('avg_width_px', 0.0):.2f} px"
-    max_width_text = f"{measurements.get('max_width_px', 0.0):.2f} px"
-    if "length_mm" in measurements:
-        length_text = f"{measurements.get('length_mm', 0.0):.2f} mm"
-        avg_width_text = f"{measurements.get('avg_width_mm', 0.0):.3f} mm"
-        max_width_text = f"{measurements.get('max_width_mm', 0.0):.3f} mm"
-
-    stat_line(py + 58, 'Length', length_text, (96, 180, 255))
-    cv2.line(canvas, (px + 20, py + 92), (px + panel_w - 26, py + 92), (87, 107, 145), 1, cv2.LINE_AA)
-    stat_line(py + 146, 'Avg Width', avg_width_text, (124, 222, 142))
-    cv2.line(canvas, (px + 20, py + 180), (px + panel_w - 26, py + 180), (87, 107, 145), 1, cv2.LINE_AA)
-    stat_line(py + 234, 'Max Width', max_width_text, (255, 120, 120))
-
-    return Image.fromarray(canvas)
-
+# =========================================================
+# 2. METRICS DASHBOARD
+# =========================================================
 
 def render_metrics_dashboard(metrics_df: pd.DataFrame):
     if metrics_df is None or metrics_df.empty:
@@ -1044,6 +1159,7 @@ def render_metrics_dashboard(metrics_df: pd.DataFrame):
     for i in range(0, len(normal_rows), cols_per_row):
         row_items = normal_rows[i:i + cols_per_row]
         cols = st.columns(cols_per_row)
+
         for j in range(cols_per_row):
             with cols[j]:
                 if j < len(row_items):
@@ -1051,13 +1167,15 @@ def render_metrics_dashboard(metrics_df: pd.DataFrame):
                     st.markdown(
                         f"""
                         <div class="metric-box">
-                            <div class="metric-name">{item["Metric"]}</div>
-                            <div class="metric-number">{item["Value"]}</div>
-                            <div class="metric-help">{item["Description"]}</div>
+                            <div class="metric-name">{item['Metric']}</div>
+                            <div class="metric-number">{item['Value']}</div>
+                            <div class="metric-help">{item['Description']}</div>
                         </div>
                         """,
                         unsafe_allow_html=True,
                     )
+                else:
+                    st.empty()
 
     if severity_value:
         st.markdown(
@@ -1083,18 +1201,17 @@ def render_metrics_dashboard(metrics_df: pd.DataFrame):
         )
 
 
-
 # =========================================================
-# 2. PDF EXPORT
+# 3. PDF EXPORT
 # =========================================================
 
 def export_pdf(
     original_img,
     analyzed_img,
     metrics_df,
-    measurement_visual_img=None,
     chart_bar_png=None,
     chart_pie_png=None,
+    measurement_visual_img=None,
     filename="bkai_report_pro_plus.pdf",
 ):
     buf = io.BytesIO()
@@ -1115,7 +1232,6 @@ def export_pdf(
 
     def draw_header(page_title, subtitle=None, page_no=None):
         y_top = page_h - TOP
-
         logo_h = 0
         if os.path.exists(LOGO_PATH):
             try:
@@ -1143,8 +1259,7 @@ def export_pdf(
         if page_no is not None:
             c.drawRightString(page_w - RIGHT, footer_y, f"Page {page_no}")
 
-        content_start_y = y_top - max(logo_h, 15 * mm) - 20 * mm
-        return content_start_y
+        return y_top - max(logo_h, 15 * mm) - 20 * mm
 
     def draw_pil_image(pil_img, x_left, top_y, max_w, max_h):
         if pil_img is None:
@@ -1164,14 +1279,13 @@ def export_pdf(
             return [""]
         lines = []
         current = words[0]
-        for w in words[1:]:
-            trial = current + " " + w
-            w_trial = pdfmetrics.stringWidth(trial, font_name, font_size)
-            if w_trial <= max_width:
+        for w_ in words[1:]:
+            trial = current + " " + w_
+            if pdfmetrics.stringWidth(trial, font_name, font_size) <= max_width:
                 current = trial
             else:
                 lines.append(current)
-                current = w
+                current = w_
         lines.append(current)
         return lines
 
@@ -1183,17 +1297,16 @@ def export_pdf(
         for line in lines:
             c.drawString(x_left + 2, text_y, line)
             text_y -= leading
-        used_height = leading * len(lines) + 4
-        return used_height, len(lines)
+        return leading * len(lines) + 4
 
     severity_val = ""
     summary_val = ""
     if metrics_df is not None:
         for _, row in metrics_df.iterrows():
-            en = str(row.get("Metric", "")).strip()
-            if en.lower() == "severity level":
+            metric = str(row.get("Metric", "")).strip()
+            if metric == "Severity Level":
                 severity_val = str(row.get("Value", ""))
-            if en.lower() == "summary":
+            if metric == "Summary":
                 summary_val = str(row.get("Value", ""))
 
     if not summary_val:
@@ -1209,9 +1322,9 @@ def export_pdf(
         banner_fill = colors.HexColor("#e8f5e9")
         banner_text = colors.HexColor("#2e7d32")
 
+    # PAGE 1
     page_no = 1
     content_top_y = draw_header("ANALYSIS REPORT", page_no=page_no)
-
     content_top_y -= 5 * mm
     gap_x = 10 * mm
     slot_w = (CONTENT_W - gap_x) / 2.0
@@ -1227,20 +1340,17 @@ def export_pdf(
     images_bottom_y = min(left_bottom, right_bottom)
 
     banner_h = 16 * mm
-    banner_bottom = images_bottom_y - 12 * mm
-    if banner_bottom < BOTTOM + 40 * mm:
-        banner_bottom = BOTTOM + 40 * mm
+    banner_bottom = max(BOTTOM + 40 * mm, images_bottom_y - 12 * mm)
 
     c.setFillColor(banner_fill)
     c.setStrokeColor(colors.transparent)
     c.rect(LEFT, banner_bottom, CONTENT_W, banner_h, stroke=0, fill=1)
-
     c.setFillColor(banner_text)
     c.setFont(BODY_FONT, 11)
     c.drawString(LEFT + 4 * mm, banner_bottom + banner_h / 2.0 - 4, summary_val)
 
     charts_top_y = banner_bottom - 18 * mm
-    max_chart_h = 70 * mm
+    max_chart_h = 62 * mm
     chart_slot_w = slot_w
 
     if chart_bar_png is not None:
@@ -1271,47 +1381,45 @@ def export_pdf(
 
     c.showPage()
 
+    # PAGE 2
     page_no += 1
-    subtitle = "Measurement visualization and summary metrics"
-    content_top_y = draw_header("ANALYSIS REPORT", subtitle=subtitle, page_no=page_no)
+    content_top_y = draw_header("ANALYSIS REPORT", subtitle="Annotated measurement view and metrics summary", page_no=page_no)
 
     if measurement_visual_img is not None:
         c.setFont(BODY_FONT, 11)
         c.setFillColor(colors.black)
-        c.drawString(LEFT, content_top_y + 4 * mm, "Crack Measurement Visualization")
-        vis_bottom = draw_pil_image(measurement_visual_img, LEFT, content_top_y, CONTENT_W, 72 * mm)
-        content_top_y = vis_bottom - 12 * mm
+        c.drawString(LEFT, content_top_y + 4 * mm, "Annotated Measurement View")
+        img = ImageReader(measurement_visual_img)
+        iw, ih = img.getSize()
+        max_w = CONTENT_W
+        max_h = 70 * mm
+        scale = min(max_w / iw, max_h / ih, 1.0)
+        draw_w = iw * scale
+        draw_h = ih * scale
+        y_bottom = content_top_y - draw_h
+        c.drawImage(img, LEFT, y_bottom, width=draw_w, height=draw_h, mask="auto")
+        content_top_y = y_bottom - 12 * mm
 
     rows = []
-    skip_keys = {"Crack Length", "Crack Width"}
+    skip_keys = {"Summary"}
     if metrics_df is not None:
         for _, r in metrics_df.iterrows():
-            en_name = str(r.get("Metric", "")).strip()
-            if en_name in skip_keys:
+            name = str(r.get("Metric", "")).strip()
+            if name in skip_keys:
                 continue
-            label = en_name
-            val = str(r.get("Value", ""))
-            rows.append((label, val))
-
-    if not rows:
-        c.save()
-        buf.seek(0)
-        return buf
+            rows.append((name, str(r.get("Value", ""))))
 
     col1_w = 12 * mm
     col2_w = 95 * mm
     col3_w = CONTENT_W - col1_w - col2_w
-
     header_h = 10 * mm
     base_lead = 4.0
-    max_body_y = content_top_y - 6 * mm
 
     def start_table_page(pn):
         c.showPage()
-        y0 = draw_header("ANALYSIS REPORT", subtitle=subtitle, page_no=pn)
+        y0 = draw_header("ANALYSIS REPORT", subtitle="Metrics summary", page_no=pn)
         return y0 - 10 * mm
 
-    table_top_y = max_body_y
     x0 = LEFT
     x1 = x0 + col1_w
     x2 = x1 + col2_w
@@ -1326,8 +1434,7 @@ def export_pdf(
         c.drawString(x2 + 2, top_y - header_h + 3, "Value")
         return top_y - header_h
 
-    current_y = draw_table_header(table_top_y)
-
+    current_y = draw_table_header(content_top_y)
     for i, (label, val) in enumerate(rows, start=1):
         label_lines = wrap_text(label, BODY_FONT, BODY_SIZE, col2_w - 4)
         value_lines = wrap_text(val, BODY_FONT, BODY_SIZE, col3_w - 4)
@@ -1335,7 +1442,7 @@ def export_pdf(
         leading = BODY_SIZE + base_lead
         row_h = n_lines * leading + 6
 
-        if current_y - row_h < BOTTOM + 30 * mm:
+        if current_y - row_h < BOTTOM + 25 * mm:
             page_no += 1
             current_y = start_table_page(page_no)
             current_y = draw_table_header(current_y)
@@ -1351,21 +1458,17 @@ def export_pdf(
         c.setFont(BODY_FONT, BODY_SIZE)
         c.setFillColor(colors.black)
         c.drawString(x0 + 2, current_y - leading, str(i))
-
         draw_wrapped_cell(label, x1, current_y, col2_w, BODY_FONT, BODY_SIZE, leading)
         draw_wrapped_cell(val, x2, current_y, col3_w, BODY_FONT, BODY_SIZE, leading)
-
         current_y -= row_h
 
     c.save()
     buf.seek(0)
     return buf
 
-
 def export_pdf_no_crack(original_img):
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
-
     page_w, page_h = A4
     LEFT = 20 * mm
     RIGHT = 20 * mm
@@ -1373,12 +1476,8 @@ def export_pdf_no_crack(original_img):
     BOTTOM = 20 * mm
     CONTENT_W = page_w - LEFT - RIGHT
 
-    TITLE_FONT = FONT_NAME
-    BODY_FONT = FONT_NAME
-
-    def draw_header_no_crack():
+    def draw_header():
         y_top = page_h - TOP
-
         logo_h = 0
         if os.path.exists(LOGO_PATH):
             try:
@@ -1389,16 +1488,13 @@ def export_pdf_no_crack(original_img):
                 c.drawImage(logo, LEFT, y_top - logo_h, width=logo_w, height=logo_h, mask="auto")
             except Exception:
                 logo_h = 0
-
-        c.setFont(TITLE_FONT, 18)
+        c.setFont(FONT_NAME, 18)
         c.drawCentredString(page_w / 2, y_top - 6 * mm, "ANALYSIS REPORT")
-        c.setFont(BODY_FONT, 11)
+        c.setFont(FONT_NAME, 11)
         c.drawCentredString(page_w / 2, y_top - 14 * mm, "Case: No significant crack detected")
-
         return y_top - max(logo_h, 15 * mm) - 20 * mm
 
-    content_top_y = draw_header_no_crack()
-
+    content_top_y = draw_header()
     max_img_h = 90 * mm
     gap_x = 10 * mm
     slot_w = (CONTENT_W - gap_x) / 2
@@ -1413,21 +1509,18 @@ def export_pdf_no_crack(original_img):
         c.drawImage(ir, x, bottom, width=w, height=h, mask="auto")
         return bottom
 
-    c.setFont(BODY_FONT, 11)
+    c.setFont(FONT_NAME, 11)
     c.drawString(LEFT, content_top_y + 4 * mm, "Original Image")
     c.drawString(LEFT + slot_w + gap_x, content_top_y + 4 * mm, "Analyzed Image")
-
     left_bottom = draw_pil(original_img, LEFT, content_top_y)
-    _ = draw_pil(original_img, LEFT + slot_w + gap_x, content_top_y)
+    draw_pil(original_img, LEFT + slot_w + gap_x, content_top_y)
 
     banner_y = left_bottom - 12 * mm
     banner_h = 16 * mm
-
     c.setFillColor(colors.HexColor("#e8f5e9"))
     c.rect(LEFT, banner_y, CONTENT_W, banner_h, stroke=0, fill=1)
-
     c.setFillColor(colors.HexColor("#2e7d32"))
-    c.setFont(BODY_FONT, 11)
+    c.setFont(FONT_NAME, 11)
     c.drawString(
         LEFT + 4 * mm,
         banner_y + banner_h / 2 - 4,
@@ -1435,11 +1528,10 @@ def export_pdf_no_crack(original_img):
     )
 
     footer_y = BOTTOM - 6
-    c.setFont(BODY_FONT, 8)
+    c.setFont(FONT_NAME, 8)
     c.setFillColor(colors.grey)
     c.drawString(LEFT, footer_y, f"BKAI – Concrete Crack Inspection | Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}")
     c.drawRightString(page_w - RIGHT, footer_y, "Page 1")
-
     c.showPage()
     c.save()
     buf.seek(0)
@@ -1447,7 +1539,7 @@ def export_pdf_no_crack(original_img):
 
 
 # =========================================================
-# 3. STAGE 2 PDF
+# 4. STAGE 2 PDF
 # =========================================================
 
 def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
@@ -1468,40 +1560,24 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
 
     page_w, _ = A4_LANDSCAPE
     usable_width = page_w - left_margin - right_margin
-
     styles = getSampleStyleSheet()
     for s in styles.byName:
         styles[s].fontName = FONT_NAME
 
     title_style = ParagraphStyle(
-        "TitleStage2",
-        parent=styles["Title"],
-        fontName=FONT_NAME,
-        alignment=1,
-        fontSize=18,
-        leading=22,
-        spaceAfter=6,
+        "TitleStage2", parent=styles["Title"], fontName=FONT_NAME,
+        alignment=1, fontSize=18, leading=22, spaceAfter=6
     )
     subtitle_style = ParagraphStyle(
-        "SubTitleStage2",
-        parent=styles["Normal"],
-        fontName=FONT_NAME,
-        alignment=1,
-        fontSize=10,
-        leading=12,
-        textColor=colors.grey,
-        spaceAfter=8,
+        "SubTitleStage2", parent=styles["Normal"], fontName=FONT_NAME,
+        alignment=1, fontSize=10, leading=12, textColor=colors.grey, spaceAfter=8
     )
     normal = ParagraphStyle(
-        "NormalStage2",
-        parent=styles["Normal"],
-        fontName=FONT_NAME,
-        fontSize=8,
-        leading=10,
+        "NormalStage2", parent=styles["Normal"], fontName=FONT_NAME,
+        fontSize=8, leading=10
     )
 
     elements = []
-
     if os.path.exists(LOGO_PATH):
         logo_flow = RLImage(LOGO_PATH, width=28 * mm, height=28 * mm)
         header_table = Table(
@@ -1510,16 +1586,14 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
             hAlign="LEFT",
         )
         header_table.setStyle(
-            TableStyle(
-                [
-                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                    ("TOPPADDING", (0, 0), (-1, -1), 0),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                    ("GRID", (0, 0), (-1, -1), 0, colors.white),
-                ]
-            )
+            TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ("GRID", (0, 0), (-1, -1), 0, colors.white),
+            ])
         )
         elements.append(header_table)
     else:
@@ -1569,28 +1643,25 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
     )
 
     table.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e88e5")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-                ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
-                ("FONTNAME", (0, 0), (-1, 0), FONT_NAME),
-                ("FONTSIZE", (0, 0), (-1, 0), 9),
-                ("FONTNAME", (0, 1), (-2, -1), FONT_NAME),
-                ("FONTSIZE", (0, 1), (-2, -1), 8),
-                ("VALIGN", (0, 1), (-1, -1), "TOP"),
-                ("ALIGN", (0, 1), (-2, -1), "LEFT"),
-                ("ALIGN", (-1, 1), (-1, -1), "CENTER"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-                ("TOPPADDING", (0, 0), (-1, -1), 3),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-            ]
-        )
+        TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e88e5")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
+            ("FONTNAME", (0, 0), (-1, 0), FONT_NAME),
+            ("FONTSIZE", (0, 0), (-1, 0), 9),
+            ("FONTNAME", (0, 1), (-2, -1), FONT_NAME),
+            ("FONTSIZE", (0, 1), (-2, -1), 8),
+            ("VALIGN", (0, 1), (-1, -1), "TOP"),
+            ("ALIGN", (0, 1), (-2, -1), "LEFT"),
+            ("ALIGN", (-1, 1), (-1, -1), "CENTER"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 3),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+        ])
     )
-
     elements.append(table)
     doc.build(elements)
     buf.seek(0)
@@ -1598,69 +1669,111 @@ def export_stage2_pdf(component_df: pd.DataFrame) -> io.BytesIO:
 
 
 # =========================================================
-# 4. STAGE 2 VIEW
+# 5. STAGE 2 VIEW
 # =========================================================
 
 def render_component_crack_table(component_df: pd.DataFrame):
-    st.markdown("### 2.2. Detailed Crack Table by Structural Component")
+    if component_df is None or component_df.empty:
+        st.info("No Stage 2 crack classification data available.")
+        return
 
-    h1, h2, h3, h4, h5 = st.columns([1, 1.2, 2.2, 2.2, 1.6])
-    header_style = (
-        "background-color:#e3f2fd;padding:6px;border:1px solid #90caf9;"
-        "font-weight:bold;text-align:center;color:#111827;"
+    st.markdown(
+        """
+        <div class="stage2-section-box">
+            <div class="stage2-section-title">2.2. Detailed Crack Table by Structural Component</div>
+            <div class="stage2-section-note">
+                The following knowledge table summarizes typical crack types by structural component,
+                including possible causes, visual characteristics, and illustration images for quick reference.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    h1.markdown(f"<div style='{header_style}'>Component</div>", unsafe_allow_html=True)
-    h2.markdown(f"<div style='{header_style}'>Crack Type</div>", unsafe_allow_html=True)
-    h3.markdown(f"<div style='{header_style}'>Cause</div>", unsafe_allow_html=True)
-    h4.markdown(f"<div style='{header_style}'>Shape Characteristics</div>", unsafe_allow_html=True)
-    h5.markdown(f"<div style='{header_style}'>Illustration</div>", unsafe_allow_html=True)
 
-    st.markdown("<hr style='margin:2px 0 6px 0;'>", unsafe_allow_html=True)
+    table_header_html = """
+    <div class="stage2-table-header">
+        <div>Component</div>
+        <div>Crack Type</div>
+        <div>Cause</div>
+        <div>Shape Characteristics</div>
+        <div>Illustration</div>
+    </div>
+    """
 
-    for component, subdf in component_df.groupby("Component"):
-        st.markdown(
-            f"<div style='background-color:#bbdefb;padding:4px 10px;margin:4px 0;"
-            f"font-weight:bold;border-left:4px solid #1976d2;color:#111827;'>"
-            f"{str(component).upper()}</div>",
-            unsafe_allow_html=True,
-        )
+    grouped = component_df.groupby("Component", sort=False)
+    for component, subdf in grouped:
+        html = f"""
+        <div class="stage2-component-block">
+            <div class="stage2-component-header">{str(component).upper()}</div>
+            {table_header_html}
+        """
 
         first_row = True
         for _, row in subdf.iterrows():
-            c1, c2, c3, c4, c5 = st.columns([1, 1.2, 2.2, 2.2, 1.6])
+            component_name = str(row.get("Component", "")).strip()
+            crack_type = str(row.get("Crack Type", "")).strip()
+            cause = str(row.get("Cause", "")).strip()
+            shape = str(row.get("Shape Characteristics", "")).strip()
+            img_path = str(row.get("Image Path", "") or row.get("Illustration", "")).strip()
 
-            if first_row:
-                c1.markdown(f"<div style='padding:4px;font-weight:bold;'>{component}</div>", unsafe_allow_html=True)
-                first_row = False
-            else:
-                c1.markdown("&nbsp;", unsafe_allow_html=True)
+            component_cell = component_name if first_row else ""
+            first_row = False
 
-            c2.write(row["Crack Type"])
-            c3.write(row["Cause"])
-            c4.write(row["Shape Characteristics"])
+            img_html = '<div class="stage2-empty">No image</div>'
+            if img_path and os.path.exists(img_path):
+                with open(img_path, "rb") as f:
+                    img_b64 = base64.b64encode(f.read()).decode("utf-8")
+                img_html = f'<img src="data:image/png;base64,{img_b64}" alt="{crack_type}" />'
 
-            img_path = row.get("Image Path", "") or row.get("Illustration", "")
-            if isinstance(img_path, str) and img_path and os.path.exists(img_path):
-                c5.image(img_path, use_container_width=True)
-            else:
-                c5.write("—")
-
-        st.markdown("<hr style='margin:6px 0 10px 0;border-top:1px dashed #b0bec5;'>", unsafe_allow_html=True)
-
+            html += f"""
+            <div class="stage2-row">
+                <div class="stage2-cell component-name">{component_cell}</div>
+                <div class="stage2-cell crack-name">{crack_type}</div>
+                <div class="stage2-cell">{cause}</div>
+                <div class="stage2-cell">{shape}</div>
+                <div class="stage2-cell">
+                    <div class="stage2-imgbox">{img_html}</div>
+                </div>
+            </div>
+            """
+        html += "</div>"
+        st.markdown(html, unsafe_allow_html=True)
 
 def show_stage2_demo(key_prefix="stage2"):
-    st.subheader("Stage 2 – Crack Classification and Suggested Causes / Actions")
+    st.markdown(
+        """
+        <div class="stage2-wrap">
+            <div class="stage2-title">Concrete Crack Classification by Structural Component</div>
+            <div class="stage2-subtitle">
+                This section provides a structured knowledge base of common concrete crack types
+                grouped by structural component, together with typical causes, geometric shape
+                characteristics, and illustration examples for engineering interpretation.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    st.markdown("### 2.0. Crack Classification Diagram and Structural Examples")
+    st.markdown(
+        """
+        <div class="stage2-section-box">
+            <div class="stage2-section-title">2.0. Crack Classification Diagram and Structural Examples</div>
+            <div class="stage2-section-note">
+                The two panels below present the general crack classification framework and a set of structural examples
+                to support quick interpretation before reviewing the detailed table.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     col_img1, col_img2 = st.columns([3, 4])
-
     with col_img1:
         tree_path = "images/stage2_crack_tree.png"
         if os.path.exists(tree_path):
             st.image(tree_path, caption="Stage 2 crack classification diagram", use_container_width=True)
         else:
             st.info("Missing file: images/stage2_crack_tree.png")
-
     with col_img2:
         example_path = "images/stage2_structural_example.png"
         if os.path.exists(example_path):
@@ -1668,7 +1781,18 @@ def show_stage2_demo(key_prefix="stage2"):
         else:
             st.info("Missing file: images/stage2_structural_example.png")
 
-    st.markdown("---")
+    st.markdown(
+        """
+        <div class="stage2-section-box">
+            <div class="stage2-section-title">2.1. Summary of Crack Types by Failure Mechanism</div>
+            <div class="stage2-section-note">
+                Select a representative crack category to review the overall failure mechanism classification before
+                moving to the component-based crack table.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     options = [
         "I.1 Plastic Shrinkage Crack",
@@ -1686,108 +1810,76 @@ def show_stage2_demo(key_prefix="stage2"):
     st.selectbox("Select a crack type (summary):", options, key=f"{key_prefix}_summary_selectbox")
     st.caption("Table 1 – Summary of crack types by failure mechanism.")
 
-    st.subheader("Concrete Crack Classification by Structural Component")
-
-    component_crack_data = pd.DataFrame(
-        [
-            {
-                "Component":"Beam",
-                "Crack Type":"Flexural Crack",
-                "Cause":"Caused by bending moment exceeding the allowable limit; inadequate flexural reinforcement or insufficient section capacity.",
-                "Shape Characteristics":"Usually appears at mid-span and is widest in the tension zone.",
-                "Image Path":"images/stage2/beam_uon.png"
-            },
-            {
-                "Component":"Beam",
-                "Crack Type":"Shear Crack",
-                "Cause":"High shear force; inadequate concrete shear capacity or insufficient stirrups.",
-                "Shape Characteristics":"Inclined crack, often around 45° relative to the beam axis.",
-                "Image Path":"images/stage2/beam_cat.png"
-            },
-            {
-                "Component":"Beam",
-                "Crack Type":"Torsional Crack",
-                "Cause":"Insufficient torsional reinforcement or unsuitable cross-section design.",
-                "Shape Characteristics":"Diagonal or zigzag pattern around the beam surface.",
-                "Image Path":"images/stage2/beam_xoan.png"
-            },
-            {
-                "Component":"Beam",
-                "Crack Type":"Corrosion-Induced Crack",
-                "Cause":"Aggressive environment, thin cover depth, and expansion due to steel corrosion.",
-                "Shape Characteristics":"Runs along reinforcement lines and may be accompanied by rust staining or cover spalling.",
-                "Image Path":"images/stage2/beam_anmon.png"
-            },
-            {
-                "Component":"Column",
-                "Crack Type":"Diagonal Crack",
-                "Cause":"Column subjected to high combined compression, bending, or shear; insufficient material or structural capacity.",
-                "Shape Characteristics":"Inclined cracks appear on the surface when the load approaches or exceeds capacity.",
-                "Image Path":"images/stage2/column_cheo.png"
-            },
-            {
-                "Component":"Column",
-                "Crack Type":"Splitting / Longitudinal Crack",
-                "Cause":"High compressive stress causing longitudinal splitting; weak concrete; insufficient longitudinal reinforcement.",
-                "Shape Characteristics":"Multiple parallel vertical cracks.",
-                "Image Path":"images/stage2/column_tach.png"
-            },
-            {
-                "Component":"Slab",
-                "Crack Type":"Plastic Shrinkage Crack",
-                "Cause":"Rapid moisture evaporation while concrete is still plastic due to wind, heat, or dry conditions.",
-                "Shape Characteristics":"Shallow and small cracks, often forming a polygonal pattern.",
-                "Image Path":"images/stage2/slab_congot_deo.png"
-            },
-            {
-                "Component":"Slab",
-                "Crack Type":"Drying Shrinkage Crack",
-                "Cause":"Shrinkage after hardening in dry or hot environments.",
-                "Shape Characteristics":"Map cracking or relatively straight crack lines.",
-                "Image Path":"images/stage2/slab_congot_kho.png"
-            },
-            {
-                "Component":"Concrete Wall",
-                "Crack Type":"Shrinkage Crack",
-                "Cause":"Rapid moisture loss; shrinkage stress exceeds tensile capacity.",
-                "Shape Characteristics":"Random, polygonal, or intersecting crack pattern.",
-                "Image Path":"images/stage2/wall_congot.png"
-            },
-            {
-                "Component":"Concrete Wall",
-                "Crack Type":"Thermal Crack",
-                "Cause":"Temperature difference through the wall thickness.",
-                "Shape Characteristics":"Often vertical and wider in the thermal tension zone.",
-                "Image Path":"images/stage2/wall_nhiet.png"
-            },
-        ]
-    )
+    component_crack_data = pd.DataFrame([
+        {"Component":"Beam","Crack Type":"Flexural Crack","Cause":"Caused by bending moment exceeding the allowable limit; inadequate flexural reinforcement or insufficient section capacity.","Shape Characteristics":"Usually appears at mid-span and is widest in the tension zone.","Image Path":"images/stage2/beam_uon.png"},
+        {"Component":"Beam","Crack Type":"Shear Crack","Cause":"High shear force; inadequate concrete shear capacity or insufficient stirrups.","Shape Characteristics":"Inclined crack, often around 45° relative to the beam axis.","Image Path":"images/stage2/beam_cat.png"},
+        {"Component":"Beam","Crack Type":"Torsional Crack","Cause":"Insufficient torsional reinforcement or unsuitable cross-section design.","Shape Characteristics":"Diagonal or zigzag pattern around the beam surface.","Image Path":"images/stage2/beam_xoan.png"},
+        {"Component":"Beam","Crack Type":"Tensile Crack","Cause":"Direct tensile stress exceeds the tensile strength of concrete.","Shape Characteristics":"Mostly vertical cracks distributed within the tension zone.","Image Path":"images/stage2/beam_keo.png"},
+        {"Component":"Beam","Crack Type":"Sliding Crack","Cause":"Weak bonding or sliding along an interface in the member.","Shape Characteristics":"Long horizontal crack near the interface zone.","Image Path":"images/stage2/beam_truot.png"},
+        {"Component":"Beam","Crack Type":"Corrosion-Induced Crack","Cause":"Aggressive environment, thin cover depth, and expansion due to steel corrosion.","Shape Characteristics":"Runs along reinforcement lines and may be accompanied by rust staining or cover spalling.","Image Path":"images/stage2/beam_anmon.png"},
+        {"Component":"Column","Crack Type":"Diagonal Crack","Cause":"Column subjected to high combined compression, bending, or shear; insufficient material or structural capacity.","Shape Characteristics":"Inclined cracks appear on the surface when the load approaches or exceeds capacity.","Image Path":"images/stage2/column_cheo.png"},
+        {"Component":"Column","Crack Type":"Horizontal Crack","Cause":"Transverse tensile stress or confinement-related failure under loading.","Shape Characteristics":"Horizontal cracks crossing the column width.","Image Path":"images/stage2/column_ngang.png"},
+        {"Component":"Column","Crack Type":"Shrinkage Crack","Cause":"Volume reduction caused by moisture loss after hardening.","Shape Characteristics":"Fine random cracks distributed on the concrete surface.","Image Path":"images/stage2/column_congot.png"},
+        {"Component":"Column","Crack Type":"Splitting / Longitudinal Crack","Cause":"High compressive stress causing longitudinal splitting; weak concrete; insufficient longitudinal reinforcement.","Shape Characteristics":"Multiple parallel vertical cracks.","Image Path":"images/stage2/column_tach.png"},
+        {"Component":"Column","Crack Type":"Corrosion-Induced Crack","Cause":"Expansion of reinforcement due to corrosion in aggressive exposure conditions.","Shape Characteristics":"Vertical cracks along reinforcement lines, often accompanied by rust staining.","Image Path":"images/stage2/column_anmon.png"},
+        {"Component":"Slab","Crack Type":"Plastic Shrinkage Crack","Cause":"Rapid moisture evaporation while concrete is still plastic due to wind, heat, or dry conditions.","Shape Characteristics":"Shallow and small cracks, often forming a polygonal pattern.","Image Path":"images/stage2/slab_congot_deo.png"},
+        {"Component":"Slab","Crack Type":"Drying Shrinkage Crack","Cause":"Shrinkage after hardening in dry or hot environments.","Shape Characteristics":"Map cracking or relatively straight crack lines.","Image Path":"images/stage2/slab_congot_kho.png"},
+        {"Component":"Slab","Crack Type":"Thermal Crack","Cause":"Temperature variation and restraint within the slab.","Shape Characteristics":"One or more dominant cracks, often wider at the exposed surface.","Image Path":"images/stage2/slab_nhiet.png"},
+        {"Component":"Slab","Crack Type":"Flexural Crack","Cause":"Bending stress exceeds the tensile capacity of the slab.","Shape Characteristics":"Cracks develop in the tension zone, usually initiating from the bottom surface.","Image Path":"images/stage2/slab_uon.png"},
+        {"Component":"Slab","Crack Type":"Shear Crack","Cause":"Punching or local shear stress exceeds slab resistance.","Shape Characteristics":"Inclined cracks or local failure zones near concentrated loads.","Image Path":"images/stage2/slab_cat.png"},
+        {"Component":"Slab","Crack Type":"Torsional Crack","Cause":"Torsional action or restraint at slab edges and corners.","Shape Characteristics":"Diagonal or twisting crack pattern near slab corners or edge regions.","Image Path":"images/stage2/slab_xoan.png"},
+        {"Component":"Slab","Crack Type":"Concentrated Load Crack","Cause":"Local stress concentration under point loading.","Shape Characteristics":"Radial cracks spreading from the loaded area.","Image Path":"images/stage2/slab_taptrung.png"},
+        {"Component":"Slab","Crack Type":"Distributed Load Crack","Cause":"Distributed service loads causing flexural distress over a wider panel area.","Shape Characteristics":"Multiple cracks distributed across the slab panel.","Image Path":"images/stage2/slab_phanbo.png"},
+        {"Component":"Slab","Crack Type":"Corrosion-Induced Crack","Cause":"Steel corrosion and expansion of reinforcement within the slab cover zone.","Shape Characteristics":"Cracks follow reinforcement layout and may lead to cover delamination.","Image Path":"images/stage2/slab_anmon.png"},
+        {"Component":"Concrete Wall","Crack Type":"Shrinkage Crack","Cause":"Rapid moisture loss; shrinkage stress exceeds tensile capacity.","Shape Characteristics":"Random, polygonal, or intersecting crack pattern.","Image Path":"images/stage2/wall_congot.png"},
+        {"Component":"Concrete Wall","Crack Type":"Thermal Crack","Cause":"Temperature difference through the wall thickness.","Shape Characteristics":"Often vertical and wider in the thermal tension zone.","Image Path":"images/stage2/wall_nhiet.png"},
+        {"Component":"Concrete Wall","Crack Type":"Vertical Load Crack","Cause":"Axial or gravity load exceeds local tensile resistance in the wall body.","Shape Characteristics":"Mostly vertical cracks extending along the wall height.","Image Path":"images/stage2/wall_doc_taitrong.png"},
+        {"Component":"Concrete Wall","Crack Type":"Horizontal Load Crack","Cause":"Lateral action or bending causes horizontal tensile zones in the wall.","Shape Characteristics":"Horizontal cracking across the wall face.","Image Path":"images/stage2/wall_ngang_taitrong.png"},
+        {"Component":"Concrete Wall","Crack Type":"Diagonal Load Crack","Cause":"Combined shear and bending due to lateral loading or restraint.","Shape Characteristics":"Inclined diagonal cracking across the wall panel.","Image Path":"images/stage2/wall_cheo_taitrong.png"},
+        {"Component":"Concrete Wall","Crack Type":"Corrosion-Induced Crack","Cause":"Corrosion of embedded reinforcement causing expansion and internal tensile stress.","Shape Characteristics":"Longitudinal cracking following reinforcement positions.","Image Path":"images/stage2/wall_anmon.png"},
+    ])
 
     render_component_crack_table(component_crack_data)
     st.caption("Table 2 – Structural component mapping with illustration examples.")
 
-    st.markdown("### 2.3. Export Stage 2 Knowledge Report")
-    csv_bytes = component_crack_data.to_csv(index=False).encode("utf-8-sig")
-    st.download_button(
-        "⬇ Download Stage 2 Table (CSV)",
-        data=csv_bytes,
-        file_name="BKAI_Stage2_CrackTable.csv",
-        mime="text/csv",
-        key=f"stage2_csv_{key_prefix}",
+    st.markdown(
+        """
+        <div class="stage2-section-box">
+            <div class="stage2-section-title">2.3. Export Stage 2 Knowledge Report</div>
+            <div class="stage2-section-note">
+                Download the current Stage 2 knowledge table as CSV or PDF for documentation, presentation,
+                or engineering reference.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
+    csv_bytes = component_crack_data.to_csv(index=False).encode("utf-8-sig")
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        st.download_button(
+            "⬇ Download Stage 2 Table (CSV)",
+            data=csv_bytes,
+            file_name="BKAI_Stage2_CrackTable.csv",
+            mime="text/csv",
+            key=f"stage2_csv_{key_prefix}",
+            use_container_width=True,
+        )
     pdf_buf = export_stage2_pdf(component_crack_data)
-    st.download_button(
-        "📄 Download Stage 2 Knowledge Report (PDF)",
-        data=pdf_buf.getvalue(),
-        file_name="BKAI_Stage2_Report.pdf",
-        mime="application/pdf",
-        key=f"stage2_pdf_{key_prefix}",
-    )
+    with col_btn2:
+        st.download_button(
+            "📄 Download Stage 2 Knowledge Report (PDF)",
+            data=pdf_buf.getvalue(),
+            file_name="BKAI_Stage2_Report.pdf",
+            mime="application/pdf",
+            key=f"stage2_pdf_{key_prefix}",
+            use_container_width=True,
+        )
 
 
 # =========================================================
-# 5. USER STATS
+# 6. USER STATS
 # =========================================================
 
 USER_STATS_FILE = "user_stats.json"
@@ -1802,7 +1894,7 @@ else:
 
 
 # =========================================================
-# 6. MAIN APP
+# 7. MAIN APP
 # =========================================================
 
 def show_top_banner(username=""):
@@ -1812,18 +1904,16 @@ def show_top_banner(username=""):
             <div class="bkai-main-title">BKAI - AI-Based Concrete Crack Detection and Classification System</div>
             <div class="bkai-main-subtitle">
                 {"Welcome back, " + username + ". " if username else ""}
-                Upload concrete images for AI-based crack detection, segmentation, severity estimation, and PDF reporting in one integrated workspace.
+                Upload concrete images for AI-based crack detection, segmentation, severity estimation, geometry measurement, and PDF reporting in one integrated workspace.
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-
 def render_profile_form():
     if "profile_filled" not in st.session_state:
         st.session_state.profile_filled = False
-
     if st.session_state.profile_filled:
         return True
 
@@ -1833,7 +1923,6 @@ def render_profile_form():
 
     with st.form("user_info_form", clear_on_submit=False):
         col1, col2 = st.columns(2)
-
         with col1:
             full_name = st.text_input("Full Name *", placeholder="Enter your full name")
             email = st.text_input("Email *", placeholder="Enter your email address")
@@ -1841,32 +1930,19 @@ def render_profile_form():
             occupation = st.selectbox(
                 "Occupation / User Group *",
                 [
-                    "Student",
-                    "Graduate Student / Researcher",
-                    "Structural Engineer",
-                    "Site Engineer",
-                    "Supervision Consultant",
-                    "Construction Contractor",
-                    "Project Owner / Project Management",
-                    "IT Engineer",
-                    "Lecturer / Academic Staff",
-                    "Other",
+                    "Student", "Graduate Student / Researcher", "Structural Engineer", "Site Engineer",
+                    "Supervision Consultant", "Construction Contractor", "Project Owner / Project Management",
+                    "IT Engineer", "Lecturer / Academic Staff", "Other",
                 ],
             )
-
         with col2:
             country = st.text_input("Country / Region", placeholder="Enter your country or region")
             project_name = st.text_input("Project / Case Name", placeholder="Optional project name")
             purpose = st.selectbox(
                 "Purpose of Use",
                 [
-                    "Academic Research",
-                    "Thesis / Dissertation",
-                    "Site Inspection",
-                    "Structural Monitoring",
-                    "Quality Control",
-                    "Training / Demonstration",
-                    "Other",
+                    "Academic Research", "Thesis / Dissertation", "Site Inspection",
+                    "Structural Monitoring", "Quality Control", "Training / Demonstration", "Other",
                 ],
             )
             notes = st.text_area("Remarks / Notes", placeholder="Optional notes", height=110)
@@ -1919,7 +1995,6 @@ def render_profile_form():
     st.markdown("</div>", unsafe_allow_html=True)
     return False
 
-
 def run_main_app():
     if not ROBOFLOW_FULL_URL:
         st.error("ROBOFLOW_FULL_URL is not configured.")
@@ -1931,34 +2006,35 @@ def run_main_app():
         return
 
     st.sidebar.markdown("<div class='bkai-sidebar-user'>Active User: " + st.session_state.get("username", "-") + "</div>", unsafe_allow_html=True)
-
     st.sidebar.header("Analysis Settings")
     min_conf = st.sidebar.slider("Minimum confidence threshold", 0.0, 1.0, 0.30, 0.05)
     st.sidebar.caption("Only crack regions with confidence greater than or equal to this threshold will be displayed.")
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Measurement Settings")
     use_scale = st.sidebar.checkbox("Use scale calibration (mm/pixel)", value=False)
-    mm_per_pixel = None
+    mm_per_pixel = 1.0
     if use_scale:
-        mm_per_pixel = st.sidebar.number_input("Scale value (mm per pixel)", min_value=0.0001, value=0.1000, step=0.0001, format="%.4f")
-        st.sidebar.caption("Example: if 1 pixel = 0.10 mm, enter 0.1000.")
+        mm_per_pixel = st.sidebar.number_input(
+            "mm per pixel",
+            min_value=0.0001,
+            value=0.1000,
+            step=0.0001,
+            format="%.4f",
+        )
 
     with st.sidebar.expander("📊 User Statistics Manager", expanded=False):
         if user_stats:
             df_stats = pd.DataFrame(user_stats)
             st.dataframe(df_stats, use_container_width=True, height=220)
             stats_csv = df_stats.to_csv(index=False).encode("utf-8-sig")
-            st.download_button(
-                "⬇ Download User Statistics (CSV)",
-                data=stats_csv,
-                file_name="BKAI_UserStats.csv",
-                mime="text/csv",
-            )
+            st.download_button("⬇ Download User Statistics (CSV)", data=stats_csv, file_name="BKAI_UserStats.csv", mime="text/csv")
         else:
             st.info("No user statistics available yet.")
 
     st.markdown("<div class='bkai-card'>", unsafe_allow_html=True)
     st.subheader("Image Upload and Analysis")
-    st.caption("Upload one or multiple concrete images. The system will perform crack detection, segmentation, and report generation.")
-
+    st.caption("Upload one or multiple concrete images. The system will perform crack detection, segmentation, geometry measurement, and report generation.")
     uploaded_files = st.file_uploader(
         "Upload one or more concrete images (JPG / PNG)",
         type=["jpg", "jpeg", "png"],
@@ -1975,7 +2051,6 @@ def run_main_app():
         for idx, uploaded_file in enumerate(uploaded_files, start=1):
             st.write("---")
             st.markdown(f"## Image {idx}: `{uploaded_file.name}`")
-
             t0 = time.time()
             orig_img = Image.open(uploaded_file).convert("RGB")
             img_w, img_h = orig_img.size
@@ -2009,7 +2084,6 @@ def run_main_app():
 
             predictions = result.get("predictions", [])
             preds_conf = [p for p in predictions if float(p.get("confidence", 0)) >= float(min_conf)]
-
             total_time = time.time() - t0
 
             col1, col2 = st.columns(2)
@@ -2018,6 +2092,8 @@ def run_main_app():
                 st.image(orig_img, use_container_width=True)
 
             analyzed_img = None
+            measurement_visual_img = None
+
             with col2:
                 st.subheader("Analyzed Image")
                 if len(preds_conf) == 0:
@@ -2026,7 +2102,6 @@ def run_main_app():
                         "<div class='bkai-status-ok'>✅ Conclusion: No clearly visible crack was detected in this image.</div>",
                         unsafe_allow_html=True,
                     )
-
                     pdf_no_crack = export_pdf_no_crack(orig_img)
                     st.download_button(
                         "📄 Download PDF Report (No Crack Detected)",
@@ -2038,10 +2113,7 @@ def run_main_app():
                     continue
                 else:
                     analyzed_img = draw_predictions_with_mask(
-                        orig_img,
-                        preds_conf,
-                        image_key=uploaded_file.name,
-                        min_conf=min_conf,
+                        orig_img, preds_conf, image_key=uploaded_file.name, min_conf=min_conf
                     )
                     st.image(analyzed_img, use_container_width=True)
                     st.markdown(
@@ -2058,19 +2130,26 @@ def run_main_app():
                 confs = [float(p.get("confidence", 0)) for p in preds_conf]
                 avg_conf = (sum(confs) / len(confs)) if confs else 0.0
 
-                measurements = compute_crack_measurements(
-                    preds_conf,
-                    img_w,
-                    img_h,
-                    mm_per_pixel=mm_per_pixel if use_scale else None,
-                )
-
-                crack_area_px2 = measurements.get("area_px2", 0.0)
-                crack_ratio_percent = measurements.get("ratio_percent", 0.0)
-                length_px = measurements.get("length_px", 0.0)
-                avg_width_px = measurements.get("avg_width_px", 0.0)
-                max_width_px = measurements.get("max_width_px", 0.0)
+                crack_ratio_percent, crack_area_px2 = crack_area_ratio_percent(preds_conf, img_w, img_h)
                 severity = estimate_severity_from_ratio(crack_ratio_percent)
+
+                mask_union = build_union_mask_from_predictions(preds_conf, img_w, img_h)
+                measure_info = measure_crack_geometry_from_mask(mask_union)
+
+                length_px = measure_info["length_px"]
+                avg_width_px = measure_info["avg_width_px"]
+                max_width_px = measure_info["max_width_px"]
+
+                if use_scale:
+                    length_value = length_px * mm_per_pixel
+                    avg_width_value = avg_width_px * mm_per_pixel
+                    max_width_value = max_width_px * mm_per_pixel
+                    unit_text = "mm"
+                else:
+                    length_value = length_px
+                    avg_width_value = avg_width_px
+                    max_width_value = max_width_px
+                    unit_text = "px"
 
                 summary_text = (
                     "Detected cracks may indicate structural concern and should be further inspected."
@@ -2078,7 +2157,14 @@ def run_main_app():
                     else "Detected cracks are minor or moderate; continuous monitoring is recommended."
                 )
 
-                measurement_visual_img = draw_measurement_overlay(orig_img, measurements)
+                measurement_visual_img = create_measurement_visualization(
+                    pil_image=orig_img,
+                    predictions=preds_conf,
+                    length_value=length_value,
+                    avg_width_value=avg_width_value,
+                    max_width_value=max_width_value,
+                    unit_text=unit_text,
+                )
 
                 st.subheader("Annotated Measurement View")
                 st.image(measurement_visual_img, use_container_width=True)
@@ -2089,26 +2175,14 @@ def run_main_app():
                     {"Metric": "Inference Speed", "Value": f"{total_time:.2f} s/image", "Description": "Processing time per image"},
                     {"Metric": "Average Confidence", "Value": f"{avg_conf:.2f}", "Description": "Average confidence score"},
                     {"Metric": "Crack Area (px²)", "Value": f"{crack_area_px2:.0f}", "Description": "Mask area in pixels"},
-                    {"Metric": "Crack Area Ratio (%)", "Value": f"{crack_ratio_percent:.2f} %", "Description": "Crack mask area ratio relative to the full image"},
-                    {"Metric": "Crack Length (px)", "Value": f"{length_px:.1f}", "Description": "Estimated crack centerline length in pixels"},
-                    {"Metric": "Average Crack Width (px)", "Value": f"{avg_width_px:.2f}", "Description": "Average width estimated from the crack mask"},
-                    {"Metric": "Maximum Crack Width (px)", "Value": f"{max_width_px:.2f}", "Description": "Maximum local crack width from the mask"},
-                ]
-
-                if use_scale and mm_per_pixel:
-                    metrics.extend([
-                        {"Metric": "Scale (mm/pixel)", "Value": f"{mm_per_pixel:.4f}", "Description": "Calibration value used to convert pixels to millimeters"},
-                        {"Metric": "Crack Length (mm)", "Value": f"{measurements.get('length_mm', 0.0):.2f}", "Description": "Estimated crack centerline length in millimeters"},
-                        {"Metric": "Average Crack Width (mm)", "Value": f"{measurements.get('avg_width_mm', 0.0):.3f}", "Description": "Average width converted to millimeters"},
-                        {"Metric": "Maximum Crack Width (mm)", "Value": f"{measurements.get('max_width_mm', 0.0):.3f}", "Description": "Maximum local crack width converted to millimeters"},
-                    ])
-
-                metrics.extend([
-                    {"Metric": "Severity Level", "Value": severity, "Description": "Severity estimated by crack area ratio"},
+                    {"Metric": "Crack Area Ratio (%)", "Value": f"{crack_ratio_percent:.2f} %", "Description": "Crack mask area ratio"},
+                    {"Metric": f"Crack Length ({unit_text})", "Value": f"{length_value:.2f}", "Description": "Estimated crack centerline length"},
+                    {"Metric": f"Average Width ({unit_text})", "Value": f"{avg_width_value:.2f}", "Description": "Average crack width estimated from distance transform"},
+                    {"Metric": f"Maximum Width ({unit_text})", "Value": f"{max_width_value:.2f}", "Description": "Maximum local crack width"},
+                    {"Metric": "Severity Level", "Value": severity, "Description": "Severity estimated by crack ratio"},
                     {"Metric": "Timestamp", "Value": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Description": "Execution timestamp"},
                     {"Metric": "Summary", "Value": summary_text, "Description": "Automatic system conclusion"},
-                ])
-
+                ]
                 metrics_df = pd.DataFrame(metrics)
                 render_metrics_dashboard(metrics_df)
 
@@ -2117,7 +2191,6 @@ def run_main_app():
 
                 st.subheader("Statistical Charts")
                 col_chart1, col_chart2 = st.columns(2)
-
                 bar_png = None
                 pie_png = None
 
@@ -2134,16 +2207,13 @@ def run_main_app():
                         ax.grid(axis="y", alpha=0.25)
                         ax.spines["top"].set_visible(False)
                         ax.spines["right"].set_visible(False)
-
                         for x, v in zip(xs, confs):
                             ax.text(x, min(1.0, v) + 0.02, f"{v*100:.0f}%", ha="center", va="bottom", fontsize=8)
-
                         if len(xs) == 1:
                             ax.set_xlim(0.5, 1.5)
                     else:
                         ax.text(0.5, 0.5, "No data", ha="center", va="center")
                         ax.set_axis_off()
-
                     fig1.tight_layout()
                     st.pyplot(fig1)
                     bar_png = fig_to_png(fig1)
@@ -2153,12 +2223,11 @@ def run_main_app():
                     labels = ["Crack region (mask)", "Remaining image area"]
                     ratio = crack_ratio_percent / 100.0
                     ratio = max(0.0, min(1.0, ratio))
-
+                    sizes = [ratio, 1 - ratio]
                     fig2, ax2 = plt.subplots(figsize=(4.2, 3.2), dpi=150)
-                    ax2.pie([ratio, 1 - ratio], labels=labels, autopct="%1.1f%%", startangle=140)
+                    ax2.pie(sizes, labels=labels, autopct="%1.1f%%", startangle=140)
                     ax2.set_title("Crack area ratio relative to full image", pad=8)
                     fig2.tight_layout()
-
                     st.pyplot(fig2)
                     pie_png = fig_to_png(fig2)
                     plt.close(fig2)
@@ -2167,9 +2236,9 @@ def run_main_app():
                     original_img=orig_img,
                     analyzed_img=analyzed_img,
                     metrics_df=metrics_df,
-                    measurement_visual_img=measurement_visual_img,
                     chart_bar_png=bar_png,
                     chart_pie_png=pie_png,
+                    measurement_visual_img=measurement_visual_img,
                 )
 
                 st.download_button(
@@ -2185,11 +2254,10 @@ def run_main_app():
 
 
 # =========================================================
-# 7. USERS
+# 8. USERS
 # =========================================================
 
 USERS_FILE = "users.json"
-
 if os.path.exists(USERS_FILE):
     with open(USERS_FILE, "r", encoding="utf-8") as f:
         try:
@@ -2203,7 +2271,6 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
     st.session_state.username = ""
-
 
 def show_auth_page():
     st.markdown('<div class="app-shell">', unsafe_allow_html=True)
@@ -2233,27 +2300,15 @@ def show_auth_page():
     </div>
     """
     st.markdown(hero_html, unsafe_allow_html=True)
-
     st.markdown('<div class="login-card-wrap"><div class="login-card"><div class="login-card-inner">', unsafe_allow_html=True)
 
     tab_login, tab_register = st.tabs(["Login", "Register"])
-
     with tab_login:
         st.markdown('<div class="section-title">Sign in</div>', unsafe_allow_html=True)
         st.markdown('<div class="section-note">Access your BKAI workspace with your registered credentials.</div>', unsafe_allow_html=True)
 
-        login_user = st.text_input(
-            "Username",
-            key="login_user",
-            placeholder="Enter username"
-        )
-        login_pass = st.text_input(
-            "Password",
-            type="password",
-            key="login_pass",
-            placeholder="Enter password"
-        )
-
+        login_user = st.text_input("Username", key="login_user", placeholder="Enter username")
+        login_pass = st.text_input("Password", type="password", key="login_pass", placeholder="Enter password")
         st.checkbox("Stay logged in", key="stay_logged_in")
 
         login_btn = st.button("Log in with Credentials", key="login_button")
@@ -2281,29 +2336,10 @@ def show_auth_page():
         st.markdown('<div class="section-title">Create account</div>', unsafe_allow_html=True)
         st.markdown('<div class="section-note">Register a new BKAI account to access the crack analysis workspace.</div>', unsafe_allow_html=True)
 
-        reg_user = st.text_input(
-            "Username",
-            key="reg_user",
-            placeholder="Choose a username"
-        )
-        reg_email = st.text_input(
-            "Email",
-            key="reg_email",
-            placeholder="Enter your email"
-        )
-        reg_pass = st.text_input(
-            "Password",
-            type="password",
-            key="reg_pass",
-            placeholder="Create a password"
-        )
-        reg_pass2 = st.text_input(
-            "Confirm Password",
-            type="password",
-            key="reg_pass2",
-            placeholder="Re-enter password"
-        )
-
+        reg_user = st.text_input("Username", key="reg_user", placeholder="Choose a username")
+        reg_email = st.text_input("Email", key="reg_email", placeholder="Enter your email")
+        reg_pass = st.text_input("Password", type="password", key="reg_pass", placeholder="Create a password")
+        reg_pass2 = st.text_input("Confirm Password", type="password", key="reg_pass2", placeholder="Re-enter password")
         register_btn = st.button("Create Account", key="register_button")
 
         if register_btn:
@@ -2327,7 +2363,7 @@ def show_auth_page():
 
 
 # =========================================================
-# 8. ENTRY
+# 9. ENTRY
 # =========================================================
 
 if st.session_state.authenticated:
