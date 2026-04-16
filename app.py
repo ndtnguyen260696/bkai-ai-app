@@ -445,187 +445,95 @@ def inject_global_styles():
             }
         }
 
-        .metric-grid{
-            display:grid;
-            grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
-            gap:14px;
-            margin:10px 0 18px 0;
-        }
-
-        .metric-card{
-            background:linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
-            border:1px solid #dbe7f5;
-            border-radius:18px;
-            padding:16px 16px 14px 16px;
-            box-shadow:0 12px 28px rgba(31,58,120,.08);
-            min-height:112px;
-        }
-
-        .metric-label{
-            font-size:12px;
-            font-weight:700;
-            text-transform:uppercase;
-            letter-spacing:.08em;
-            color:#6b7a90;
-            margin-bottom:8px;
-        }
-
-        .metric-value{
-            font-size:24px;
-            line-height:1.2;
-            font-weight:800;
-            color:#162033;
-            margin-bottom:8px;
-            word-break:break-word;
-        }
-
-        .metric-desc{
-            font-size:13px;
-            line-height:1.5;
-            color:#6c7a92;
-        }
-
-        .metric-card.severity-minor{
-            border:1px solid #bfe7cd;
-            background:linear-gradient(180deg, #f4fff7 0%, #ecfbf1 100%);
-        }
-
-        .metric-card.severity-moderate{
-            border:1px solid #ffd59c;
-            background:linear-gradient(180deg, #fffaf2 0%, #fff3df 100%);
-        }
-
-        .metric-card.severity-severe{
-            border:1px solid #f3b4b4;
-            background:linear-gradient(180deg, #fff6f6 0%, #ffebeb 100%);
-        }
-
-        .metric-card.summary-card{
-            grid-column:1 / -1;
-            min-height:auto;
-        }
-
-        .metric-card.summary-card .metric-value{
-            font-size:18px;
-            font-weight:700;
-        }
-
-        .metrics-table-wrap{
-            margin-top:8px;
-        }
-
-        /* ===== STAGE 2 ===== */
-        .stage2-shell{
+        /* ===== METRICS DASHBOARD FIXED ===== */
+        .metric-box{
             background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-            border: 1px solid #dbe6f3;
-            border-radius: 24px;
-            padding: 20px 22px;
-            box-shadow: 0 16px 34px rgba(31,58,120,.08);
-            margin: 8px 0 18px 0;
+            border: 1px solid #dbe7f5;
+            border-radius: 18px;
+            padding: 14px 16px;
+            box-shadow: 0 10px 24px rgba(31,58,120,.08);
+            min-height: 120px;
+            margin-bottom: 12px;
         }
-        .stage2-hero-title{
-            font-size: 28px;
+
+        .metric-box.metric-minor{
+            border: 1px solid #bfe7cd;
+            background: linear-gradient(180deg, #f4fff7 0%, #ecfbf1 100%);
+        }
+
+        .metric-box.metric-moderate{
+            border: 1px solid #ffd59c;
+            background: linear-gradient(180deg, #fffaf2 0%, #fff3df 100%);
+        }
+
+        .metric-box.metric-severe{
+            border: 1px solid #f3b4b4;
+            background: linear-gradient(180deg, #fff6f6 0%, #ffebeb 100%);
+        }
+
+        .metric-name{
+            font-size: 12px;
             font-weight: 800;
-            color: #1e293b;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #64748b;
             margin-bottom: 8px;
         }
-        .stage2-hero-subtitle{
-            font-size: 15px;
-            line-height: 1.7;
-            color: #64748b;
-            margin-bottom: 0;
-        }
-        .stage2-box{
-            background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
-            border: 1px solid #dbe6f3;
-            border-radius: 20px;
-            padding: 16px 18px;
-            box-shadow: 0 10px 24px rgba(31,58,120,.05);
-            margin: 10px 0 16px 0;
-        }
-        .stage2-box-title{
-            font-size: 20px;
+
+        .metric-number{
+            font-size: 24px;
             font-weight: 800;
-            color: #1e293b;
+            color: #0f172a;
+            line-height: 1.2;
             margin-bottom: 6px;
+            word-break: break-word;
         }
-        .stage2-box-note{
-            font-size: 14px;
-            line-height: 1.7;
+
+        .metric-help{
+            font-size: 13px;
+            line-height: 1.5;
             color: #64748b;
-            margin-bottom: 0;
         }
-        .stage2-comp-title{
-            background: linear-gradient(135deg, #4f8cff 0%, #2b6ee9 60%, #1d5ddb 100%);
-            color: #fff;
-            padding: 12px 16px;
-            border-radius: 16px 16px 0 0;
-            font-size: 16px;
-            font-weight: 800;
-            letter-spacing: .04em;
-            text-transform: uppercase;
+
+        .metric-summary{
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            border: 1px solid #dbe7f5;
+            border-radius: 18px;
+            padding: 16px 18px;
+            box-shadow: 0 10px 24px rgba(31,58,120,.08);
             margin-top: 8px;
+            margin-bottom: 12px;
         }
-        .stage2-head-cell{
-            background:#eaf4ff;
-            border:1px solid #d7e4f4;
-            padding:10px 12px;
-            border-radius:12px;
-            font-size:13px;
-            font-weight:800;
-            color:#1e293b;
-            text-align:center;
+
+        .metric-summary.metric-minor{
+            border: 1px solid #bfe7cd;
+            background: linear-gradient(180deg, #f4fff7 0%, #ecfbf1 100%);
         }
-        .stage2-row-card{
-            background:#ffffff;
-            border:1px solid #e4edf7;
-            border-radius:16px;
-            padding:12px 10px;
-            margin:8px 0;
-            box-shadow:0 8px 18px rgba(31,58,120,.04);
+
+        .metric-summary.metric-moderate{
+            border: 1px solid #ffd59c;
+            background: linear-gradient(180deg, #fffaf2 0%, #fff3df 100%);
         }
-        .stage2-mini-label{
-            font-size:11px;
-            font-weight:800;
-            color:#7a8aa4;
-            text-transform:uppercase;
-            letter-spacing:.06em;
-            margin-bottom:6px;
+
+        .metric-summary.metric-severe{
+            border: 1px solid #f3b4b4;
+            background: linear-gradient(180deg, #fff6f6 0%, #ffebeb 100%);
         }
-        .stage2-component-name{
-            font-size:14px;
-            font-weight:800;
-            color:#1e293b;
-            line-height:1.6;
+
+        .metric-summary-title{
+            font-size: 13px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #64748b;
+            margin-bottom: 8px;
         }
-        .stage2-crack-name{
-            font-size:14px;
-            font-weight:800;
-            color:#2563eb;
-            line-height:1.6;
-        }
-        .stage2-body-text{
-            font-size:13px;
-            color:#334155;
-            line-height:1.75;
-        }
-        .stage2-image-frame{
-            background:linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-            border:1px solid #dbe6f3;
-            border-radius:14px;
-            padding:8px;
-        }
-        .stage2-export-note{
-            display:inline-flex;
-            align-items:center;
-            padding:8px 14px;
-            border-radius:999px;
-            background:#eef6ff;
-            border:1px solid #cfe3fb;
-            color:#2563eb;
-            font-size:13px;
-            font-weight:700;
-            margin-bottom:10px;
+
+        .metric-summary-text{
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.6;
+            color: #0f172a;
         }
 
         </style>
@@ -877,66 +785,80 @@ def render_metrics_dashboard(metrics_df: pd.DataFrame):
         return
 
     severity_value = ""
-    summary_row = None
+    summary_value = ""
+    summary_desc = ""
     normal_rows = []
 
     for _, row in metrics_df.iterrows():
         metric = str(row.get("Metric", "")).strip()
         value = str(row.get("Value", "")).strip()
+        desc = str(row.get("Description", "")).strip()
 
         if metric == "Severity Level":
             severity_value = value
         elif metric == "Summary":
-            summary_row = row
+            summary_value = value
+            summary_desc = desc
         else:
-            normal_rows.append(row)
+            normal_rows.append({
+                "Metric": metric,
+                "Value": value,
+                "Description": desc
+            })
 
     severity_class = ""
     sv = severity_value.lower()
     if "minor" in sv:
-        severity_class = "severity-minor"
+        severity_class = "metric-minor"
     elif "moderate" in sv:
-        severity_class = "severity-moderate"
+        severity_class = "metric-moderate"
     elif "severe" in sv:
-        severity_class = "severity-severe"
+        severity_class = "metric-severe"
 
-    html = '<div class="metric-grid">'
+    cols_per_row = 3
+    for i in range(0, len(normal_rows), cols_per_row):
+        row_items = normal_rows[i:i+cols_per_row]
+        cols = st.columns(cols_per_row)
 
-    for row in normal_rows:
-        metric = str(row.get("Metric", "")).strip()
-        value = str(row.get("Value", "")).strip()
-        desc = str(row.get("Description", "")).strip()
-
-        html += f"""
-        <div class="metric-card">
-            <div class="metric-label">{metric}</div>
-            <div class="metric-value">{value}</div>
-            <div class="metric-desc">{desc}</div>
-        </div>
-        """
+        for j in range(cols_per_row):
+            with cols[j]:
+                if j < len(row_items):
+                    item = row_items[j]
+                    st.markdown(
+                        f"""
+                        <div class="metric-box">
+                            <div class="metric-name">{item['Metric']}</div>
+                            <div class="metric-number">{item['Value']}</div>
+                            <div class="metric-help">{item['Description']}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.empty()
 
     if severity_value:
-        html += f"""
-        <div class="metric-card {severity_class}">
-            <div class="metric-label">Severity Level</div>
-            <div class="metric-value">{severity_value}</div>
-            <div class="metric-desc">Severity estimated by crack ratio</div>
-        </div>
-        """
+        st.markdown(
+            f"""
+            <div class="metric-summary {severity_class}">
+                <div class="metric-summary-title">Severity Level</div>
+                <div class="metric-summary-text">{severity_value}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    if summary_row is not None:
-        summary_value = str(summary_row.get("Value", "")).strip()
-        summary_desc = str(summary_row.get("Description", "")).strip()
-        html += f"""
-        <div class="metric-card summary-card {severity_class}">
-            <div class="metric-label">Summary</div>
-            <div class="metric-value">{summary_value}</div>
-            <div class="metric-desc">{summary_desc}</div>
-        </div>
-        """
-
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
+    if summary_value:
+        st.markdown(
+            f"""
+            <div class="metric-summary {severity_class}">
+                <div class="metric-summary-title">Summary</div>
+                <div class="metric-summary-text">{summary_value}</div>
+                <div class="metric-help" style="margin-top:8px;">{summary_desc}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 # =========================================================
@@ -1169,7 +1091,7 @@ def export_pdf(
         c.setFont(BODY_FONT, 10)
         c.setFillColor(colors.white)
         c.drawString(x0 + 2, top_y - header_h + 3, "No.")
-        c.drawString(x1 + 2, top_y - header_h + 3, "Metric (VI / EN)")
+        c.drawString(x1 + 2, top_y - header_h + 3, "Metric")
         c.drawString(x2 + 2, top_y - header_h + 3, "Value")
         return top_y - header_h
 
@@ -1496,33 +1418,9 @@ def render_component_crack_table(component_df: pd.DataFrame):
 
 
 def show_stage2_demo(key_prefix="stage2"):
-    st.markdown(
-        """
-        <div class="stage2-shell">
-            <div class="stage2-hero-title">Concrete Crack Classification by Structural Component</div>
-            <div class="stage2-hero-subtitle">
-                Stage 2 provides a structured engineering knowledge base of common concrete crack types
-                grouped by structural component, including typical causes, shape characteristics,
-                and visual illustration references.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.subheader("Stage 2 – Crack Classification and Suggested Causes / Actions")
 
-    st.markdown(
-        """
-        <div class="stage2-box">
-            <div class="stage2-box-title">2.0. Crack Classification Diagram and Structural Examples</div>
-            <div class="stage2-box-note">
-                The figures below summarize the crack classification framework and structural examples
-                for quick interpretation before reviewing the detailed component-based table.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
+    st.markdown("### 2.0. Crack Classification Diagram and Structural Examples")
     col_img1, col_img2 = st.columns([3, 4])
 
     with col_img1:
@@ -1539,17 +1437,7 @@ def show_stage2_demo(key_prefix="stage2"):
         else:
             st.info("Missing file: images/stage2_structural_example.png")
 
-    st.markdown(
-        """
-        <div class="stage2-box">
-            <div class="stage2-box-title">2.1. Summary of Crack Types by Failure Mechanism</div>
-            <div class="stage2-box-note">
-                Select a representative crack category below to review the failure mechanism classification.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown("---")
 
     options = [
         "I.1 Plastic Shrinkage Crack",
@@ -1564,86 +1452,107 @@ def show_stage2_demo(key_prefix="stage2"):
         "II.6b Load-Induced Crack – Shear / Compression / Torsion",
         "II.7 Settlement Crack",
     ]
-    st.selectbox(
-        "Select a crack type (summary):",
-        options,
-        key=f"{key_prefix}_summary_selectbox",
-    )
+    st.selectbox("Select a crack type (summary):", options, key=f"{key_prefix}_summary_selectbox")
     st.caption("Table 1 – Summary of crack types by failure mechanism.")
 
-    component_crack_data = pd.DataFrame([
-        {"Component":"Beam","Crack Type":"Flexural Crack","Cause":"Caused by bending moment exceeding the allowable limit; inadequate flexural reinforcement or insufficient section capacity.","Shape Characteristics":"Usually appears at mid-span and is widest in the tension zone.","Image Path":"images/stage2/beam_uon.png"},
-        {"Component":"Beam","Crack Type":"Shear Crack","Cause":"High shear force; inadequate concrete shear capacity or insufficient stirrups.","Shape Characteristics":"Inclined crack, often around 45° relative to the beam axis.","Image Path":"images/stage2/beam_cat.png"},
-        {"Component":"Beam","Crack Type":"Torsional Crack","Cause":"Insufficient torsional reinforcement or unsuitable cross-section design.","Shape Characteristics":"Diagonal or zigzag pattern around the beam surface.","Image Path":"images/stage2/beam_xoan.png"},
-        {"Component":"Beam","Crack Type":"Tensile Crack","Cause":"Direct tensile stress exceeds the tensile strength of concrete.","Shape Characteristics":"Mostly vertical cracks distributed within the tension zone.","Image Path":"images/stage2/beam_keo.png"},
-        {"Component":"Beam","Crack Type":"Sliding Crack","Cause":"Weak bonding or sliding along an interface in the member.","Shape Characteristics":"Long horizontal crack near the interface zone.","Image Path":"images/stage2/beam_truot.png"},
-        {"Component":"Beam","Crack Type":"Corrosion-Induced Crack","Cause":"Aggressive environment, thin cover depth, and expansion due to steel corrosion.","Shape Characteristics":"Runs along reinforcement lines and may be accompanied by rust staining or cover spalling.","Image Path":"images/stage2/beam_anmon.png"},
+    st.subheader("Concrete Crack Classification by Structural Component")
 
-        {"Component":"Column","Crack Type":"Diagonal Crack","Cause":"Column subjected to high combined compression, bending, or shear; insufficient material or structural capacity.","Shape Characteristics":"Inclined cracks appear on the surface when the load approaches or exceeds capacity.","Image Path":"images/stage2/column_cheo.png"},
-        {"Component":"Column","Crack Type":"Horizontal Crack","Cause":"Transverse tensile stress or confinement-related failure under loading.","Shape Characteristics":"Horizontal cracks crossing the column width.","Image Path":"images/stage2/column_ngang.png"},
-        {"Component":"Column","Crack Type":"Shrinkage Crack","Cause":"Volume reduction caused by moisture loss after hardening.","Shape Characteristics":"Fine random cracks distributed on the concrete surface.","Image Path":"images/stage2/column_congot.png"},
-        {"Component":"Column","Crack Type":"Splitting / Longitudinal Crack","Cause":"High compressive stress causing longitudinal splitting; weak concrete; insufficient longitudinal reinforcement.","Shape Characteristics":"Multiple parallel vertical cracks.","Image Path":"images/stage2/column_tach.png"},
-        {"Component":"Column","Crack Type":"Corrosion-Induced Crack","Cause":"Expansion of reinforcement due to corrosion in aggressive exposure conditions.","Shape Characteristics":"Vertical cracks along reinforcement lines, often accompanied by rust staining.","Image Path":"images/stage2/column_anmon.png"},
-
-        {"Component":"Slab","Crack Type":"Plastic Shrinkage Crack","Cause":"Rapid moisture evaporation while concrete is still plastic due to wind, heat, or dry conditions.","Shape Characteristics":"Shallow and small cracks, often forming a polygonal pattern.","Image Path":"images/stage2/slab_congot_deo.png"},
-        {"Component":"Slab","Crack Type":"Drying Shrinkage Crack","Cause":"Shrinkage after hardening in dry or hot environments.","Shape Characteristics":"Map cracking or relatively straight crack lines.","Image Path":"images/stage2/slab_congot_kho.png"},
-        {"Component":"Slab","Crack Type":"Thermal Crack","Cause":"Temperature variation and restraint within the slab.","Shape Characteristics":"One or more dominant cracks, often wider at the exposed surface.","Image Path":"images/stage2/slab_nhiet.png"},
-        {"Component":"Slab","Crack Type":"Flexural Crack","Cause":"Bending stress exceeds the tensile capacity of the slab.","Shape Characteristics":"Cracks develop in the tension zone, usually initiating from the bottom surface.","Image Path":"images/stage2/slab_uon.png"},
-        {"Component":"Slab","Crack Type":"Shear Crack","Cause":"Punching or local shear stress exceeds slab resistance.","Shape Characteristics":"Inclined cracks or local failure zones near concentrated loads.","Image Path":"images/stage2/slab_cat.png"},
-        {"Component":"Slab","Crack Type":"Torsional Crack","Cause":"Torsional action or restraint at slab edges and corners.","Shape Characteristics":"Diagonal or twisting crack pattern near slab corners or edge regions.","Image Path":"images/stage2/slab_xoan.png"},
-        {"Component":"Slab","Crack Type":"Concentrated Load Crack","Cause":"Local stress concentration under point loading.","Shape Characteristics":"Radial cracks spreading from the loaded area.","Image Path":"images/stage2/slab_taptrung.png"},
-        {"Component":"Slab","Crack Type":"Distributed Load Crack","Cause":"Distributed service loads causing flexural distress over a wider panel area.","Shape Characteristics":"Multiple cracks distributed across the slab panel.","Image Path":"images/stage2/slab_phanbo.png"},
-        {"Component":"Slab","Crack Type":"Corrosion-Induced Crack","Cause":"Steel corrosion and expansion of reinforcement within the slab cover zone.","Shape Characteristics":"Cracks follow reinforcement layout and may lead to cover delamination.","Image Path":"images/stage2/slab_anmon.png"},
-
-        {"Component":"Concrete Wall","Crack Type":"Shrinkage Crack","Cause":"Rapid moisture loss; shrinkage stress exceeds tensile capacity.","Shape Characteristics":"Random, polygonal, or intersecting crack pattern.","Image Path":"images/stage2/wall_congot.png"},
-        {"Component":"Concrete Wall","Crack Type":"Thermal Crack","Cause":"Temperature difference through the wall thickness.","Shape Characteristics":"Often vertical and wider in the thermal tension zone.","Image Path":"images/stage2/wall_nhiet.png"},
-        {"Component":"Concrete Wall","Crack Type":"Vertical Load Crack","Cause":"Axial or gravity load exceeds local tensile resistance in the wall body.","Shape Characteristics":"Mostly vertical cracks extending along the wall height.","Image Path":"images/stage2/wall_doc_taitrong.png"},
-        {"Component":"Concrete Wall","Crack Type":"Horizontal Load Crack","Cause":"Lateral action or bending causes horizontal tensile zones in the wall.","Shape Characteristics":"Horizontal cracking across the wall face.","Image Path":"images/stage2/wall_ngang_taitrong.png"},
-        {"Component":"Concrete Wall","Crack Type":"Diagonal Load Crack","Cause":"Combined shear and bending due to lateral loading or restraint.","Shape Characteristics":"Inclined diagonal cracking across the wall panel.","Image Path":"images/stage2/wall_cheo_taitrong.png"},
-        {"Component":"Concrete Wall","Crack Type":"Corrosion-Induced Crack","Cause":"Corrosion of embedded reinforcement causing expansion and internal tensile stress.","Shape Characteristics":"Longitudinal cracking following reinforcement positions.","Image Path":"images/stage2/wall_anmon.png"},
-    ])
+    component_crack_data = pd.DataFrame(
+        [
+            {
+                "Component":"Beam",
+                "Crack Type":"Flexural Crack",
+                "Cause":"Caused by bending moment exceeding the allowable limit; inadequate flexural reinforcement or insufficient section capacity.",
+                "Shape Characteristics":"Usually appears at mid-span and is widest in the tension zone.",
+                "Image Path":"images/stage2/beam_uon.png"
+            },
+            {
+                "Component":"Beam",
+                "Crack Type":"Shear Crack",
+                "Cause":"High shear force; inadequate concrete shear capacity or insufficient stirrups.",
+                "Shape Characteristics":"Inclined crack, often around 45° relative to the beam axis.",
+                "Image Path":"images/stage2/beam_cat.png"
+            },
+            {
+                "Component":"Beam",
+                "Crack Type":"Torsional Crack",
+                "Cause":"Insufficient torsional reinforcement or unsuitable cross-section design.",
+                "Shape Characteristics":"Diagonal or zigzag pattern around the beam surface.",
+                "Image Path":"images/stage2/beam_xoan.png"
+            },
+            {
+                "Component":"Beam",
+                "Crack Type":"Corrosion-Induced Crack",
+                "Cause":"Aggressive environment, thin cover depth, and expansion due to steel corrosion.",
+                "Shape Characteristics":"Runs along reinforcement lines and may be accompanied by rust staining or cover spalling.",
+                "Image Path":"images/stage2/beam_anmon.png"
+            },
+            {
+                "Component":"Column",
+                "Crack Type":"Diagonal Crack",
+                "Cause":"Column subjected to high combined compression, bending, or shear; insufficient material or structural capacity.",
+                "Shape Characteristics":"Inclined cracks appear on the surface when the load approaches or exceeds capacity.",
+                "Image Path":"images/stage2/column_cheo.png"
+            },
+            {
+                "Component":"Column",
+                "Crack Type":"Splitting / Longitudinal Crack",
+                "Cause":"High compressive stress causing longitudinal splitting; weak concrete; insufficient longitudinal reinforcement.",
+                "Shape Characteristics":"Multiple parallel vertical cracks.",
+                "Image Path":"images/stage2/column_tach.png"
+            },
+            {
+                "Component":"Slab",
+                "Crack Type":"Plastic Shrinkage Crack",
+                "Cause":"Rapid moisture evaporation while concrete is still plastic due to wind, heat, or dry conditions.",
+                "Shape Characteristics":"Shallow and small cracks, often forming a polygonal pattern.",
+                "Image Path":"images/stage2/slab_congot_deo.png"
+            },
+            {
+                "Component":"Slab",
+                "Crack Type":"Drying Shrinkage Crack",
+                "Cause":"Shrinkage after hardening in dry or hot environments.",
+                "Shape Characteristics":"Map cracking or relatively straight crack lines.",
+                "Image Path":"images/stage2/slab_congot_kho.png"
+            },
+            {
+                "Component":"Concrete Wall",
+                "Crack Type":"Shrinkage Crack",
+                "Cause":"Rapid moisture loss; shrinkage stress exceeds tensile capacity.",
+                "Shape Characteristics":"Random, polygonal, or intersecting crack pattern.",
+                "Image Path":"images/stage2/wall_congot.png"
+            },
+            {
+                "Component":"Concrete Wall",
+                "Crack Type":"Thermal Crack",
+                "Cause":"Temperature difference through the wall thickness.",
+                "Shape Characteristics":"Often vertical and wider in the thermal tension zone.",
+                "Image Path":"images/stage2/wall_nhiet.png"
+            },
+        ]
+    )
 
     render_component_crack_table(component_crack_data)
     st.caption("Table 2 – Structural component mapping with illustration examples.")
 
-    st.markdown(
-        """
-        <div class="stage2-box">
-            <div class="stage2-box-title">2.3. Export Stage 2 Knowledge Report</div>
-            <div class="stage2-box-note">
-                Download the current Stage 2 knowledge table as CSV or PDF for documentation,
-                reporting, or engineering reference.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    st.markdown("### 2.3. Export Stage 2 Knowledge Report")
+    csv_bytes = component_crack_data.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        "⬇ Download Stage 2 Table (CSV)",
+        data=csv_bytes,
+        file_name="BKAI_Stage2_CrackTable.csv",
+        mime="text/csv",
+        key=f"stage2_csv_{key_prefix}",
     )
 
-    st.markdown('<div class="stage2-export-note">Stage 2 knowledge base ready for export</div>', unsafe_allow_html=True)
-
-    csv_bytes = component_crack_data.to_csv(index=False).encode("utf-8-sig")
-    col_btn1, col_btn2 = st.columns(2)
-
-    with col_btn1:
-        st.download_button(
-            "⬇ Download Stage 2 Table (CSV)",
-            data=csv_bytes,
-            file_name="BKAI_Stage2_CrackTable.csv",
-            mime="text/csv",
-            key=f"stage2_csv_{key_prefix}",
-            use_container_width=True,
-        )
-
     pdf_buf = export_stage2_pdf(component_crack_data)
-    with col_btn2:
-        st.download_button(
-            "📄 Download Stage 2 Knowledge Report (PDF)",
-            data=pdf_buf.getvalue(),
-            file_name="BKAI_Stage2_Report.pdf",
-            mime="application/pdf",
-            key=f"stage2_pdf_{key_prefix}",
-            use_container_width=True,
-        )
+    st.download_button(
+        "📄 Download Stage 2 Knowledge Report (PDF)",
+        data=pdf_buf.getvalue(),
+        file_name="BKAI_Stage2_Report.pdf",
+        mime="application/pdf",
+        key=f"stage2_pdf_{key_prefix}",
+    )
 
 
 # =========================================================
