@@ -12,8 +12,8 @@ import base64
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.ndimage import distance_transform_edt
-from skimage.morphology import skeletonize
+import cv2
+import math
 
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -796,14 +796,79 @@ def predictions_to_binary_mask(predictions, img_w: int, img_h: int):
     return np.array(mask_img, dtype=np.uint8)
 
 
+def cv2_skeletonize(binary: np.ndarray) -> np.ndarray:
+    img = (binary.astype(np.uint8) * 255).copy()
+    skeleton = np.zeros_like(img)
+    kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
+
+    while True:
+        eroded = cv2.erode(img, kernel)
+        temp = cv2.dilate(eroded, kernel)
+        temp = cv2.subtract(img, temp)
+        skeleton = cv2.bitwise_or(skeleton, temp)
+        img = eroded.copy()
+        if cv2.countNonZero(img) == 0:
+            break
+
+    return skeleton > 0
+
+
+def estimate_local_normal(skeleton_bool: np.ndarray, center_xy: tuple[int, int]) -> tuple[float, float]:
+    ys, xs = np.where(skeleton_bool)
+    if len(xs) < 3:
+        return (0.0, 1.0)
+
+    cx, cy = center_xy
+    pts = np.column_stack([xs, ys]).astype(np.float32)
+    d2 = (pts[:, 0] - cx) ** 2 + (pts[:, 1] - cy) ** 2
+    idx = np.argsort(d2)[: min(25, len(pts))]
+    local = pts[idx]
+    if len(local) < 2:
+        return (0.0, 1.0)
+
+    mean = local.mean(axis=0)
+    centered = local - mean
+    cov = np.cov(centered.T)
+    vals, vecs = np.linalg.eigh(cov)
+    tangent = vecs[:, np.argmax(vals)]
+    tx, ty = float(tangent[0]), float(tangent[1])
+    norm = math.hypot(tx, ty)
+    if norm == 0:
+        return (0.0, 1.0)
+    tx, ty = tx / norm, ty / norm
+    nx, ny = -ty, tx
+    return (nx, ny)
+
+
+def trace_width_line(binary: np.ndarray, center_xy: tuple[int, int], normal_xy: tuple[float, float], half_width_px: float):
+    h, w = binary.shape[:2]
+    cx, cy = center_xy
+    nx, ny = normal_xy
+    max_steps = max(3, int(round(half_width_px * 2.2)) + 2)
+
+    def walk(sign: int):
+        last = (int(cx), int(cy))
+        for step in range(1, max_steps + 1):
+            x = int(round(cx + sign * nx * step))
+            y = int(round(cy + sign * ny * step))
+            if x < 0 or x >= w or y < 0 or y >= h or not binary[y, x]:
+                break
+            last = (x, y)
+        return last
+
+    p1 = walk(-1)
+    p2 = walk(1)
+    return p1, p2
+
+
 def compute_crack_measurements(predictions, img_w: int, img_h: int, mm_per_pixel: float | None = None):
     if img_w <= 0 or img_h <= 0:
         return {}
 
     mask = predictions_to_binary_mask(predictions, img_w, img_h)
     binary = mask > 0
-
     area_px2 = float(binary.sum())
+
     if area_px2 <= 0:
         return {
             "mask": mask,
@@ -817,48 +882,31 @@ def compute_crack_measurements(predictions, img_w: int, img_h: int, mm_per_pixel
             "ratio_percent": 0.0,
         }
 
-    skeleton = skeletonize(binary)
-    skel_points = np.argwhere(skeleton)
+    skeleton = cv2_skeletonize(binary)
+    length_px = float(skeleton.sum())
+    if length_px <= 0:
+        length_px = float(area_px2)
 
-    if len(skel_points) >= 2:
-        length_px = 0.0
-        pts = skel_points[np.lexsort((skel_points[:, 1], skel_points[:, 0]))]
-        for i in range(1, len(pts)):
-            y0, x0 = pts[i - 1]
-            y1, x1 = pts[i]
-            dy = float(y1 - y0)
-            dx = float(x1 - x0)
-            step = (dx * dx + dy * dy) ** 0.5
-            if step <= 2.0:
-                length_px += step
-        if length_px <= 0:
-            length_px = float(skeleton.sum())
-    else:
-        length_px = float(skeleton.sum())
-
-    dist_map = distance_transform_edt(binary)
+    dist_map = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
     local_half_widths = dist_map[skeleton]
+
     if local_half_widths.size > 0:
         local_widths = local_half_widths * 2.0
         avg_width_px = float(local_widths.mean())
         max_width_px = float(local_widths.max())
+
+        ys, xs = np.where(skeleton)
         max_idx = int(local_widths.argmax())
-        cy, cx = skel_points[max_idx]
+        cy, cx = int(ys[max_idx]), int(xs[max_idx])
+        normal = estimate_local_normal(skeleton, (cx, cy))
+        p1, p2 = trace_width_line(binary, (cx, cy), normal, float(local_half_widths[max_idx]))
+        max_width_line = (p1, p2)
+        max_width_center = (cx, cy)
     else:
         avg_width_px = float(area_px2 / max(length_px, 1.0))
         max_width_px = avg_width_px
-        cy, cx = None, None
-
-    max_width_line = None
-    max_width_center = None
-    if cy is not None and cx is not None and max_width_px > 0:
-        radius = max(1, int(round(max_width_px / 2.0)))
-        x0 = max(0, int(cx - radius))
-        x1 = min(img_w - 1, int(cx + radius))
-        y0 = int(cy)
-        y1 = int(cy)
-        max_width_line = ((x0, y0), (x1, y1))
-        max_width_center = (int(cx), int(cy))
+        max_width_line = None
+        max_width_center = None
 
     ratio_percent = (area_px2 / float(img_w * img_h)) * 100.0 if img_w > 0 and img_h > 0 else 0.0
 
@@ -886,46 +934,78 @@ def draw_measurement_overlay(image: Image.Image, measurements: dict):
     if image is None:
         return None
 
-    base = image.convert("RGBA")
-    overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-    font = _get_font(20)
+    base = np.array(image.convert("RGB"))
+    h, w = base.shape[:2]
+    mask = measurements.get("mask")
+    skeleton = measurements.get("skeleton")
 
-    skeleton = measurements.get("skeleton", None)
+    left = base.copy()
+    if mask is not None:
+        mask_u8 = (mask > 0).astype(np.uint8)
+        contours, _ = cv2.findContours(mask_u8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        fill = np.zeros_like(left)
+        fill[mask_u8 > 0] = (120, 70, 220)
+        left = cv2.addWeighted(left, 1.0, fill, 0.45, 0)
+        cv2.drawContours(left, contours, -1, (103, 47, 214), 2)
+
     if skeleton is not None:
         ys, xs = np.where(skeleton)
-        for x, y in zip(xs, ys):
-            draw.point((int(x), int(y)), fill=(255, 215, 0, 255))
+        left[ys, xs] = (255, 196, 64)
 
     max_width_line = measurements.get("max_width_line")
     max_width_center = measurements.get("max_width_center")
     if max_width_line:
-        draw.line([max_width_line[0], max_width_line[1]], fill=(255, 80, 80, 255), width=3)
+        cv2.line(left, max_width_line[0], max_width_line[1], (255, 92, 92), 3, cv2.LINE_AA)
     if max_width_center:
-        cx, cy = max_width_center
-        r = 4
-        draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=(255, 255, 255, 255), outline=(255, 80, 80, 255))
+        cv2.circle(left, max_width_center, 6, (255, 255, 255), -1, cv2.LINE_AA)
+        cv2.circle(left, max_width_center, 9, (255, 92, 92), 2, cv2.LINE_AA)
 
-    lines = [
-        f"Length: {measurements.get('length_px', 0.0):.1f} px",
-        f"Avg Width: {measurements.get('avg_width_px', 0.0):.2f} px",
-        f"Max Width: {measurements.get('max_width_px', 0.0):.2f} px",
-    ]
+    # border frame
+    cv2.rectangle(left, (8, 8), (w - 8, h - 8), (88, 45, 210), 3, cv2.LINE_AA)
+
+    # label badge
+    badge_w, badge_h = 120, 34
+    badge = left.copy()
+    cv2.rectangle(badge, (10, 10), (10 + badge_w, 10 + badge_h), (103, 47, 214), -1)
+    left = cv2.addWeighted(badge, 0.55, left, 0.45, 0)
+    cv2.putText(left, 'crack 0.92', (18, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (245, 245, 255), 2, cv2.LINE_AA)
+
+    panel_w = max(260, int(w * 0.36))
+    gap = 14
+    canvas = np.zeros((h, w + gap + panel_w, 3), dtype=np.uint8)
+    canvas[:] = (247, 248, 251)
+    canvas[:, :w] = left
+
+    px = w + gap
+    py = 8
+    ph = h - 16
+    panel = canvas.copy()
+    cv2.rectangle(panel, (px, py), (px + panel_w - 8, py + ph), (38, 63, 104), -1)
+    canvas = cv2.addWeighted(panel, 0.92, canvas, 0.08, 0)
+
+    def stat_line(y, title, value, color):
+        icon_x = px + 28
+        cv2.line(canvas, (icon_x, y), (icon_x + 34, y), color, 3, cv2.LINE_AA)
+        cv2.circle(canvas, (icon_x, y), 5, color, -1, cv2.LINE_AA)
+        cv2.circle(canvas, (icon_x + 34, y), 5, color, -1, cv2.LINE_AA)
+        cv2.putText(canvas, title, (px + 78, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (236, 241, 248), 2, cv2.LINE_AA)
+        cv2.putText(canvas, value, (px + 78, y + 28), cv2.FONT_HERSHEY_SIMPLEX, 1.15, color, 3, cv2.LINE_AA)
+
+    length_text = f"{measurements.get('length_px', 0.0):.1f} px"
+    avg_width_text = f"{measurements.get('avg_width_px', 0.0):.2f} px"
+    max_width_text = f"{measurements.get('max_width_px', 0.0):.2f} px"
     if "length_mm" in measurements:
-        lines.append(f"Length: {measurements.get('length_mm', 0.0):.2f} mm")
-        lines.append(f"Avg Width: {measurements.get('avg_width_mm', 0.0):.3f} mm")
-        lines.append(f"Max Width: {measurements.get('max_width_mm', 0.0):.3f} mm")
+        length_text = f"{measurements.get('length_mm', 0.0):.2f} mm"
+        avg_width_text = f"{measurements.get('avg_width_mm', 0.0):.3f} mm"
+        max_width_text = f"{measurements.get('max_width_mm', 0.0):.3f} mm"
 
-    panel_x, panel_y = 18, 18
-    panel_w = 280
-    line_h = 24
-    panel_h = 14 + len(lines) * line_h
-    draw.rounded_rectangle([panel_x, panel_y, panel_x + panel_w, panel_y + panel_h], radius=14, fill=(10, 25, 48, 185))
-    for i, line in enumerate(lines):
-        draw.text((panel_x + 14, panel_y + 8 + i * line_h), line, fill=(255, 255, 255, 255), font=font)
+    stat_line(py + 58, 'Length', length_text, (96, 180, 255))
+    cv2.line(canvas, (px + 20, py + 92), (px + panel_w - 26, py + 92), (87, 107, 145), 1, cv2.LINE_AA)
+    stat_line(py + 146, 'Avg Width', avg_width_text, (124, 222, 142))
+    cv2.line(canvas, (px + 20, py + 180), (px + panel_w - 26, py + 180), (87, 107, 145), 1, cv2.LINE_AA)
+    stat_line(py + 234, 'Max Width', max_width_text, (255, 120, 120))
 
-    result = Image.alpha_composite(base, overlay)
-    return result.convert("RGB")
+    return Image.fromarray(canvas)
 
 
 def render_metrics_dashboard(metrics_df: pd.DataFrame):
@@ -1012,6 +1092,7 @@ def export_pdf(
     original_img,
     analyzed_img,
     metrics_df,
+    measurement_visual_img=None,
     chart_bar_png=None,
     chart_pie_png=None,
     filename="bkai_report_pro_plus.pdf",
@@ -1191,8 +1272,15 @@ def export_pdf(
     c.showPage()
 
     page_no += 1
-    subtitle = "Summary table of crack-related metrics"
+    subtitle = "Measurement visualization and summary metrics"
     content_top_y = draw_header("ANALYSIS REPORT", subtitle=subtitle, page_no=page_no)
+
+    if measurement_visual_img is not None:
+        c.setFont(BODY_FONT, 11)
+        c.setFillColor(colors.black)
+        c.drawString(LEFT, content_top_y + 4 * mm, "Crack Measurement Visualization")
+        vis_bottom = draw_pil_image(measurement_visual_img, LEFT, content_top_y, CONTENT_W, 72 * mm)
+        content_top_y = vis_bottom - 12 * mm
 
     rows = []
     skip_keys = {"Crack Length", "Crack Width"}
@@ -1216,7 +1304,7 @@ def export_pdf(
 
     header_h = 10 * mm
     base_lead = 4.0
-    max_body_y = content_top_y - 10 * mm
+    max_body_y = content_top_y - 6 * mm
 
     def start_table_page(pn):
         c.showPage()
@@ -1234,7 +1322,7 @@ def export_pdf(
         c.setFont(BODY_FONT, 10)
         c.setFillColor(colors.white)
         c.drawString(x0 + 2, top_y - header_h + 3, "No.")
-        c.drawString(x1 + 2, top_y - header_h + 3, "Metric (VI / EN)")
+        c.drawString(x1 + 2, top_y - header_h + 3, "Metric")
         c.drawString(x2 + 2, top_y - header_h + 3, "Value")
         return top_y - header_h
 
@@ -1990,7 +2078,7 @@ def run_main_app():
                     else "Detected cracks are minor or moderate; continuous monitoring is recommended."
                 )
 
-                analyzed_img_measured = draw_measurement_overlay(analyzed_img, measurements)
+                measurement_visual_img = draw_measurement_overlay(orig_img, measurements)
 
                 st.subheader("Annotated Measurement View")
                 st.image(analyzed_img_measured, use_container_width=True)
