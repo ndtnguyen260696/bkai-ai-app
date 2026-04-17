@@ -1,7 +1,7 @@
 
 import streamlit as st
 import requests
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import colorsys
 import hashlib
 import io
@@ -627,6 +627,14 @@ def draw_predictions_with_mask(image: Image.Image, predictions, image_key: str =
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
 
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 22)
+    except Exception:
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 22)
+        except Exception:
+            font = None
+
     for i, p in enumerate(predictions):
         conf = float(p.get("confidence", 0.0))
         if conf < float(min_conf):
@@ -649,14 +657,12 @@ def draw_predictions_with_mask(image: Image.Image, predictions, image_key: str =
         x1 = max(0.0, min(W - 1.0, x1))
         y1 = max(0.0, min(H - 1.0, y1))
 
-        instance_key = str(p.get("detection_id", "")).strip()
-        if not instance_key:
-            instance_key = f"{p.get('class','')}|{x}|{y}|{w}|{h}|{i}"
-
-        r, g, b = stable_rgb(image_key, instance_key)
+        # fixed style for analyzed image
+        r, g, b = 50, 170, 255
         box_color = (r, g, b, 255)
-        overlay_fill = (r, g, b, 110)
+        overlay_fill = (r, g, b, 85)
         overlay_edge = (r, g, b, 255)
+        text_color = (r, g, b, 255)
 
         pts_raw = p.get("points", None)
         poly = []
@@ -667,17 +673,35 @@ def draw_predictions_with_mask(image: Image.Image, predictions, image_key: str =
 
         if len(poly) >= 3:
             draw.polygon(poly, fill=overlay_fill)
-            draw.line(poly + [poly[0]], fill=overlay_edge, width=2)
+            draw.line(poly + [poly[0]], fill=overlay_edge, width=3)
         else:
-            draw.rectangle([x0, y0, x1, y1], fill=(r, g, b, 60))
+            draw.rectangle([x0, y0, x1, y1], fill=(r, g, b, 55))
 
         draw.rectangle([x0, y0, x1, y1], outline=box_color, width=3)
 
         cls = p.get("class", "crack")
         label = f"{cls} {int(round(conf * 100))}%"
 
-        draw.rectangle([x0, max(0, y0 - 28), x0 + 130, max(0, y0 - 2)], fill=(r, g, b, 220))
-        draw.text((x0 + 8, max(0, y0 - 25)), label, fill=(255, 255, 255, 255))
+        if font is not None:
+            tb = draw.textbbox((0, 0), label, font=font)
+            tw = tb[2] - tb[0]
+            th = tb[3] - tb[1]
+        else:
+            tw = max(140, len(label) * 11)
+            th = 24
+
+        pad_x = 10
+        pad_y = 6
+        rect_x0 = x0
+        rect_y0 = max(0, y0 - th - 2 * pad_y - 6)
+        rect_x1 = x0 + tw + 2 * pad_x
+        rect_y1 = rect_y0 + th + 2 * pad_y
+
+        draw.rounded_rectangle([rect_x0, rect_y0, rect_x1, rect_y1], radius=8, fill=(0, 0, 0, 225))
+        if font is not None:
+            draw.text((rect_x0 + pad_x, rect_y0 + pad_y - 1), label, fill=text_color, font=font)
+        else:
+            draw.text((rect_x0 + pad_x, rect_y0 + pad_y), label, fill=text_color)
 
     result = Image.alpha_composite(base.convert("RGBA"), overlay)
     return result.convert("RGB")
