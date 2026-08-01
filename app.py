@@ -305,6 +305,18 @@ def inject_global_styles():
         margin-top:6px;
     }
 
+    .chip{
+        display:inline-block;
+        padding:7px 11px;
+        margin:0 6px 8px 0;
+        border-radius:999px;
+        background:#edf4ff;
+        border:1px solid #cfe0fb;
+        color:#1d4ed8;
+        font-size:12px;
+        font-weight:750;
+    }
+
     .stButton>button,.stDownloadButton>button{
         border-radius:11px;
         min-height:40px;
@@ -621,8 +633,8 @@ def draw_predictions_with_mask(image, predictions, image_key='', min_conf=0.0):
         for poly in extract_polygons(p.get('points', None), W, H):
             if len(poly)>=3:
                 draw.polygon(poly, fill=(r,g,b,90))
-                draw.line(poly+[poly[0]], fill=(r,g,b,255), width=3)
-        draw.rectangle([x0,y0,x1,y1], outline=(r,g,b,255), width=3)
+                draw.line(poly+[poly[0]], fill=(r,g,b,255), width=2)
+        draw.rectangle([x0,y0,x1,y1], outline=(r,g,b,255), width=2)
         label=f"crack {int(round(conf*100))}%"
         lx0=x0; ly0=max(0, y0-28); lx1=lx0+130; ly1=ly0+28
         draw.rectangle([lx0,ly0,lx1,ly1], fill=(0,0,0,210))
@@ -654,7 +666,7 @@ def create_single_crack_visualization(
         cv2.circle(
             crack_view,
             endpoint,
-            6,
+            3,
             (40, 205, 70),
             -1,
             cv2.LINE_AA,
@@ -665,7 +677,7 @@ def create_single_crack_visualization(
     cv2.circle(
         crack_view,
         (int(max_point[0]), int(max_point[1])),
-        10,
+        6,
         (65, 80, 255),
         3,
         cv2.LINE_AA,
@@ -673,27 +685,9 @@ def create_single_crack_visualization(
     cv2.circle(
         crack_view,
         (int(max_point[0]), int(max_point[1])),
-        4,
-        (255, 255, 255),
-        -1,
-        cv2.LINE_AA,
-    )
-
-    cv2.rectangle(
-        crack_view,
-        (12, 12),
-        (210, 52),
-        (18, 30, 50),
-        -1,
-    )
-    cv2.putText(
-        crack_view,
-        f"{crack_record['crack_id']} | {crack_record['confidence'] * 100:.1f}%",
-        (24, 40),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.66,
-        (255, 255, 255),
         2,
+        (255, 255, 255),
+        -1,
         cv2.LINE_AA,
     )
 
@@ -938,12 +932,182 @@ def run_main_app():
         mm_per_pixel=st.sidebar.number_input('mm per pixel', min_value=0.0001, value=0.1000, step=0.0001, format='%.4f')
     st.markdown("<div class='bkai-card'>", unsafe_allow_html=True)
     st.subheader('Image Upload and Analysis')
-    uploaded_files=st.file_uploader('Upload one or more concrete images (JPG / PNG)', type=['jpg','jpeg','png'], accept_multiple_files=True)
+    uploaded_files=st.file_uploader(
+        'Upload concrete images (JPG / PNG)',
+        type=['jpg','jpeg','png'],
+        accept_multiple_files=True,
+        help='Upload 1–10 images for detailed analysis. Use Batch Summary Mode for larger uploads.',
+    )
+
+    selected_count=len(uploaded_files) if uploaded_files else 0
+
+    if selected_count:
+        st.caption(
+            f'{selected_count} image(s) selected. '
+            'Detailed results are displayed one image at a time.'
+        )
+
+    batch_summary_only=False
+
+    if selected_count > 10:
+        batch_summary_only=st.checkbox(
+            'Batch Summary Mode (recommended for more than 10 images)',
+            value=True,
+            help=(
+                'Processes all images but renders only a compact summary table. '
+                'This keeps the page responsive for 50–100 images.'
+            ),
+        )
+
     analyze_btn=st.button('Analyze Images')
+
+    st.markdown(
+        '''
+        <div class="status-box status-warning">
+            For 50–100 images, use Batch Summary Mode. The app will show one row per image
+            instead of rendering every detailed measurement view, chart, and report control.
+        </div>
+        ''',
+        unsafe_allow_html=True,
+    )
     st.markdown('</div>', unsafe_allow_html=True)
     if not analyze_btn: return
     if not uploaded_files:
         st.warning('Please upload at least one image before clicking Analyze Images.'); return
+    if batch_summary_only:
+        batch_rows=[]
+        progress_bar=st.progress(0, text='Preparing batch analysis...')
+
+        for batch_index, uploaded_file in enumerate(uploaded_files, start=1):
+            progress_bar.progress(
+                int(batch_index/len(uploaded_files)*100),
+                text=f'Processing {batch_index} of {len(uploaded_files)}: {uploaded_file.name}',
+            )
+
+            try:
+                batch_start=time.time()
+                batch_image=Image.open(uploaded_file).convert('RGB')
+                batch_w,batch_h=batch_image.size
+
+                batch_buffer=io.BytesIO()
+                batch_image.save(batch_buffer, format='JPEG')
+                batch_buffer.seek(0)
+
+                batch_response=requests.post(
+                    ROBOFLOW_FULL_URL,
+                    files={'file':('image.jpg', batch_buffer.getvalue(), 'image/jpeg')},
+                    timeout=60,
+                )
+                batch_response.raise_for_status()
+                batch_result=batch_response.json()
+
+                batch_predictions=[
+                    prediction
+                    for prediction in batch_result.get('predictions',[])
+                    if float(prediction.get('confidence',0.0)) >= float(min_conf)
+                ]
+
+                batch_records=measure_each_crack(
+                    batch_predictions,
+                    batch_w,
+                    batch_h,
+                    use_scale=use_scale,
+                    mm_per_pixel=mm_per_pixel,
+                )
+
+                batch_confidence=(
+                    sum(item['confidence'] for item in batch_records)
+                    / len(batch_records)
+                    if batch_records else 0.0
+                )
+                batch_total_length=sum(
+                    item['length_value']
+                    for item in batch_records
+                )
+                batch_max_width=max(
+                    (item['max_width_value'] for item in batch_records),
+                    default=0.0,
+                )
+
+                batch_rows.append({
+                    'Image ID': os.path.splitext(uploaded_file.name)[0],
+                    'File Name': uploaded_file.name,
+                    'Status': 'Crack Detected' if batch_records else 'No Crack',
+                    'Cracks': len(batch_records),
+                    'Average Confidence': (
+                        f'{batch_confidence*100:.1f}%'
+                        if batch_records else '—'
+                    ),
+                    f'Total Length ({"mm" if use_scale else "px"})': f'{batch_total_length:.2f}',
+                    f'Max Width ({"mm" if use_scale else "px"})': f'{batch_max_width:.2f}',
+                    'Processing Time (s)': f'{time.time()-batch_start:.2f}',
+                })
+
+            except Exception as batch_error:
+                batch_rows.append({
+                    'Image ID': os.path.splitext(uploaded_file.name)[0],
+                    'File Name': uploaded_file.name,
+                    'Status': 'Processing Error',
+                    'Cracks': '—',
+                    'Average Confidence': '—',
+                    'Processing Time (s)': '—',
+                    'Error': str(batch_error),
+                })
+
+        progress_bar.empty()
+        batch_df=pd.DataFrame(batch_rows)
+
+        st.markdown("<div class='section-card'>", unsafe_allow_html=True)
+        st.markdown("<div class='section-title'>Batch Analysis Summary</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-subtitle'>"
+            "One row per image. Detailed image rendering is disabled in batch mode."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        status_filter=st.selectbox(
+            'Filter by status',
+            ['All','Crack Detected','No Crack','Processing Error'],
+        )
+        search_image=st.text_input(
+            'Search Image ID',
+            placeholder='Example: 13452_1',
+        )
+
+        filtered_batch_df=batch_df.copy()
+
+        if status_filter != 'All':
+            filtered_batch_df=filtered_batch_df[
+                filtered_batch_df['Status']==status_filter
+            ]
+
+        if search_image.strip():
+            filtered_batch_df=filtered_batch_df[
+                filtered_batch_df['Image ID'].astype(str).str.contains(
+                    search_image.strip(),
+                    case=False,
+                    na=False,
+                )
+            ]
+
+        st.dataframe(
+            filtered_batch_df,
+            use_container_width=True,
+            hide_index=True,
+            height=520,
+        )
+
+        st.download_button(
+            'Export Batch CSV',
+            data=batch_df.to_csv(index=False).encode('utf-8-sig'),
+            file_name='BKAI_Batch_Analysis.csv',
+            mime='text/csv',
+        )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+        return
+
     for idx, uploaded_file in enumerate(uploaded_files, start=1):
         st.write('---')
         inspection_id=f"BKAI-{datetime.datetime.now():%Y%m%d-%H%M%S}-{idx:03d}"
@@ -986,20 +1150,58 @@ def run_main_app():
         predictions=result.get('predictions', [])
         preds_conf=[p for p in predictions if float(p.get('confidence',0)) >= float(min_conf)]
         total_time=time.time()-t0
-        col1,col2=st.columns(2)
-        with col1:
-            st.subheader('Original Image'); st.image(orig_img, use_container_width=True)
-        with col2:
-            st.subheader('Analyzed Image')
-            if len(preds_conf)==0:
+        if len(preds_conf)==0:
+            st.markdown("<div class='section-card'>", unsafe_allow_html=True)
+            st.markdown("<div class='section-title'>1. Image Analysis</div>", unsafe_allow_html=True)
+            st.markdown("<div class='subsection-title'>1.1 Crack Detection</div>", unsafe_allow_html=True)
+
+            no_crack_left, no_crack_right = st.columns([2.2,1])
+
+            with no_crack_left:
+                st.markdown("**Original Image**")
                 st.image(orig_img, use_container_width=True)
-                st.markdown("<div class='bkai-status-ok'>✅ Conclusion: No clearly visible crack was detected in this image.</div>", unsafe_allow_html=True)
-                pdf_no=export_pdf_no_crack(orig_img)
-                st.download_button('📄 Download PDF Report (No Crack Detected)', data=pdf_no.getvalue(), file_name=f"BKAI_NoCrack_{uploaded_file.name.split('.')[0]}.pdf", mime='application/pdf', key=f'pdf_no_crack_{idx}')
-                continue
-            analyzed_img=draw_predictions_with_mask(orig_img, preds_conf, image_key=uploaded_file.name, min_conf=min_conf)
-            st.image(analyzed_img, use_container_width=True)
-            st.markdown("<div class='bkai-status-danger'>⚠️ Conclusion: Cracks were detected in this image.</div>", unsafe_allow_html=True)
+
+            with no_crack_right:
+                st.markdown(
+                    f'''
+                    <div class="metric-box">
+                        <div class="metric-name">Image ID</div>
+                        <div class="metric-number">{os.path.splitext(uploaded_file.name)[0]}</div>
+                        <div class="metric-help">Input image identifier.</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-name">Image Resolution</div>
+                        <div class="metric-number">{img_w} × {img_h}</div>
+                        <div class="metric-help">Image width and height in pixels.</div>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True,
+                )
+
+            st.markdown(
+                "<div class='status-box status-success'>"
+                "Conclusion: No crack instance passed the selected confidence threshold."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            pdf_no=export_pdf_no_crack(orig_img)
+            st.download_button(
+                'Download PDF Report – No Crack Detected',
+                data=pdf_no.getvalue(),
+                file_name=f"BKAI_NoCrack_{uploaded_file.name.split('.')[0]}.pdf",
+                mime='application/pdf',
+                key=f'pdf_no_crack_{idx}',
+            )
+            continue
+
+        analyzed_img=draw_predictions_with_mask(
+            orig_img,
+            preds_conf,
+            image_key=uploaded_file.name,
+            min_conf=min_conf,
+        )
         crack_records=measure_each_crack(
             preds_conf,
             img_w,
@@ -1029,36 +1231,36 @@ def run_main_app():
         tab1, tab2=st.tabs(['Stage 1 – Detailed Analysis Report', 'Stage 2 – Crack Classification'])
         with tab1:
             st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-            st.markdown("<div class='section-title'>1. Phân tích ảnh</div>", unsafe_allow_html=True)
-            st.markdown("<div class='section-subtitle'>Kết quả phát hiện và đo đạc vết nứt từ mô hình Mask R-CNN.</div>", unsafe_allow_html=True)
+            st.markdown("<div class='section-title'>1. Image Analysis</div>", unsafe_allow_html=True)
+            st.markdown("<div class='section-subtitle'>Crack detection and quantitative measurement results generated by the Mask R-CNN model.</div>", unsafe_allow_html=True)
 
-            st.markdown("<div class='subsection-title'>1.1 Phát hiện vết nứt</div>", unsafe_allow_html=True)
+            st.markdown("<div class='subsection-title'>1.1 Crack Detection</div>", unsafe_allow_html=True)
             detect_left, detect_right, detect_info = st.columns([1.1,1.1,.9])
 
             with detect_left:
-                st.markdown("**Ảnh gốc (Original Image)**")
+                st.markdown("**Original Image**")
                 st.image(orig_img, use_container_width=True)
 
             with detect_right:
-                st.markdown("**Ảnh phân tích (Analyzed Image)**")
+                st.markdown("**Analyzed Image**")
                 st.image(analyzed_img, use_container_width=True)
 
             with detect_info:
-                st.markdown("**Thông tin phát hiện**")
+                st.markdown("**Detection Summary**")
                 st.markdown(
                     f'''
                     <div class="metric-box">
-                        <div class="metric-name">Tổng số vết nứt</div>
+                        <div class="metric-name">Detected Cracks</div>
                         <div class="metric-number">{len(crack_records)}</div>
-                        <div class="metric-help">Số instance vượt ngưỡng confidence.</div>
+                        <div class="metric-help">Instances above the selected confidence threshold.</div>
                     </div>
                     <div class="metric-box">
-                        <div class="metric-name">Độ tin cậy trung bình</div>
+                        <div class="metric-name">Average Confidence</div>
                         <div class="metric-number">{sum(item["confidence"] for item in crack_records)/len(crack_records)*100:.1f}%</div>
                         <div class="metric-help">Average confidence score.</div>
                     </div>
                     <div class="metric-box">
-                        <div class="metric-name">Kích thước ảnh</div>
+                        <div class="metric-name">Image Resolution</div>
                         <div class="metric-number">{img_w} × {img_h}</div>
                         <div class="metric-help">Image resolution in pixels.</div>
                     </div>
@@ -1067,13 +1269,13 @@ def run_main_app():
                 )
 
             st.markdown(
-                "<div class='status-box status-success'>✅ Kết luận: Trong ảnh có phát hiện vết nứt.</div>",
+                "<div class='status-box status-success'>✅ Conclusion: One or more cracks were detected in this image.</div>",
                 unsafe_allow_html=True,
             )
 
-            st.markdown("<div class='subsection-title'>1.2 Đo chiều dài vết nứt</div>", unsafe_allow_html=True)
+            st.markdown("<div class='subsection-title'>1.2 Crack Measurement</div>", unsafe_allow_html=True)
             st.markdown(
-                "<div class='section-subtitle'>Hiển thị kết quả đo kích thước từng vết nứt riêng biệt. Đường màu vàng là centerline thực tế.</div>",
+                "<div class='section-subtitle'>Each detected crack is measured separately. The yellow line follows the estimated crack centerline.</div>",
                 unsafe_allow_html=True,
             )
 
@@ -1084,6 +1286,15 @@ def run_main_app():
                     crack_visual=create_single_crack_visualization(
                         analyzed_img,
                         crack_item,
+                    )
+
+                    st.markdown(
+                        f'''
+                        <span class="chip">Selected Crack: {crack_item["crack_id"]}</span>
+                        <span class="chip">Confidence: {crack_item["confidence"]*100:.1f}%</span>
+                        <span class="chip">Unique ID: {os.path.splitext(uploaded_file.name)[0]}-{crack_item["crack_id"]}</span>
+                        ''',
+                        unsafe_allow_html=True,
                     )
 
                     image_col, metric_col = st.columns([2.2,1])
@@ -1132,7 +1343,7 @@ def run_main_app():
                             <div class="metric-box">
                                 <div class="metric-name">Orientation</div>
                                 <div class="metric-number">{crack_item["geometry"]["orientation_deg"]:.2f}°</div>
-                                <div class="metric-help">0° ngang · 90° đứng</div>
+                                <div class="metric-help">0° horizontal · 90° vertical</div>
                             </div>
                             <div class="metric-box">
                                 <div class="metric-name">Tortuosity</div>
@@ -1166,11 +1377,15 @@ def run_main_app():
             metrics_df=pd.DataFrame(metrics)
 
             st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-            st.markdown("<div class='subsection-title'>Bảng thông số từng vết nứt (Per-Crack Measurement Table)</div>", unsafe_allow_html=True)
+            st.markdown("<div class='subsection-title'>Per-Crack Measurement Table</div>", unsafe_allow_html=True)
+
+            image_id=os.path.splitext(uploaded_file.name)[0]
 
             per_crack_df=pd.DataFrame([
                 {
-                    'ID': item['crack_id'],
+                    'Image ID': image_id,
+                    'Crack ID': item['crack_id'],
+                    'Unique Crack ID': f"{image_id}-{item['crack_id']}",
                     'Confidence': f"{item['confidence']*100:.1f}%",
                     'Length (px)': f"{item['length_px']:.2f}",
                     'Length (mm)': f"{item['length_px']*mm_per_pixel:.2f}",
