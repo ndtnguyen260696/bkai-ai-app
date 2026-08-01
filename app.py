@@ -39,61 +39,287 @@ st.set_page_config(page_title="BKAI - AI-Based Concrete Crack Detection and Clas
 def inject_global_styles():
     st.markdown("""
     <style>
-    .stApp{background:radial-gradient(circle at top left, rgba(255,255,255,.96), rgba(223,231,243,.80) 22%, transparent 45%),linear-gradient(180deg, #e9eff8 0%, #dfe7f3 100%);} 
-    html, body, [class*="css"]{font-family:Inter, Arial, Helvetica, sans-serif;color:#1f2937;}
-    .block-container{max-width:1180px;padding-top:1.2rem;padding-bottom:2rem;}
-    [data-testid="stSidebar"]{background:linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);border-right:1px solid #d9e3f0;}
-    .bkai-main-header{background:linear-gradient(135deg,#4f8cff 0%,#2563eb 55%,#1e4fc4 100%);border-radius:24px;padding:24px 28px;margin-top:8px;margin-bottom:18px;color:#fff;box-shadow:0 24px 60px rgba(34,55,100,.16);}
-    .bkai-main-title{font-size:34px;font-weight:800;margin-bottom:8px;}
-    .bkai-main-subtitle{font-size:16px;opacity:.95;max-width:820px;line-height:1.7;}
-    .bkai-card{background:linear-gradient(180deg,#ffffff 0%,#f9fbff 100%);border:1px solid #dde6f2;border-radius:24px;padding:22px;box-shadow:0 16px 34px rgba(31,58,120,.08);margin-bottom:16px;}
-    .bkai-status-ok{background:#ebfaf0;border:1px solid #c7efda;color:#198754;padding:12px 14px;border-radius:14px;font-weight:700;}
-    .bkai-status-danger{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 14px;border-radius:14px;font-weight:700;}
-    .bkai-sidebar-user{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:10px 12px;color:#1d4ed8;font-weight:700;margin-bottom:8px;}
-    .metric-box{background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);border:1px solid #dbe7f5;border-radius:18px;padding:14px 16px;box-shadow:0 10px 24px rgba(31,58,120,.08);min-height:120px;margin-bottom:12px;}
-    .metric-box.metric-minor{border:1px solid #bfe7cd;background:linear-gradient(180deg,#f4fff7 0%,#ecfbf1 100%);} 
-    .metric-box.metric-moderate{border:1px solid #ffd59c;background:linear-gradient(180deg,#fffaf2 0%,#fff3df 100%);} 
-    .metric-box.metric-severe{border:1px solid #f3b4b4;background:linear-gradient(180deg,#fff6f6 0%,#ffebeb 100%);} 
-    .metric-name{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px;}
-    .metric-number{font-size:24px;font-weight:800;color:#0f172a;line-height:1.2;margin-bottom:6px;word-break:break-word;}
-    .metric-help{font-size:13px;line-height:1.5;color:#64748b;}
-    .metric-summary{background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);border:1px solid #dbe7f5;border-radius:18px;padding:16px 18px;box-shadow:0 10px 24px rgba(31,58,120,.08);margin-top:8px;margin-bottom:12px;}
-    .metric-summary.metric-minor{border:1px solid #bfe7cd;background:linear-gradient(180deg,#f4fff7 0%,#ecfbf1 100%);} 
-    .metric-summary.metric-moderate{border:1px solid #ffd59c;background:linear-gradient(180deg,#fffaf2 0%,#fff3df 100%);} 
-    .metric-summary.metric-severe{border:1px solid #f3b4b4;background:linear-gradient(180deg,#fff6f6 0%,#ffebeb 100%);} 
-    .metric-summary-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px;}
-    .metric-summary-text{font-size:18px;font-weight:700;line-height:1.6;color:#0f172a;}
-    .stage2-component{border:1px solid #dbe7f5;border-radius:18px;overflow:hidden;margin-bottom:16px;background:#fff;box-shadow:0 10px 24px rgba(31,58,120,.06);} 
-    .stage2-header{background:linear-gradient(135deg,#4f8cff 0%,#2b6ee9 60%,#1d5ddb 100%);color:#fff;padding:10px 16px;font-weight:800;}
-
-    .crack-summary-card{
-        background:linear-gradient(180deg,#ffffff 0%,#f7faff 100%);
-        border:1px solid #dbe7f5;
-        border-radius:16px;
-        padding:14px 16px;
-        box-shadow:0 8px 20px rgba(31,58,120,.07);
-        min-height:94px;
-        margin-bottom:10px;
+    :root{
+        --primary:#1769e0;
+        --primary-dark:#0c4db5;
+        --primary-soft:#eaf2ff;
+        --surface:#ffffff;
+        --surface-soft:#f7faff;
+        --text:#0f172a;
+        --muted:#64748b;
+        --border:#dce6f2;
+        --success:#16a34a;
+        --warning:#f59e0b;
+        --danger:#ef4444;
     }
-    .crack-summary-label{
-        font-size:11px;
+
+    html,body,[class*="css"]{
+        font-family:Inter,"Segoe UI",Arial,sans-serif;
+        color:var(--text);
+    }
+
+    .stApp{
+        background:linear-gradient(180deg,#f6f9fe 0%,#eaf1fb 100%);
+    }
+
+    .block-container{
+        max-width:1280px;
+        padding-top:.75rem;
+        padding-bottom:2.5rem;
+    }
+
+    [data-testid="stSidebar"]{
+        background:#ffffff;
+        border-right:1px solid #dce6f2;
+    }
+
+    .bkai-topbar{
+        background:linear-gradient(135deg,#0b3f91 0%,#0d5ccc 55%,#1681ee 100%);
+        color:white;
+        border-radius:0 0 20px 20px;
+        padding:18px 24px;
+        margin:-12px -12px 18px -12px;
+        box-shadow:0 10px 28px rgba(20,65,145,.18);
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:16px;
+    }
+
+    .bkai-top-title{
+        font-size:24px;
+        font-weight:850;
+        letter-spacing:-.02em;
+    }
+
+    .bkai-top-subtitle{
+        font-size:12px;
+        opacity:.88;
+        margin-top:4px;
+    }
+
+    .bkai-user-pill{
+        border:1px solid rgba(255,255,255,.24);
+        background:rgba(255,255,255,.10);
+        padding:9px 13px;
+        border-radius:999px;
+        font-size:12px;
+        font-weight:750;
+        white-space:nowrap;
+    }
+
+    .sidebar-user{
+        background:linear-gradient(135deg,#eef5ff,#e2edff);
+        border:1px solid #c9dcfa;
+        color:#1d4ed8;
+        border-radius:14px;
+        padding:12px 13px;
+        font-weight:800;
+        margin-bottom:12px;
+    }
+
+    .system-card{
+        background:#fff;
+        border:1px solid var(--border);
+        border-radius:16px;
+        padding:14px;
+        box-shadow:0 8px 20px rgba(31,58,120,.06);
+        margin-top:14px;
+        font-size:12px;
+        line-height:1.7;
+    }
+
+    .meta-grid{
+        display:grid;
+        grid-template-columns:repeat(4,minmax(0,1fr));
+        gap:12px;
+        margin:12px 0 18px;
+    }
+
+    .meta-card{
+        background:#fff;
+        border:1px solid var(--border);
+        border-radius:16px;
+        padding:14px 15px;
+        box-shadow:0 8px 20px rgba(31,58,120,.05);
+    }
+
+    .meta-label{
+        font-size:10px;
         text-transform:uppercase;
-        letter-spacing:.07em;
-        color:#64748b;
+        letter-spacing:.08em;
+        color:var(--muted);
         font-weight:800;
         margin-bottom:7px;
     }
-    .crack-summary-value{
-        font-size:21px;
-        color:#0f172a;
+
+    .meta-value{
+        font-size:15px;
         font-weight:850;
+        color:#0f3f9f;
+        line-height:1.3;
+    }
+
+    .section-card{
+        background:#fff;
+        border:1px solid var(--border);
+        border-radius:18px;
+        padding:18px;
+        box-shadow:0 10px 28px rgba(31,58,120,.06);
+        margin-bottom:16px;
+    }
+
+    .section-title{
+        font-size:21px;
+        font-weight:850;
+        color:#0f2f68;
+        margin-bottom:4px;
+    }
+
+    .section-subtitle{
+        font-size:13px;
+        color:var(--muted);
+        margin-bottom:14px;
+        line-height:1.55;
+    }
+
+    .subsection-title{
+        font-size:18px;
+        font-weight:850;
+        color:#102a56;
+        margin:8px 0 4px;
+    }
+
+    .metric-box{
+        background:#fff;
+        border:1px solid var(--border);
+        border-radius:16px;
+        padding:14px 15px;
+        box-shadow:0 8px 20px rgba(31,58,120,.05);
+        min-height:108px;
+        margin-bottom:10px;
+    }
+
+    .metric-name{
+        font-size:10px;
+        font-weight:850;
+        letter-spacing:.08em;
+        color:var(--muted);
+        text-transform:uppercase;
+        margin-bottom:8px;
+    }
+
+    .metric-number{
+        font-size:22px;
+        font-weight:900;
+        color:var(--text);
         line-height:1.2;
     }
-    .crack-summary-note{
-        font-size:12px;
-        color:#64748b;
+
+    .metric-help{
+        font-size:11px;
+        color:var(--muted);
+        line-height:1.45;
         margin-top:5px;
-        line-height:1.4;
+    }
+
+    .measure-card{
+        background:#fff;
+        border:1px solid var(--border);
+        border-radius:16px;
+        padding:14px 16px;
+        margin-bottom:10px;
+        box-shadow:0 8px 20px rgba(31,58,120,.05);
+    }
+
+    .measure-card.orange{border-left:7px solid #f97316;}
+    .measure-card.green{border-left:7px solid #22c55e;}
+    .measure-card.blue{border-left:7px solid #3b82f6;}
+
+    .measure-label{
+        font-size:11px;
+        font-weight:850;
+        color:#64748b;
+        text-transform:uppercase;
+        letter-spacing:.05em;
+        margin-bottom:6px;
+    }
+
+    .measure-main{
+        font-size:23px;
+        font-weight:900;
+        line-height:1.15;
+    }
+
+    .measure-sub{
+        font-size:13px;
+        color:#475569;
+        font-weight:750;
+        margin-top:4px;
+    }
+
+    .status-box{
+        border-radius:14px;
+        padding:12px 14px;
+        font-size:13px;
+        font-weight:750;
+        line-height:1.55;
+        margin-top:10px;
+    }
+
+    .status-success{background:#ecfdf3;border:1px solid #bbf7d0;color:#166534;}
+    .status-warning{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;}
+    .status-danger{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;}
+
+    .legend-box{
+        background:rgba(15,23,42,.82);
+        color:white;
+        border-radius:12px;
+        padding:10px 12px;
+        font-size:11px;
+        line-height:1.8;
+        display:inline-block;
+        margin-top:8px;
+    }
+
+    .assessment-card{
+        background:linear-gradient(180deg,#fff8f8,#fff1f2);
+        border:1px solid #f6b7bd;
+        border-radius:16px;
+        padding:14px 16px;
+        margin-top:12px;
+    }
+
+    .assessment-title{
+        font-size:11px;
+        color:#9f1239;
+        font-weight:850;
+        text-transform:uppercase;
+        letter-spacing:.06em;
+    }
+
+    .assessment-value{
+        font-size:21px;
+        font-weight:900;
+        color:#b91c1c;
+        margin-top:6px;
+    }
+
+    .stButton>button,.stDownloadButton>button{
+        border-radius:11px;
+        min-height:40px;
+        font-weight:800;
+    }
+
+    div[data-testid="stDataFrame"]{
+        border:1px solid var(--border);
+        border-radius:14px;
+        overflow:hidden;
+    }
+
+    @media(max-width:900px){
+        .meta-grid{grid-template-columns:1fr 1fr;}
+        .bkai-topbar{align-items:flex-start;flex-direction:column;}
     }
     </style>
     """, unsafe_allow_html=True)
@@ -163,7 +389,6 @@ def build_union_mask_from_predictions(predictions, img_w, img_h):
 
 
 def morphological_skeleton(binary_mask):
-    """Create a one-pixel-wide skeleton from a binary crack mask."""
     if binary_mask is None or binary_mask.size == 0:
         return np.zeros_like(binary_mask, dtype=np.uint8)
 
@@ -172,12 +397,6 @@ def morphological_skeleton(binary_mask):
 
 
 def weighted_skeleton_length(skeleton):
-    """
-    Calculate centerline length from 8-neighbour skeleton connections.
-
-    Horizontal/vertical connection = 1 px.
-    Diagonal connection = sqrt(2) px.
-    """
     if skeleton is None or skeleton.size == 0:
         return 0.0
 
@@ -196,7 +415,6 @@ def weighted_skeleton_length(skeleton):
 
 
 def skeleton_endpoints(skeleton):
-    """Return skeleton pixels having exactly one neighbouring skeleton pixel."""
     if skeleton is None or skeleton.size == 0:
         return []
 
@@ -238,16 +456,15 @@ def farthest_endpoint_pair(endpoints):
 
 
 def crack_orientation_from_skeleton(skeleton):
-    """0 degrees is horizontal and 90 degrees is vertical."""
     ys, xs = np.where(skeleton > 0)
 
     if len(xs) < 2:
         return 0.0
 
-    coordinates = np.column_stack((xs, ys)).astype(np.float64)
-    coordinates -= coordinates.mean(axis=0, keepdims=True)
+    points = np.column_stack((xs, ys)).astype(np.float64)
+    points -= points.mean(axis=0, keepdims=True)
 
-    covariance = np.cov(coordinates, rowvar=False)
+    covariance = np.cov(points, rowvar=False)
     eigenvalues, eigenvectors = np.linalg.eigh(covariance)
     principal_vector = eigenvectors[:, np.argmax(eigenvalues)]
 
@@ -264,12 +481,6 @@ def crack_orientation_from_skeleton(skeleton):
 
 
 def measure_crack_geometry_from_mask(mask):
-    """
-    Measure one crack mask.
-
-    Crack length follows the real skeleton path rather than a straight line.
-    Width remains estimated from the distance transform along the skeleton.
-    """
     if mask is None or mask.size == 0 or cv2.countNonZero(mask) == 0:
         empty = np.zeros_like(mask, dtype=np.uint8)
         return {
@@ -281,14 +492,12 @@ def measure_crack_geometry_from_mask(mask):
             'skeleton': empty,
             'dist_map': np.zeros(mask.shape, dtype=np.float32),
             'max_point': (0, 0),
-            'length_line': ((0, 0), (0, 0)),
             'endpoints': [],
         }
 
     binary = (mask > 0).astype(np.uint8) * 255
-
-    # Close tiny holes without aggressively deleting thin crack sections.
     kernel = np.ones((3, 3), dtype=np.uint8)
+
     binary = cv2.morphologyEx(
         binary,
         cv2.MORPH_CLOSE,
@@ -312,7 +521,6 @@ def measure_crack_geometry_from_mask(mask):
         if radius_values.size > 0
         else 0.0
     )
-
     max_width_px = (
         float(np.max(radius_values) * 2.0)
         if radius_values.size > 0
@@ -324,17 +532,15 @@ def measure_crack_geometry_from_mask(mask):
     endpoints = skeleton_endpoints(skeleton)
     endpoint_pair = farthest_endpoint_pair(endpoints)
 
-    if endpoint_pair is None:
-        length_line = ((0, 0), (0, 0))
-        straight_distance = 0.0
-    else:
-        length_line = endpoint_pair
+    if endpoint_pair is not None:
         straight_distance = float(
             np.hypot(
                 endpoint_pair[0][0] - endpoint_pair[1][0],
                 endpoint_pair[0][1] - endpoint_pair[1][1],
             )
         )
+    else:
+        straight_distance = 0.0
 
     tortuosity = (
         float(length_px / straight_distance)
@@ -351,7 +557,6 @@ def measure_crack_geometry_from_mask(mask):
         'skeleton': skeleton,
         'dist_map': dist_map,
         'max_point': max_point,
-        'length_line': length_line,
         'endpoints': endpoints,
     }
 
@@ -363,8 +568,7 @@ def measure_each_crack(
     use_scale=False,
     mm_per_pixel=1.0,
 ):
-    """Measure every Mask R-CNN instance separately."""
-    results = []
+    records = []
 
     for index, prediction in enumerate(predictions, start=1):
         instance_mask = build_union_mask_from_predictions(
@@ -386,19 +590,22 @@ def measure_each_crack(
             max_width_value = geometry['max_width_px']
             unit_text = 'px'
 
-        results.append({
+        records.append({
             'crack_id': f'C{index:02d}',
             'prediction': prediction,
             'mask': instance_mask,
             'geometry': geometry,
             'confidence': float(prediction.get('confidence', 0.0)),
+            'length_px': float(geometry['length_px']),
+            'avg_width_px': float(geometry['avg_width_px']),
+            'max_width_px': float(geometry['max_width_px']),
             'length_value': float(length_value),
             'avg_width_value': float(avg_width_value),
             'max_width_value': float(max_width_value),
             'unit_text': unit_text,
         })
 
-    return results
+    return records
 
 def draw_predictions_with_mask(image, predictions, image_key='', min_conf=0.0):
     base=image.convert('RGB'); W,H=base.size
@@ -423,40 +630,32 @@ def draw_predictions_with_mask(image, predictions, image_key='', min_conf=0.0):
     return Image.alpha_composite(base.convert('RGBA'), overlay).convert('RGB')
 
 
-def create_single_crack_measurement_visualization(
+def create_single_crack_visualization(
     analyzed_pil_image,
     crack_record,
-    panel_ratio=0.32,
 ):
-    """
-    Display one crack with its true curved skeleton and a clearer metric panel.
-    """
     image_rgb = np.array(analyzed_pil_image.convert('RGB'))
     image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
 
     image_h, image_w = image_bgr.shape[:2]
-    panel_w = max(210, int(image_w * panel_ratio))
     crack_view = image_bgr.copy()
 
     geometry = crack_record['geometry']
-    skeleton = geometry['skeleton']
-
-    # Emphasize the selected crack.
     active_mask = crack_record['mask'] > 0
+
     pale = np.full_like(crack_view, 235)
     dimmed = cv2.addWeighted(crack_view, 0.62, pale, 0.38, 0)
     crack_view[~active_mask] = dimmed[~active_mask]
 
-    # Draw the real curved centerline.
-    ys, xs = np.where(skeleton > 0)
+    ys, xs = np.where(geometry['skeleton'] > 0)
     crack_view[ys, xs] = (0, 235, 255)
 
     for endpoint in geometry['endpoints']:
         cv2.circle(
             crack_view,
             endpoint,
-            5,
-            (60, 210, 70),
+            6,
+            (40, 205, 70),
             -1,
             cv2.LINE_AA,
         )
@@ -466,15 +665,15 @@ def create_single_crack_measurement_visualization(
     cv2.circle(
         crack_view,
         (int(max_point[0]), int(max_point[1])),
-        9,
-        (70, 75, 255),
+        10,
+        (65, 80, 255),
         3,
         cv2.LINE_AA,
     )
     cv2.circle(
         crack_view,
         (int(max_point[0]), int(max_point[1])),
-        3,
+        4,
         (255, 255, 255),
         -1,
         cv2.LINE_AA,
@@ -483,127 +682,23 @@ def create_single_crack_measurement_visualization(
     cv2.rectangle(
         crack_view,
         (12, 12),
-        (200, 48),
+        (210, 52),
         (18, 30, 50),
         -1,
     )
     cv2.putText(
         crack_view,
         f"{crack_record['crack_id']} | {crack_record['confidence'] * 100:.1f}%",
-        (24, 37),
+        (24, 40),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.62,
+        0.66,
         (255, 255, 255),
         2,
         cv2.LINE_AA,
     )
 
-    # Clear, light right-side panel.
-    panel = np.full(
-        (image_h, panel_w, 3),
-        (247, 250, 255),
-        dtype=np.uint8,
-    )
-
-    cv2.rectangle(
-        panel,
-        (0, 0),
-        (panel_w - 1, image_h - 1),
-        (205, 219, 238),
-        2,
-    )
-
-    cv2.putText(
-        panel,
-        'CRACK MEASUREMENTS',
-        (20, 34),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.48,
-        (45, 72, 120),
-        2,
-        cv2.LINE_AA,
-    )
-
-    unit_text = crack_record['unit_text']
-
-    cards = [
-        (
-            'CENTERLINE LENGTH',
-            f"{crack_record['length_value']:.2f} {unit_text}",
-            (52, 139, 235),
-        ),
-        (
-            'AVERAGE WIDTH',
-            f"{crack_record['avg_width_value']:.2f} {unit_text}",
-            (48, 170, 95),
-        ),
-        (
-            'MAXIMUM WIDTH',
-            f"{crack_record['max_width_value']:.2f} {unit_text}",
-            (235, 95, 88),
-        ),
-    ]
-
-    top_margin = 54
-    gap = 10
-    available_height = image_h - top_margin - 18
-    card_height = max(
-        68,
-        int((available_height - gap * 2) / 3),
-    )
-
-    for index, (label, value, accent) in enumerate(cards):
-        y0 = top_margin + index * (card_height + gap)
-        y1 = min(image_h - 10, y0 + card_height)
-
-        cv2.rectangle(
-            panel,
-            (14, y0),
-            (panel_w - 14, y1),
-            (255, 255, 255),
-            -1,
-        )
-        cv2.rectangle(
-            panel,
-            (14, y0),
-            (panel_w - 14, y1),
-            (218, 228, 242),
-            1,
-        )
-        cv2.rectangle(
-            panel,
-            (14, y0),
-            (20, y1),
-            accent,
-            -1,
-        )
-
-        cv2.putText(
-            panel,
-            label,
-            (34, y0 + 24),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.38,
-            (92, 108, 132),
-            1,
-            cv2.LINE_AA,
-        )
-
-        cv2.putText(
-            panel,
-            value,
-            (34, min(y1 - 16, y0 + 57)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.58,
-            accent,
-            2,
-            cv2.LINE_AA,
-        )
-
-    combined = np.concatenate([crack_view, panel], axis=1)
-
     return Image.fromarray(
-        cv2.cvtColor(combined, cv2.COLOR_BGR2RGB)
+        cv2.cvtColor(crack_view, cv2.COLOR_BGR2RGB)
     )
 
 
@@ -616,10 +711,6 @@ def create_measurement_visualization(
     unit_text='px',
     panel_ratio=0.28,
 ):
-    """
-    Compatibility function for the existing PDF code.
-    It uses the first detected crack for the report image.
-    """
     if not predictions:
         return analyzed_pil_image
 
@@ -633,17 +724,9 @@ def create_measurement_visualization(
         mm_per_pixel=1.0,
     )
 
-    first_record = records[0]
-
-    # Preserve values already calculated by the existing app.
-    first_record['length_value'] = float(length_value)
-    first_record['avg_width_value'] = float(avg_width_value)
-    first_record['max_width_value'] = float(max_width_value)
-    first_record['unit_text'] = unit_text
-
-    return create_single_crack_measurement_visualization(
+    return create_single_crack_visualization(
         analyzed_pil_image,
-        first_record,
+        records[0],
     )
 
 def estimate_severity_from_ratio(area_ratio_percent):
@@ -783,7 +866,24 @@ if 'username' not in st.session_state: st.session_state.username=''
 if 'profile_filled' not in st.session_state: st.session_state.profile_filled=False
 
 def show_top_banner(username=''):
-    st.markdown(f"""<div class='bkai-main-header'><div class='bkai-main-title'>BKAI - AI-Based Concrete Crack Detection and Classification System</div><div class='bkai-main-subtitle'>{'Welcome back, ' + username + '. ' if username else ''}Upload concrete images for AI-based crack detection, segmentation, measurement, and PDF reporting in one integrated workspace.</div></div>""", unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class='bkai-topbar'>
+            <div>
+                <div class='bkai-top-title'>
+                    BKAI – AI-Based Concrete Crack Detection and Classification System
+                </div>
+                <div class='bkai-top-subtitle'>
+                    Mask R-CNN detection, per-crack geometry measurement, reporting, and engineering reference.
+                </div>
+            </div>
+            <div class='bkai-user-pill'>
+                👤 {username if username else 'Guest'} · 🟢 Online
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 def render_profile_form():
     if st.session_state.profile_filled: return True
@@ -820,6 +920,17 @@ def run_main_app():
     st.sidebar.markdown("<div class='bkai-sidebar-user'>Active User: " + st.session_state.get('username','-') + "</div>", unsafe_allow_html=True)
     st.sidebar.header('Analysis Settings')
     min_conf=st.sidebar.slider('Minimum confidence threshold', 0.0, 1.0, 0.30, 0.05)
+    st.sidebar.markdown(
+        '''
+        <div class="system-card">
+            <b>System Status</b><br>
+            🟢 Model Status: Connected<br>
+            🟢 API Status: Connected<br>
+            Version 2.0.0
+        </div>
+        ''',
+        unsafe_allow_html=True,
+    )
     st.sidebar.subheader('Measurement Settings')
     use_scale=st.sidebar.checkbox('Use scale calibration (mm/pixel)', value=False)
     mm_per_pixel=1.0
@@ -834,7 +945,32 @@ def run_main_app():
     if not uploaded_files:
         st.warning('Please upload at least one image before clicking Analyze Images.'); return
     for idx, uploaded_file in enumerate(uploaded_files, start=1):
-        st.write('---'); st.markdown(f"## Image {idx}: `{uploaded_file.name}`")
+        st.write('---')
+        inspection_id=f"BKAI-{datetime.datetime.now():%Y%m%d-%H%M%S}-{idx:03d}"
+        st.markdown(
+            f'''
+            <div class="meta-grid">
+                <div class="meta-card">
+                    <div class="meta-label">Inspection ID</div>
+                    <div class="meta-value">{inspection_id}</div>
+                </div>
+                <div class="meta-card">
+                    <div class="meta-label">Image Name</div>
+                    <div class="meta-value">{uploaded_file.name}</div>
+                </div>
+                <div class="meta-card">
+                    <div class="meta-label">Date & Time</div>
+                    <div class="meta-value">{datetime.datetime.now():%d/%m/%Y %H:%M}</div>
+                </div>
+                <div class="meta-card">
+                    <div class="meta-label">Calibration</div>
+                    <div class="meta-value">{f"1 px = {mm_per_pixel:.4f} mm" if use_scale else "Pixel-space only"}</div>
+                </div>
+            </div>
+            ''',
+            unsafe_allow_html=True,
+        )
+        st.markdown(f"## Image {idx}: `{uploaded_file.name}`")
         t0=time.time(); orig_img=Image.open(uploaded_file).convert('RGB'); img_w,img_h=orig_img.size
         buf=io.BytesIO(); orig_img.save(buf, format='JPEG'); buf.seek(0)
         with st.spinner(f'Sending image {idx} to the AI inference service...'):
@@ -864,7 +1000,6 @@ def run_main_app():
             analyzed_img=draw_predictions_with_mask(orig_img, preds_conf, image_key=uploaded_file.name, min_conf=min_conf)
             st.image(analyzed_img, use_container_width=True)
             st.markdown("<div class='bkai-status-danger'>⚠️ Conclusion: Cracks were detected in this image.</div>", unsafe_allow_html=True)
-        # Measure every detected crack separately.
         crack_records=measure_each_crack(
             preds_conf,
             img_w,
@@ -875,11 +1010,7 @@ def run_main_app():
 
         unit_text='mm' if use_scale else 'px'
 
-        # Keep the old overall summary, but calculate it from separate cracks.
-        length_value=sum(
-            item['length_value']
-            for item in crack_records
-        )
+        length_value=sum(item['length_value'] for item in crack_records)
         avg_width_value=(
             sum(item['avg_width_value'] for item in crack_records)
             / len(crack_records)
@@ -890,80 +1021,130 @@ def run_main_app():
             default=0.0,
         )
 
-        measurement_visual_img=create_single_crack_measurement_visualization(
+        measurement_visual_img=create_single_crack_visualization(
             analyzed_img,
             crack_records[0],
         )
         st.write('---')
         tab1, tab2=st.tabs(['Stage 1 – Detailed Analysis Report', 'Stage 2 – Crack Classification'])
         with tab1:
-            st.subheader('Annotated Measurement View')
-            st.caption(
-                'The original website layout is preserved. '
-                'Each Mask R-CNN crack instance is now measured separately, '
-                'and length follows the curved skeleton centerline.'
+            st.markdown("<div class='section-card'>", unsafe_allow_html=True)
+            st.markdown("<div class='section-title'>1. Phân tích ảnh</div>", unsafe_allow_html=True)
+            st.markdown("<div class='section-subtitle'>Kết quả phát hiện và đo đạc vết nứt từ mô hình Mask R-CNN.</div>", unsafe_allow_html=True)
+
+            st.markdown("<div class='subsection-title'>1.1 Phát hiện vết nứt</div>", unsafe_allow_html=True)
+            detect_left, detect_right, detect_info = st.columns([1.1,1.1,.9])
+
+            with detect_left:
+                st.markdown("**Ảnh gốc (Original Image)**")
+                st.image(orig_img, use_container_width=True)
+
+            with detect_right:
+                st.markdown("**Ảnh phân tích (Analyzed Image)**")
+                st.image(analyzed_img, use_container_width=True)
+
+            with detect_info:
+                st.markdown("**Thông tin phát hiện**")
+                st.markdown(
+                    f'''
+                    <div class="metric-box">
+                        <div class="metric-name">Tổng số vết nứt</div>
+                        <div class="metric-number">{len(crack_records)}</div>
+                        <div class="metric-help">Số instance vượt ngưỡng confidence.</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-name">Độ tin cậy trung bình</div>
+                        <div class="metric-number">{sum(item["confidence"] for item in crack_records)/len(crack_records)*100:.1f}%</div>
+                        <div class="metric-help">Average confidence score.</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-name">Kích thước ảnh</div>
+                        <div class="metric-number">{img_w} × {img_h}</div>
+                        <div class="metric-help">Image resolution in pixels.</div>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True,
+                )
+
+            st.markdown(
+                "<div class='status-box status-success'>✅ Kết luận: Trong ảnh có phát hiện vết nứt.</div>",
+                unsafe_allow_html=True,
             )
 
-            crack_tabs=st.tabs(
-                [item['crack_id'] for item in crack_records]
+            st.markdown("<div class='subsection-title'>1.2 Đo chiều dài vết nứt</div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div class='section-subtitle'>Hiển thị kết quả đo kích thước từng vết nứt riêng biệt. Đường màu vàng là centerline thực tế.</div>",
+                unsafe_allow_html=True,
             )
 
-            for crack_tab, crack_item in zip(
-                crack_tabs,
-                crack_records,
-            ):
+            crack_tabs=st.tabs([item['crack_id'] for item in crack_records])
+
+            for crack_tab, crack_item in zip(crack_tabs, crack_records):
                 with crack_tab:
-                    crack_visual=create_single_crack_measurement_visualization(
+                    crack_visual=create_single_crack_visualization(
                         analyzed_img,
                         crack_item,
                     )
 
-                    st.image(
-                        crack_visual,
-                        use_container_width=True,
-                    )
+                    image_col, metric_col = st.columns([2.2,1])
 
-                    value_columns=st.columns(3)
+                    with image_col:
+                        st.image(crack_visual, use_container_width=True)
+                        st.markdown(
+                            '''
+                            <div class="legend-box">
+                                <div>🟡 Centerline</div>
+                                <div>🔵 Crack contour</div>
+                                <div>🟢 Endpoints</div>
+                                <div>🔴 Maximum width point</div>
+                            </div>
+                            ''',
+                            unsafe_allow_html=True,
+                        )
 
-                    value_items=[
-                        (
-                            'Centerline Length',
-                            f"{crack_item['length_value']:.2f} {crack_item['unit_text']}",
-                            'Length following the real skeleton path',
-                        ),
-                        (
-                            'Average Width',
-                            f"{crack_item['avg_width_value']:.2f} {crack_item['unit_text']}",
-                            'Average distance-transform width',
-                        ),
-                        (
-                            'Maximum Width',
-                            f"{crack_item['max_width_value']:.2f} {crack_item['unit_text']}",
-                            'Largest estimated local width',
-                        ),
-                    ]
+                    with metric_col:
+                        if use_scale:
+                            length_mm=crack_item['length_value']
+                            avg_width_mm=crack_item['avg_width_value']
+                            max_width_mm=crack_item['max_width_value']
+                        else:
+                            length_mm=crack_item['length_px'] * mm_per_pixel
+                            avg_width_mm=crack_item['avg_width_px'] * mm_per_pixel
+                            max_width_mm=crack_item['max_width_px'] * mm_per_pixel
 
-                    for value_column, (label, value, note) in zip(
-                        value_columns,
-                        value_items,
-                    ):
-                        with value_column:
-                            st.markdown(
-                                f"""
-                                <div class='crack-summary-card'>
-                                    <div class='crack-summary-label'>{label}</div>
-                                    <div class='crack-summary-value'>{value}</div>
-                                    <div class='crack-summary-note'>{note}</div>
-                                </div>
-                                """,
-                                unsafe_allow_html=True,
-                            )
+                        st.markdown(
+                            f'''
+                            <div class="measure-card orange">
+                                <div class="measure-label">Centerline Length</div>
+                                <div class="measure-main" style="color:#f97316">{crack_item["length_px"]:.2f} px</div>
+                                <div class="measure-sub">{length_mm:.2f} mm</div>
+                            </div>
+                            <div class="measure-card green">
+                                <div class="measure-label">Average Width</div>
+                                <div class="measure-main" style="color:#16a34a">{crack_item["avg_width_px"]:.2f} px</div>
+                                <div class="measure-sub">{avg_width_mm:.2f} mm</div>
+                            </div>
+                            <div class="measure-card blue">
+                                <div class="measure-label">Maximum Width</div>
+                                <div class="measure-main" style="color:#2563eb">{crack_item["max_width_px"]:.2f} px</div>
+                                <div class="measure-sub">{max_width_mm:.2f} mm</div>
+                            </div>
+                            <div class="metric-box">
+                                <div class="metric-name">Orientation</div>
+                                <div class="metric-number">{crack_item["geometry"]["orientation_deg"]:.2f}°</div>
+                                <div class="metric-help">0° ngang · 90° đứng</div>
+                            </div>
+                            <div class="metric-box">
+                                <div class="metric-name">Tortuosity</div>
+                                <div class="metric-number">{crack_item["geometry"]["tortuosity"]:.3f}</div>
+                                <div class="metric-help">Centerline length / endpoint distance</div>
+                            </div>
+                            ''',
+                            unsafe_allow_html=True,
+                        )
 
-                    st.caption(
-                        f"Confidence: {crack_item['confidence'] * 100:.1f}% · "
-                        f"Orientation: {crack_item['geometry']['orientation_deg']:.1f}° · "
-                        f"Tortuosity: {crack_item['geometry']['tortuosity']:.3f}"
-                    )
+            st.markdown("</div>", unsafe_allow_html=True)
+
             confs=[float(p.get('confidence',0)) for p in preds_conf]; avg_conf=(sum(confs)/len(confs)) if confs else 0.0
             crack_ratio_percent, crack_area_px2 = crack_area_ratio_percent(preds_conf, img_w, img_h)
             severity=estimate_severity_from_ratio(crack_ratio_percent)
@@ -984,25 +1165,40 @@ def run_main_app():
             ]
             metrics_df=pd.DataFrame(metrics)
 
+            st.markdown("<div class='section-card'>", unsafe_allow_html=True)
+            st.markdown("<div class='subsection-title'>Bảng thông số từng vết nứt (Per-Crack Measurement Table)</div>", unsafe_allow_html=True)
+
             per_crack_df=pd.DataFrame([
                 {
-                    'Crack ID': item['crack_id'],
-                    'Confidence': f"{item['confidence']:.3f}",
-                    f"Crack Length ({item['unit_text']})": f"{item['length_value']:.2f}",
-                    f"Average Width ({item['unit_text']})": f"{item['avg_width_value']:.2f}",
-                    f"Maximum Width ({item['unit_text']})": f"{item['max_width_value']:.2f}",
+                    'ID': item['crack_id'],
+                    'Confidence': f"{item['confidence']*100:.1f}%",
+                    'Length (px)': f"{item['length_px']:.2f}",
+                    'Length (mm)': f"{item['length_px']*mm_per_pixel:.2f}",
+                    'Avg Width (px)': f"{item['avg_width_px']:.2f}",
+                    'Avg Width (mm)': f"{item['avg_width_px']*mm_per_pixel:.2f}",
+                    'Max Width (px)': f"{item['max_width_px']:.2f}",
+                    'Max Width (mm)': f"{item['max_width_px']*mm_per_pixel:.2f}",
                     'Orientation (°)': f"{item['geometry']['orientation_deg']:.2f}",
                     'Tortuosity': f"{item['geometry']['tortuosity']:.3f}",
                 }
                 for item in crack_records
             ])
 
-            st.subheader('Per-Crack Measurement Table')
             st.dataframe(
                 per_crack_df,
                 use_container_width=True,
                 hide_index=True,
             )
+
+            st.download_button(
+                '📗 Export CSV Data',
+                data=per_crack_df.to_csv(index=False).encode('utf-8-sig'),
+                file_name=f"BKAI_Measurements_{uploaded_file.name.split('.')[0]}.csv",
+                mime='text/csv',
+                key=f'csv_btn_{idx}_{uploaded_file.name}',
+            )
+
+            st.markdown("</div>", unsafe_allow_html=True)
 
             render_metrics_dashboard(metrics_df)
             with st.expander('View Metrics Table', expanded=False):
