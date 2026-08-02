@@ -1518,9 +1518,18 @@ def run_main_app():
 
             st.markdown("</div>", unsafe_allow_html=True)
 
-            render_metrics_dashboard(metrics_df)
-            with st.expander('View Metrics Table', expanded=False):
-                st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+            st.markdown("<div class='section-card'>", unsafe_allow_html=True)
+            st.markdown("<div class='subsection-title'>Review Metrics Table</div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div class='section-subtitle'>Complete image-level analysis results for technical review.</div>",
+                unsafe_allow_html=True,
+            )
+            st.dataframe(
+                metrics_df,
+                use_container_width=True,
+                hide_index=True,
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
             st.subheader('Statistical Charts')
             c1,c2=st.columns(2); bar_png=None; pie_png=None
             with c1:
