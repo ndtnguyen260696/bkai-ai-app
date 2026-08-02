@@ -538,6 +538,140 @@ def inject_global_styles():
         .meta-grid{grid-template-columns:1fr 1fr;}
         .bkai-topbar{align-items:flex-start;flex-direction:column;}
     }
+    
+    .stage2-hero{
+        background:linear-gradient(135deg,#0f4fa8 0%,#1769e0 58%,#3b82f6 100%);
+        color:#ffffff;
+        border-radius:20px;
+        padding:22px 24px;
+        margin-bottom:16px;
+        box-shadow:0 14px 34px rgba(23,105,224,.18);
+    }
+
+    .stage2-hero-title{
+        font-size:25px;
+        font-weight:900;
+        line-height:1.2;
+        margin-bottom:7px;
+    }
+
+    .stage2-hero-subtitle{
+        font-size:13px;
+        line-height:1.65;
+        opacity:.94;
+        max-width:920px;
+    }
+
+    .stage2-reference-note{
+        background:#eff6ff;
+        border:1px solid #bfdbfe;
+        color:#1e40af;
+        border-radius:14px;
+        padding:12px 14px;
+        font-size:12px;
+        line-height:1.55;
+        margin:10px 0 16px;
+    }
+
+    .stage2-image-caption{
+        font-size:12px;
+        font-weight:850;
+        color:#102a56;
+        text-align:center;
+        margin-top:6px;
+    }
+
+    .stage2-library-heading{
+        font-size:21px;
+        font-weight:900;
+        color:#102a56;
+        margin:14px 0 4px;
+    }
+
+    .stage2-library-note{
+        font-size:12px;
+        color:#64748b;
+        line-height:1.55;
+        margin-bottom:12px;
+    }
+
+    .stage2-crack-card{
+        background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+        border:1px solid #d7e3f3;
+        border-radius:18px;
+        padding:16px;
+        box-shadow:0 10px 26px rgba(31,58,120,.07);
+        margin:10px 0 16px;
+    }
+
+    .stage2-crack-title{
+        font-size:18px;
+        font-weight:900;
+        color:#0f4fa8;
+        margin-bottom:3px;
+    }
+
+    .stage2-crack-code{
+        display:inline-block;
+        padding:5px 9px;
+        border-radius:999px;
+        background:#eaf2ff;
+        border:1px solid #c8dcfb;
+        color:#1d4ed8;
+        font-size:10px;
+        font-weight:850;
+        margin-bottom:10px;
+    }
+
+    .stage2-field{
+        background:#ffffff;
+        border:1px solid #e2eaf4;
+        border-radius:12px;
+        padding:10px 11px;
+        margin-bottom:8px;
+    }
+
+    .stage2-field-label{
+        font-size:9px;
+        text-transform:uppercase;
+        letter-spacing:.08em;
+        color:#64748b;
+        font-weight:850;
+        margin-bottom:4px;
+    }
+
+    .stage2-field-value{
+        font-size:12px;
+        line-height:1.55;
+        color:#1e293b;
+    }
+
+    .stage2-member-summary{
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px;
+        margin:8px 0 14px;
+    }
+
+    .stage2-member-chip{
+        padding:7px 11px;
+        border-radius:999px;
+        background:#eef5ff;
+        border:1px solid #cfe0fb;
+        color:#174ea6;
+        font-size:11px;
+        font-weight:800;
+    }
+
+    .stage2-standards{
+        background:#ffffff;
+        border:1px solid #d7e3f3;
+        border-radius:18px;
+        padding:16px 18px;
+        box-shadow:0 10px 26px rgba(31,58,120,.06);
+        margin-top:18px;
+    }
+
     </style>
     """, unsafe_allow_html=True)
 inject_global_styles()
@@ -1265,30 +1399,497 @@ def export_pdf_no_crack(original_img):
     by=top-h-16*mm; c.setFillColor(colors.HexColor('#e8f5e9')); c.rect(LEFT, by, CONTENT_W, 16*mm, stroke=0, fill=1); c.setFillColor(colors.HexColor('#2e7d32')); c.drawString(LEFT+4*mm, by+8*mm, 'No clearly visible cracks were detected in the image under the current model threshold.')
     fy=BOTTOM-6; c.setFont(FONT_NAME,8); c.setFillColor(colors.grey); c.drawString(LEFT, fy, f"BKAI – Concrete Crack Inspection | Generated at {datetime.datetime.now():%Y-%m-%d %H:%M:%S}"); c.drawRightString(page_w-RIGHT, fy, 'Page 1'); c.save(); buf.seek(0); return buf
 
-def render_component_crack_table(component_df):
-    if component_df is None or component_df.empty:
-        st.info('No Stage 2 crack classification data available.'); return
-    for component, subdf in component_df.groupby('Component', sort=False):
-        st.markdown(f"<div class='stage2-component'><div class='stage2-header'>{component}</div>", unsafe_allow_html=True)
-        st.dataframe(subdf[['Crack Type','Cause','Shape Characteristics']].reset_index(drop=True), use_container_width=True, hide_index=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+
+STAGE2_CRACK_DATABASE = {
+    "Beam": [
+        {
+            "code": "B01",
+            "name": "Flexural Crack",
+            "image": "images/stage2/beam_uon.png",
+            "cause": "Flexural tensile stress exceeds the concrete tensile capacity, commonly because of high bending demand, insufficient longitudinal reinforcement, or inadequate section capacity.",
+            "shape": "Predominantly vertical cracks in the tension zone. They are usually widest at the tensile face and become narrower toward the neutral axis.",
+            "location": "Commonly concentrated near the mid-span region of simply supported beams or near negative-moment zones in continuous beams.",
+            "time": "Generally develops after significant service loading or overload.",
+            "action": "Verify load level, reinforcement detailing, crack width, deflection, and durability exposure. Repair may include sealing or epoxy injection after the structural cause has been assessed.",
+        },
+        {
+            "code": "B02",
+            "name": "Shear Crack",
+            "image": "images/stage2/beam_cat.png",
+            "cause": "Shear demand exceeds the available concrete and transverse-reinforcement capacity, or stirrup detailing is inadequate.",
+            "shape": "Inclined cracks, often approximately 30–45° to the beam axis. They may occur as an isolated crack or as a group.",
+            "location": "Frequently develops near supports or concentrated-load regions.",
+            "time": "Usually develops under high service load, overload, or progressive deterioration.",
+            "action": "Check shear force, stirrup spacing, anchorage, support conditions, and load history. Urgent structural review is required when cracks widen or propagate rapidly.",
+        },
+        {
+            "code": "B03",
+            "name": "Torsional Crack",
+            "image": "images/stage2/beam_xoan.png",
+            "cause": "Torsional demand is greater than the torsional resistance of the member, often due to eccentric loading or inadequate closed transverse reinforcement.",
+            "shape": "Diagonal or helical cracks appearing on multiple faces and forming a zigzag pattern around the beam.",
+            "location": "Common in edge beams, transfer members, curved structures, and regions subjected to eccentric load paths.",
+            "time": "Develops after torsional loading becomes significant.",
+            "action": "Review load eccentricity, torsional reinforcement, compatibility with adjacent members, and support restraint. Strengthening may require closed stirrups or external reinforcement.",
+        },
+        {
+            "code": "B04",
+            "name": "Sliding / Interface Crack",
+            "image": "images/stage2/beam_truot.png",
+            "cause": "Inadequate bond or shear transfer at a construction joint, interface, or bearing region.",
+            "shape": "A relatively continuous crack following an interface, construction joint, or horizontal weak plane.",
+            "location": "Construction joints, beam–column interfaces, support zones, or composite interfaces.",
+            "time": "May appear after load transfer begins or after cyclic movement.",
+            "action": "Inspect joint preparation, dowel action, shear-friction reinforcement, bearing movement, and water ingress. Repair should restore both bond and shear transfer.",
+        },
+        {
+            "code": "B05",
+            "name": "Direct Tension Crack",
+            "image": "images/stage2/beam_keo.png",
+            "cause": "Direct tensile force or restrained deformation exceeds the tensile capacity of concrete.",
+            "shape": "Cracks are generally perpendicular to the tensile force and may be relatively evenly spaced.",
+            "location": "Tension ties, restrained members, hanger regions, and members carrying axial tension.",
+            "time": "Appears when tensile loading or restraint becomes significant.",
+            "action": "Confirm force path, reinforcement continuity, anchorage, restraint, and crack spacing. Seal cracks where durability is a concern and strengthen if required.",
+        },
+        {
+            "code": "B06",
+            "name": "Shrinkage Crack",
+            "image": "images/stage2/beam_congot.png",
+            "cause": "Drying shrinkage or restrained volume change generates tensile stress exceeding the early-age tensile capacity.",
+            "shape": "Fine, relatively straight or irregular cracks that may occur independently of the primary structural stress pattern.",
+            "location": "Long members, restrained beam zones, and poorly cured concrete surfaces.",
+            "time": "From early age to several months after casting.",
+            "action": "Improve curing, construction-joint planning, shrinkage reinforcement, moisture control, and mixture design. Seal cracks when necessary for durability.",
+        },
+        {
+            "code": "B07",
+            "name": "Corrosion-Induced Crack",
+            "image": "images/stage2/beam_ammon.png",
+            "cause": "Expansion of corrosion products around reinforcing steel creates radial tensile pressure and cover cracking.",
+            "shape": "Longitudinal cracks following reinforcement lines, often accompanied by rust staining, delamination, or concrete spalling.",
+            "location": "Near the concrete cover above longitudinal bars and stirrups.",
+            "time": "Typically develops after prolonged chloride, carbonation, or moisture exposure.",
+            "action": "Assess corrosion extent, steel loss, cover condition, chloride/carbonation depth, and moisture source. Remove unsound concrete, treat steel, and restore protective cover.",
+        },
+    ],
+    "Column": [
+        {
+            "code": "C01",
+            "name": "Horizontal Crack",
+            "image": "images/stage2/column_ngang.png",
+            "cause": "Insufficient flexural capacity, construction-joint weakness, impact, or concentrated horizontal action.",
+            "shape": "A predominantly horizontal crack across one or more faces of the column.",
+            "location": "Often near beam–column joints, construction joints, or regions of moment reversal.",
+            "time": "After lateral loading, movement, impact, or deterioration of an interface.",
+            "action": "Check moment demand, joint condition, reinforcement continuity, displacement history, and confinement. Treat as structurally significant when the crack crosses the full section.",
+        },
+        {
+            "code": "C02",
+            "name": "Diagonal Crack",
+            "image": "images/stage2/column_cheo.png",
+            "cause": "Combined shear, bending, and axial compression exceed the member capacity.",
+            "shape": "Inclined crack traversing the column face, often growing toward a joint or loaded region.",
+            "location": "Column ends, beam–column joints, short columns, and seismic critical regions.",
+            "time": "Usually develops under high lateral or combined loading.",
+            "action": "Perform prompt structural assessment. Check shear capacity, confinement, axial-load ratio, displacement demand, and joint detailing.",
+        },
+        {
+            "code": "C03",
+            "name": "Splitting / Longitudinal Crack",
+            "image": "images/stage2/column_tach.png",
+            "cause": "High compression, bond splitting, insufficient confinement, or expansion around longitudinal reinforcement.",
+            "shape": "One or more vertical cracks, frequently parallel to longitudinal reinforcement.",
+            "location": "Column faces along longitudinal bars, especially where cover or confinement is insufficient.",
+            "time": "Develops progressively under high compression or deterioration.",
+            "action": "Check axial stress, transverse reinforcement, bar buckling risk, bond, cover, and corrosion. Strengthening may require confinement jackets.",
+        },
+        {
+            "code": "C04",
+            "name": "Shrinkage Crack",
+            "image": "images/stage2/column_congot.png",
+            "cause": "Restrained drying shrinkage, inadequate curing, or early thermal contraction.",
+            "shape": "Fine vertical, short, or irregular surface cracks that do not clearly follow a load-induced pattern.",
+            "location": "Exposed column surfaces and locally restrained regions.",
+            "time": "Early age to several months.",
+            "action": "Improve curing and moisture control, verify depth and activity, and seal cracks where durability protection is needed.",
+        },
+        {
+            "code": "C05",
+            "name": "Corrosion-Induced Crack",
+            "image": "images/stage2/column_ammon.png",
+            "cause": "Reinforcement corrosion produces expansive products and tensile pressure in the surrounding cover concrete.",
+            "shape": "Longitudinal cracking along reinforcement, frequently followed by delamination or cover spalling.",
+            "location": "Along longitudinal bars and ties near the concrete surface.",
+            "time": "Long-term environmental exposure.",
+            "action": "Map delamination, measure steel loss, identify moisture/chloride sources, repair concrete cover, and provide corrosion protection.",
+        },
+    ],
+    "Slab": [
+        {
+            "code": "S01",
+            "name": "Plastic Shrinkage Crack",
+            "image": "images/stage2/slab_congot_deo.png",
+            "cause": "Surface evaporation exceeds bleeding while concrete remains plastic.",
+            "shape": "Shallow, irregular, parallel, or polygonal cracks that may form a random network.",
+            "location": "Large exposed slab surfaces, especially under hot, dry, or windy conditions.",
+            "time": "Approximately 0.5–6 hours after placement.",
+            "action": "Use windbreaks, fogging, sunshades, evaporation reducers, prompt finishing, and immediate curing.",
+        },
+        {
+            "code": "S02",
+            "name": "Drying Shrinkage Crack",
+            "image": "images/stage2/slab_congot_kho.png",
+            "cause": "Moisture loss after hardening causes restrained volume reduction.",
+            "shape": "Map cracking, straight transverse cracks, or an irregular surface network.",
+            "location": "Slabs with long joint spacing, high water content, insufficient reinforcement, or inadequate curing.",
+            "time": "Several days to several months after casting.",
+            "action": "Optimize joint spacing, reinforcement, curing, water–cement ratio, aggregate content, and moisture exposure.",
+        },
+        {
+            "code": "S03",
+            "name": "Thermal Crack",
+            "image": "images/stage2/slab_nhiet.png",
+            "cause": "Temperature gradients or restrained thermal contraction generate tensile stress.",
+            "shape": "Cracks may radiate from restraints or form long, relatively straight lines.",
+            "location": "Thick slabs, mass concrete regions, restrained edges, and abrupt thickness changes.",
+            "time": "Early age or during repeated thermal cycles.",
+            "action": "Control placing temperature, insulation, curing, pour sequence, joint layout, and thermal gradients.",
+        },
+        {
+            "code": "S04",
+            "name": "Flexural Crack",
+            "image": "images/stage2/slab_uon.png",
+            "cause": "Positive or negative bending demand exceeds slab flexural capacity.",
+            "shape": "Cracks generally perpendicular to the principal tensile stress and may curve near supports.",
+            "location": "Mid-span positive-moment zones or support negative-moment zones.",
+            "time": "After service loading or overload.",
+            "action": "Check slab thickness, reinforcement position, loading, deflection, support conditions, and crack width.",
+        },
+        {
+            "code": "S05",
+            "name": "Shear Crack",
+            "image": "images/stage2/slab_cat.png",
+            "cause": "One-way shear demand exceeds slab capacity or concentrated load transfer is inadequate.",
+            "shape": "Inclined cracks, typically associated with a support, line load, or concentrated action.",
+            "location": "Near supports, openings, abrupt depth changes, or concentrated loads.",
+            "time": "Under high service load or overload.",
+            "action": "Review shear demand, support geometry, openings, effective depth, and reinforcement detailing.",
+        },
+        {
+            "code": "S06",
+            "name": "Torsional Crack",
+            "image": "images/stage2/slab_xoan.png",
+            "cause": "Twisting action, discontinuity, corner restraint, or eccentric loading causes principal tensile stress.",
+            "shape": "Diagonal or curved cracks, often appearing near corners or discontinuities.",
+            "location": "Slab corners, edge zones, irregular supports, and discontinuous panels.",
+            "time": "After torsional action develops.",
+            "action": "Check corner reinforcement, load eccentricity, support compatibility, and restraint conditions.",
+        },
+        {
+            "code": "S07",
+            "name": "Distributed Load Crack",
+            "image": "images/stage2/slab_phanbo.png",
+            "cause": "Distributed load, restrained deformation, or widespread bending exceeds local tensile capacity.",
+            "shape": "Several cracks distributed over a broader slab area.",
+            "location": "Loaded panels and regions with inadequate distributed reinforcement.",
+            "time": "During service loading or progressive deformation.",
+            "action": "Review load distribution, reinforcement ratio, support conditions, and long-term deflection.",
+        },
+        {
+            "code": "S08",
+            "name": "Concentrated-Load / Punching Crack",
+            "image": "images/stage2/slab_taptrung.png",
+            "cause": "High concentrated force or punching shear develops around a column, support, or point load.",
+            "shape": "Radial, cross-shaped, or perimeter-type cracking around the loaded region.",
+            "location": "Around columns, pedestals, concentrated supports, and heavy equipment bases.",
+            "time": "Under high concentrated load or progressive punching distress.",
+            "action": "Treat as potentially critical. Check punching perimeter, effective depth, shear reinforcement, column dimensions, and load transfer.",
+        },
+        {
+            "code": "S09",
+            "name": "Corrosion-Induced Crack",
+            "image": "images/stage2/slab_ammon.png",
+            "cause": "Corrosion of slab reinforcement creates expansion, cracking, delamination, and possible cover loss.",
+            "shape": "Cracks commonly follow the reinforcement grid and may be associated with rust staining or spalling.",
+            "location": "Near top or bottom reinforcement depending on the exposure surface.",
+            "time": "Long-term exposure to moisture, chlorides, or carbonation.",
+            "action": "Survey delamination and corrosion, identify exposure sources, repair damaged concrete, restore steel section where necessary, and improve waterproofing.",
+        },
+    ],
+    "Concrete Wall": [
+        {
+            "code": "W01",
+            "name": "Shrinkage Crack",
+            "image": "images/stage2/wall_congot.png",
+            "cause": "Drying shrinkage and restraint produce tensile stress in the wall.",
+            "shape": "Random, polygonal, short, or distributed cracks without a clear load-oriented pattern.",
+            "location": "Large wall panels, restrained bases, openings, and long wall segments.",
+            "time": "Early age to several months.",
+            "action": "Improve curing, joint layout, reinforcement distribution, panel dimensions, and moisture control.",
+        },
+        {
+            "code": "W02",
+            "name": "Thermal Crack",
+            "image": "images/stage2/wall_nhiet.png",
+            "cause": "Temperature variation through the wall or restrained cooling produces tensile stress.",
+            "shape": "Frequently vertical and relatively straight, although the exact orientation depends on restraint.",
+            "location": "Long walls, thick walls, construction joints, and restrained boundaries.",
+            "time": "Early thermal cooling or repeated seasonal cycles.",
+            "action": "Control temperature rise and cooling, use insulation, optimize pour sequence and joints, and provide distributed reinforcement.",
+        },
+        {
+            "code": "W03",
+            "name": "Horizontal Load-Induced Crack",
+            "image": "images/stage2/wall_ngang_taitrong.png",
+            "cause": "Out-of-plane bending, restraint, lateral pressure, or differential movement creates horizontal tension.",
+            "shape": "Predominantly horizontal cracking, sometimes accompanied by wall curvature or displacement.",
+            "location": "Retaining walls, tanks, basement walls, and walls subjected to lateral pressure.",
+            "time": "After lateral load, earth pressure, water pressure, or movement develops.",
+            "action": "Check pressure demand, wall thickness, reinforcement, support restraint, drainage, and displacement.",
+        },
+        {
+            "code": "W04",
+            "name": "Vertical Load-Induced Crack",
+            "image": "images/stage2/wall_doc_taitrong.png",
+            "cause": "Bending, restraint, support settlement, or load redistribution produces vertical tensile stress.",
+            "shape": "A vertical crack that may separate two regions of the wall.",
+            "location": "Wall mid-length, above supports, near openings, or where restraint changes.",
+            "time": "During service loading or differential movement.",
+            "action": "Check support settlement, wall continuity, reinforcement, load path, openings, and crack activity.",
+        },
+        {
+            "code": "W05",
+            "name": "Diagonal Load-Induced Crack",
+            "image": "images/stage2/wall_cheo_taitrong.png",
+            "cause": "Combined shear and bending, in-plane lateral load, or differential support movement.",
+            "shape": "Inclined crack, commonly originating near an opening, support, corner, or highly stressed zone.",
+            "location": "Shear walls, openings, wall corners, and support discontinuities.",
+            "time": "After significant lateral load or differential movement.",
+            "action": "Check in-plane shear, reinforcement, boundary elements, openings, foundation movement, and seismic demand.",
+        },
+        {
+            "code": "W06",
+            "name": "Corrosion-Induced Crack",
+            "image": "images/stage2/wall_ammon.png",
+            "cause": "Expansion caused by reinforcement corrosion cracks the concrete cover.",
+            "shape": "Longitudinal cracking following embedded reinforcement and possibly accompanied by rust staining or spalling.",
+            "location": "Exposed wall faces, wet zones, coastal environments, and areas with inadequate cover.",
+            "time": "Long-term environmental exposure.",
+            "action": "Assess moisture and chloride sources, map delamination, repair reinforcement and cover concrete, and improve surface protection.",
+        },
+    ],
+}
+
+
+def render_stage2_image(image_path, caption, use_container_width=True):
+    if os.path.exists(image_path):
+        st.image(
+            image_path,
+            use_container_width=use_container_width,
+        )
+        st.markdown(
+            f"<div class='stage2-image-caption'>{caption}</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.warning(
+            f"Reference image not found: {image_path}"
+        )
+
+
+def render_stage2_crack_card(member, crack, card_index):
+    st.markdown(
+        "<div class='stage2-crack-card'>",
+        unsafe_allow_html=True,
+    )
+
+    image_column, information_column = st.columns(
+        [0.92, 2.08],
+        gap="large",
+    )
+
+    with image_column:
+        render_stage2_image(
+            crack["image"],
+            crack["name"],
+        )
+
+    with information_column:
+        st.markdown(
+            f"<div class='stage2-crack-title'>{crack['name']}</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"<span class='stage2-crack-code'>{member} · {crack['code']}</span>",
+            unsafe_allow_html=True,
+        )
+
+        field_pairs = [
+            ("Formation Cause", crack["cause"]),
+            ("Geometric / Visual Characteristics", crack["shape"]),
+            ("Typical Location", crack["location"]),
+            ("Typical Appearance Time", crack["time"]),
+            ("Inspection / Control Recommendation", crack["action"]),
+        ]
+
+        for label, value in field_pairs:
+            st.markdown(
+                f"""
+                <div class="stage2-field">
+                    <div class="stage2-field-label">{label}</div>
+                    <div class="stage2-field-value">{value}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
 
 def show_stage2_demo(key_prefix='stage2'):
-    st.subheader('Stage 2 – Crack Classification and Suggested Causes / Actions')
-    df=pd.DataFrame([
-        {'Component':'Beam','Crack Type':'Flexural Crack','Cause':'Bending moment exceeds allowable limit; inadequate flexural reinforcement or section capacity.','Shape Characteristics':'Usually appears at mid-span and is widest in the tension zone.'},
-        {'Component':'Beam','Crack Type':'Shear Crack','Cause':'High shear force; inadequate concrete shear capacity or insufficient stirrups.','Shape Characteristics':'Inclined crack, often around 45° relative to the beam axis.'},
-        {'Component':'Beam','Crack Type':'Torsional Crack','Cause':'Insufficient torsional reinforcement or unsuitable cross-section design.','Shape Characteristics':'Diagonal or zigzag pattern around the beam surface.'},
-        {'Component':'Beam','Crack Type':'Corrosion-Induced Crack','Cause':'Aggressive environment, thin cover depth, and steel corrosion expansion.','Shape Characteristics':'Runs along reinforcement lines and may be accompanied by rust staining or cover spalling.'},
-        {'Component':'Column','Crack Type':'Diagonal Crack','Cause':'High combined compression, bending, or shear.','Shape Characteristics':'Inclined cracks appear on the surface when the load approaches or exceeds capacity.'},
-        {'Component':'Column','Crack Type':'Splitting / Longitudinal Crack','Cause':'Longitudinal splitting due to high compressive stress or weak concrete.','Shape Characteristics':'Multiple parallel vertical cracks.'},
-        {'Component':'Slab','Crack Type':'Plastic Shrinkage Crack','Cause':'Rapid moisture evaporation while concrete is still plastic.','Shape Characteristics':'Shallow and small cracks, often forming a polygonal pattern.'},
-        {'Component':'Slab','Crack Type':'Drying Shrinkage Crack','Cause':'Shrinkage after hardening in dry or hot environments.','Shape Characteristics':'Map cracking or relatively straight crack lines.'},
-        {'Component':'Concrete Wall','Crack Type':'Shrinkage Crack','Cause':'Rapid moisture loss; shrinkage stress exceeds tensile capacity.','Shape Characteristics':'Random, polygonal, or intersecting crack pattern.'},
-        {'Component':'Concrete Wall','Crack Type':'Thermal Crack','Cause':'Temperature difference through the wall thickness.','Shape Characteristics':'Often vertical and wider in the thermal tension zone.'},
-    ])
-    render_component_crack_table(df)
-    st.caption('Component-based crack knowledge reference.')
+    st.markdown(
+        """
+        <div class="stage2-hero">
+            <div class="stage2-hero-title">
+                Stage 2 – Engineering Crack Knowledge Base
+            </div>
+            <div class="stage2-hero-subtitle">
+                Component-based reference library describing likely formation mechanisms,
+                geometric characteristics, typical locations, appearance periods, and
+                recommended inspection or control actions for reinforced-concrete cracks.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div class="stage2-reference-note">
+            <b>Important:</b> Stage 2 is an engineering reference library.
+            The current Mask R-CNN model detects and segments crack instances but does
+            not automatically classify the engineering crack type. Selection of a
+            possible type must be verified using member location, loading, crack pattern,
+            physical width, construction history, and applicable standards.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    overview_left, overview_right = st.columns(
+        2,
+        gap="large",
+    )
+
+    with overview_left:
+        render_stage2_image(
+            "images/stage2_crack_tree.png",
+            "Concrete Crack Classification Tree",
+        )
+
+    with overview_right:
+        render_stage2_image(
+            "images/stage2_structural_example.png",
+            "Structural Crack Pattern Examples",
+        )
+
+    st.markdown(
+        "<div class='stage2-library-heading'>Component-Based Crack Library</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        <div class="stage2-library-note">
+            Select a structural member to review its crack types. Each entry combines
+            the illustration stored in the GitHub repository with engineering information
+            extracted and translated from the supplied reference tables.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    member_names = list(STAGE2_CRACK_DATABASE.keys())
+    member_tabs = st.tabs(member_names)
+
+    for member_tab, member in zip(
+        member_tabs,
+        member_names,
+    ):
+        with member_tab:
+            member_records = STAGE2_CRACK_DATABASE[member]
+
+            st.markdown(
+                f"""
+                <div class="stage2-member-summary">
+                    <span class="stage2-member-chip">
+                        Structural member: {member}
+                    </span>
+                    <span class="stage2-member-chip">
+                        Crack types: {len(member_records)}
+                    </span>
+                    <span class="stage2-member-chip">
+                        Illustrated engineering reference
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            search_text = st.text_input(
+                f"Search {member} crack types",
+                placeholder="Enter a crack name or keyword",
+                key=f"{key_prefix}_{member}_search",
+            )
+
+            filtered_records = member_records
+
+            if search_text.strip():
+                search_value = search_text.strip().lower()
+                filtered_records = [
+                    record
+                    for record in member_records
+                    if search_value in (
+                        record["name"]
+                        + " "
+                        + record["cause"]
+                        + " "
+                        + record["shape"]
+                    ).lower()
+                ]
+
+            if not filtered_records:
+                st.info(
+                    "No crack type matches the current search."
+                )
+
+            for card_index, crack in enumerate(
+                filtered_records,
+                start=1,
+            ):
+                render_stage2_crack_card(
+                    member,
+                    crack,
+                    card_index,
+                )
+
+    st.markdown(
+        """
+        <div class="stage2-standards">
+            <b>Reference framework for engineering verification</b><br>
+            ACI 224R · ACI 116R · EN 206 · Eurocode 2 · TCVN 5574 ·
+            project inspection specifications and qualified structural-engineering review.
+            <br><br>
+            The listed causes and control measures are reference guidance and must be
+            reconciled with field observations, drawings, material records, loading,
+            exposure conditions, and the governing project standard.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 USER_STATS_FILE='user_stats.json'
 if os.path.exists(USER_STATS_FILE):
