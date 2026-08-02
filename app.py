@@ -1980,7 +1980,7 @@ def run_main_app():
             st.markdown("## Scientific Charts")
             st.caption(
                 "Clear image-level and instance-level visual summaries. "
-                "The charts automatically adapt when only one crack is detected."
+                "All charts use the same white background and equal display size."
             )
 
             crack_labels=[item['crack_id'] for item in crack_records]
@@ -1993,26 +1993,30 @@ def run_main_app():
             chart_length_png=None
             chart_width_png=None
 
-            chart_row1_col1,chart_row1_col2=st.columns(2)
+            chart_row1_col1,chart_row1_col2=st.columns(2, gap="medium")
 
             with chart_row1_col1:
-                st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-                st.markdown(
-                    "<div class='chart-title'>Detection Confidence</div>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    "<div class='chart-note'>Model confidence for each retained crack instance. "
-                    "Values closer to 100% indicate stronger model confidence.</div>",
-                    unsafe_allow_html=True,
+                st.markdown("#### Detection Confidence")
+                st.caption(
+                    "Model confidence for each retained crack instance."
                 )
 
-                fig1,ax1=plt.subplots(figsize=(5.4,2.7), dpi=170)
+                fig1,ax1=plt.subplots(figsize=(5.4,3.0), dpi=170)
                 fig1.patch.set_facecolor('white')
                 ax1.set_facecolor('white')
+
                 y_positions=np.arange(len(crack_labels))
-                ax1.barh(y_positions,[1.0]*len(crack_labels),height=0.42,alpha=0.15)
-                ax1.barh(y_positions,confs,height=0.42)
+                ax1.barh(
+                    y_positions,
+                    [1.0]*len(crack_labels),
+                    height=0.42,
+                    alpha=0.12,
+                )
+                ax1.barh(
+                    y_positions,
+                    confs,
+                    height=0.42,
+                )
                 ax1.set_yticks(y_positions)
                 ax1.set_yticklabels(crack_labels)
                 ax1.set_xlim(0,1)
@@ -2035,29 +2039,33 @@ def run_main_app():
                     )
 
                 fig1.tight_layout()
-                st.pyplot(fig1)
+                st.pyplot(fig1, use_container_width=True)
                 chart_confidence_png=fig_to_png(fig1)
                 plt.close(fig1)
-                st.markdown("</div>",unsafe_allow_html=True)
 
             with chart_row1_col2:
-                st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-                st.markdown(
-                    "<div class='chart-title'>Crack Area within the Image</div>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    "<div class='chart-note'>Percentage of image pixels classified as crack mask. "
-                    "This is image-space extent, not structural severity.</div>",
-                    unsafe_allow_html=True,
+                st.markdown("#### Crack Area within the Image")
+                st.caption(
+                    "Percentage of image pixels classified as crack mask."
                 )
 
                 ratio=max(0.0,min(100.0,crack_ratio_percent))
-                fig2,ax2=plt.subplots(figsize=(5.4,2.7), dpi=170)
+
+                fig2,ax2=plt.subplots(figsize=(5.4,3.0), dpi=170)
                 fig2.patch.set_facecolor('white')
                 ax2.set_facecolor('white')
-                ax2.barh(['Image area'],[100],height=.42,alpha=.15)
-                ax2.barh(['Image area'],[ratio],height=.42)
+
+                ax2.barh(
+                    ['Image area'],
+                    [100],
+                    height=.42,
+                    alpha=.12,
+                )
+                ax2.barh(
+                    ['Image area'],
+                    [ratio],
+                    height=.42,
+                )
                 ax2.set_xlim(0,100)
                 ax2.set_xticks([0,25,50,75,100])
                 ax2.set_xticklabels(['0%','25%','50%','75%','100%'])
@@ -2074,31 +2082,30 @@ def run_main_app():
                     fontsize=10,
                     fontweight='bold',
                 )
+
                 fig2.tight_layout()
-                st.pyplot(fig2)
+                st.pyplot(fig2, use_container_width=True)
                 chart_area_png=fig_to_png(fig2)
                 plt.close(fig2)
-                st.markdown("</div>",unsafe_allow_html=True)
 
-            chart_row2_col1,chart_row2_col2=st.columns(2)
+            chart_row2_col1,chart_row2_col2=st.columns(2, gap="medium")
 
             with chart_row2_col1:
-                st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-                st.markdown(
-                    "<div class='chart-title'>Centerline Length</div>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    "<div class='chart-note'>Estimated centerline length for each crack instance. "
-                    "Values are reported in pixels unless calibration is enabled.</div>",
-                    unsafe_allow_html=True,
+                st.markdown("#### Centerline Length")
+                st.caption(
+                    "Estimated centerline length for each crack instance."
                 )
 
-                fig3,ax3=plt.subplots(figsize=(5.4,2.7), dpi=170)
+                fig3,ax3=plt.subplots(figsize=(5.4,3.0), dpi=170)
                 fig3.patch.set_facecolor('white')
                 ax3.set_facecolor('white')
+
                 y_positions=np.arange(len(crack_labels))
-                ax3.barh(y_positions,lengths,height=.42)
+                ax3.barh(
+                    y_positions,
+                    lengths,
+                    height=.42,
+                )
                 ax3.set_yticks(y_positions)
                 ax3.set_yticklabels(crack_labels)
                 ax3.set_xlabel('Centerline length (px)')
@@ -2121,24 +2128,17 @@ def run_main_app():
                     )
 
                 fig3.tight_layout()
-                st.pyplot(fig3)
+                st.pyplot(fig3, use_container_width=True)
                 chart_length_png=fig_to_png(fig3)
                 plt.close(fig3)
-                st.markdown("</div>",unsafe_allow_html=True)
 
             with chart_row2_col2:
-                st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-                st.markdown(
-                    "<div class='chart-title'>Crack Width Comparison</div>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    "<div class='chart-note'>Grouped column chart comparing average and maximum "
-                    "crack width for each detected crack instance.</div>",
-                    unsafe_allow_html=True,
+                st.markdown("#### Crack Width Comparison")
+                st.caption(
+                    "Average and maximum width shown as separate vertical columns."
                 )
 
-                fig4,ax4=plt.subplots(figsize=(5.4,2.7), dpi=170)
+                fig4,ax4=plt.subplots(figsize=(5.4,3.0), dpi=170)
                 fig4.patch.set_facecolor('white')
                 ax4.set_facecolor('white')
 
@@ -2162,14 +2162,13 @@ def run_main_app():
                 ax4.set_xticklabels(crack_labels)
                 ax4.set_ylabel('Width (px)')
                 ax4.set_xlabel('Crack instance')
-                ax4.set_title('Average vs Maximum Crack Width', pad=10)
                 ax4.grid(axis='y',alpha=.18)
                 ax4.legend(loc='upper left')
                 ax4.spines['top'].set_visible(False)
                 ax4.spines['right'].set_visible(False)
 
                 upper_limit=max(max_widths) if max_widths else 1.0
-                ax4.set_ylim(0,upper_limit*1.28)
+                ax4.set_ylim(0,upper_limit*1.30)
 
                 for bar,value in zip(avg_bars,avg_widths):
                     ax4.text(
@@ -2194,11 +2193,9 @@ def run_main_app():
                     )
 
                 fig4.tight_layout()
-                st.pyplot(fig4)
+                st.pyplot(fig4, use_container_width=True)
                 chart_width_png=fig_to_png(fig4)
                 plt.close(fig4)
-
-                st.markdown("</div>",unsafe_allow_html=True)
 
             pdf_buf=export_pdf(
                 orig_img,
