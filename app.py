@@ -378,12 +378,20 @@ def inject_global_styles():
     }
 
     .chart-card{
-        background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+        background:#ffffff;
         border:1px solid #cfddf0;
         border-radius:18px;
         padding:14px;
         box-shadow:0 10px 26px rgba(31,58,120,.08);
         margin-bottom:16px;
+        min-height:350px;
+    }
+
+    .chart-card [data-testid="stPlotlyChart"],
+    .chart-card [data-testid="stVegaLiteChart"],
+    .chart-card [data-testid="stArrowVegaLiteChart"],
+    .chart-card [data-testid="stPyplotGlobalUse"]{
+        background:#ffffff !important;
     }
 
     .chart-title{
@@ -2000,6 +2008,8 @@ def run_main_app():
                 )
 
                 fig1,ax1=plt.subplots(figsize=(5.4,2.7), dpi=170)
+                fig1.patch.set_facecolor('white')
+                ax1.set_facecolor('white')
                 y_positions=np.arange(len(crack_labels))
                 ax1.barh(y_positions,[1.0]*len(crack_labels),height=0.42,alpha=0.15)
                 ax1.barh(y_positions,confs,height=0.42)
@@ -2044,6 +2054,8 @@ def run_main_app():
 
                 ratio=max(0.0,min(100.0,crack_ratio_percent))
                 fig2,ax2=plt.subplots(figsize=(5.4,2.7), dpi=170)
+                fig2.patch.set_facecolor('white')
+                ax2.set_facecolor('white')
                 ax2.barh(['Image area'],[100],height=.42,alpha=.15)
                 ax2.barh(['Image area'],[ratio],height=.42)
                 ax2.set_xlim(0,100)
@@ -2083,6 +2095,8 @@ def run_main_app():
                 )
 
                 fig3,ax3=plt.subplots(figsize=(5.4,2.7), dpi=170)
+                fig3.patch.set_facecolor('white')
+                ax3.set_facecolor('white')
                 y_positions=np.arange(len(crack_labels))
                 ax3.barh(y_positions,lengths,height=.42)
                 ax3.set_yticks(y_positions)
@@ -2119,46 +2133,68 @@ def run_main_app():
                     unsafe_allow_html=True,
                 )
                 st.markdown(
-                    "<div class='chart-note'>Average and maximum width are shown side by side "
-                    "for each crack instance.</div>",
+                    "<div class='chart-note'>Grouped column chart comparing average and maximum "
+                    "crack width for each detected crack instance.</div>",
                     unsafe_allow_html=True,
                 )
 
-                width_df=pd.DataFrame({
-                    'Crack ID':crack_labels,
-                    'Average width':avg_widths,
-                    'Maximum width':max_widths,
-                }).set_index('Crack ID')
-
-                st.bar_chart(
-                    width_df,
-                    use_container_width=True,
-                )
-
                 fig4,ax4=plt.subplots(figsize=(5.4,2.7), dpi=170)
-                y_positions=np.arange(len(crack_labels))
-                bar_height=.28
-                ax4.barh(
-                    y_positions-bar_height/2,
+                fig4.patch.set_facecolor('white')
+                ax4.set_facecolor('white')
+
+                x_positions=np.arange(len(crack_labels))
+                bar_width=.34
+
+                avg_bars=ax4.bar(
+                    x_positions-bar_width/2,
                     avg_widths,
-                    height=bar_height,
+                    width=bar_width,
                     label='Average width',
                 )
-                ax4.barh(
-                    y_positions+bar_height/2,
+                max_bars=ax4.bar(
+                    x_positions+bar_width/2,
                     max_widths,
-                    height=bar_height,
+                    width=bar_width,
                     label='Maximum width',
                 )
-                ax4.set_yticks(y_positions)
-                ax4.set_yticklabels(crack_labels)
-                ax4.set_xlabel('Width (px)')
-                ax4.grid(axis='x',alpha=.18)
-                ax4.legend(loc='lower right')
+
+                ax4.set_xticks(x_positions)
+                ax4.set_xticklabels(crack_labels)
+                ax4.set_ylabel('Width (px)')
+                ax4.set_xlabel('Crack instance')
+                ax4.set_title('Average vs Maximum Crack Width', pad=10)
+                ax4.grid(axis='y',alpha=.18)
+                ax4.legend(loc='upper left')
                 ax4.spines['top'].set_visible(False)
                 ax4.spines['right'].set_visible(False)
-                ax4.spines['left'].set_visible(False)
+
+                upper_limit=max(max_widths) if max_widths else 1.0
+                ax4.set_ylim(0,upper_limit*1.28)
+
+                for bar,value in zip(avg_bars,avg_widths):
+                    ax4.text(
+                        bar.get_x()+bar.get_width()/2,
+                        bar.get_height()+upper_limit*.03,
+                        f'{value:.2f}',
+                        ha='center',
+                        va='bottom',
+                        fontsize=8,
+                        fontweight='bold',
+                    )
+
+                for bar,value in zip(max_bars,max_widths):
+                    ax4.text(
+                        bar.get_x()+bar.get_width()/2,
+                        bar.get_height()+upper_limit*.03,
+                        f'{value:.2f}',
+                        ha='center',
+                        va='bottom',
+                        fontsize=8,
+                        fontweight='bold',
+                    )
+
                 fig4.tight_layout()
+                st.pyplot(fig4)
                 chart_width_png=fig_to_png(fig4)
                 plt.close(fig4)
 
