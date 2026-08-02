@@ -378,12 +378,105 @@ def inject_global_styles():
     }
 
     .chart-card{
+        background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+        border:1px solid #cfddf0;
+        border-radius:18px;
+        padding:14px;
+        box-shadow:0 10px 26px rgba(31,58,120,.08);
+        margin-bottom:16px;
+    }
+
+    .chart-title{
+        font-size:15px;
+        font-weight:850;
+        color:#102a56;
+        margin-bottom:3px;
+    }
+
+    .chart-note{
+        font-size:11px;
+        color:#64748b;
+        line-height:1.45;
+        margin-bottom:10px;
+    }
+
+    .technical-table-wrap{
+        overflow-x:auto;
+        border:1px solid #c9d9ee;
+        border-radius:14px;
         background:#ffffff;
-        border:1px solid #dce6f2;
-        border-radius:16px;
-        padding:10px;
-        box-shadow:0 8px 22px rgba(31,58,120,.06);
-        margin-bottom:14px;
+        box-shadow:0 8px 22px rgba(31,58,120,.07);
+    }
+
+    .technical-table{
+        width:100%;
+        border-collapse:separate;
+        border-spacing:0;
+        font-size:12px;
+        color:#0f172a;
+    }
+
+    .technical-table thead th{
+        position:sticky;
+        top:0;
+        z-index:1;
+        background:linear-gradient(180deg,#1769e0 0%,#0f56c7 100%);
+        color:#ffffff;
+        text-align:center;
+        font-weight:800;
+        padding:11px 10px;
+        border-right:1px solid rgba(255,255,255,.18);
+        white-space:nowrap;
+    }
+
+    .technical-table tbody td{
+        padding:10px 10px;
+        border-top:1px solid #e6edf7;
+        border-right:1px solid #edf2f8;
+        vertical-align:middle;
+        background:#ffffff;
+    }
+
+    .technical-table tbody tr:nth-child(even) td{
+        background:#f6f9fe;
+    }
+
+    .technical-table tbody tr:hover td{
+        background:#eaf2ff;
+    }
+
+    .technical-table td.num{
+        text-align:right;
+        font-variant-numeric:tabular-nums;
+        font-weight:700;
+    }
+
+    .technical-table td.center{
+        text-align:center;
+    }
+
+    .technical-table td.group{
+        font-weight:800;
+        color:#0f4ca3;
+        background:#eef5ff !important;
+        white-space:nowrap;
+    }
+
+    .table-highlight{
+        display:flex;
+        gap:10px;
+        flex-wrap:wrap;
+        margin:10px 0 14px;
+    }
+
+    .table-highlight-item{
+        background:#eef5ff;
+        color:#174ea6;
+        border:1px solid #cfe0fb;
+        padding:7px 10px;
+        border-radius:999px;
+        font-size:11px;
+        font-weight:800;
     }
 
     .assessment-card{
@@ -497,6 +590,60 @@ def style_technical_table(df, numeric_columns=None):
             )
 
     return styler
+
+
+def render_html_table(df, numeric_columns=None, center_columns=None, group_column=None):
+    if df is None or df.empty:
+        st.info('No table data available.')
+        return
+
+    numeric_columns=set(numeric_columns or [])
+    center_columns=set(center_columns or [])
+
+    headers=''.join(
+        f'<th>{column}</th>'
+        for column in df.columns
+    )
+
+    rows=[]
+
+    for _,row in df.iterrows():
+        cells=[]
+
+        for column in df.columns:
+            value=row[column]
+            css_class=[]
+
+            if column in numeric_columns:
+                css_class.append('num')
+            elif column in center_columns:
+                css_class.append('center')
+
+            if group_column and column==group_column:
+                css_class.append('group')
+
+            class_attr=(
+                f' class="{" ".join(css_class)}"'
+                if css_class else ''
+            )
+
+            cells.append(
+                f'<td{class_attr}>{value}</td>'
+            )
+
+        rows.append(f'<tr>{"".join(cells)}</tr>')
+
+    st.markdown(
+        f'''
+        <div class="technical-table-wrap">
+            <table class="technical-table">
+                <thead><tr>{headers}</tr></thead>
+                <tbody>{''.join(rows)}</tbody>
+            </table>
+        </div>
+        ''',
+        unsafe_allow_html=True,
+    )
 
 def extract_poly_points(points_field, img_w, img_h):
     pts=[]
@@ -1752,17 +1899,31 @@ def run_main_app():
 
             per_crack_df=pd.DataFrame(per_crack_rows)
 
-            st.dataframe(
-                style_technical_table(
-                    per_crack_df,
-                    numeric_columns=[
-                        'Confidence (%)','Length (px)','Avg Width (px)',
-                        'Max Width (px)','Orientation (°)','Tortuosity',
-                        'Length (mm)','Avg Width (mm)','Max Width (mm)',
-                    ],
-                ),
-                use_container_width=True,
-                hide_index=True,
+            st.markdown(
+                f'''
+                <div class="table-highlight">
+                    <span class="table-highlight-item">
+                        Image: {image_id}
+                    </span>
+                    <span class="table-highlight-item">
+                        Crack instances: {len(per_crack_df)}
+                    </span>
+                    <span class="table-highlight-item">
+                        Unit: {"px + mm" if use_scale else "pixel space"}
+                    </span>
+                </div>
+                ''',
+                unsafe_allow_html=True,
+            )
+
+            render_html_table(
+                per_crack_df,
+                numeric_columns=[
+                    'Confidence (%)','Length (px)','Avg Width (px)',
+                    'Max Width (px)','Orientation (°)','Tortuosity',
+                    'Length (mm)','Avg Width (mm)','Max Width (mm)',
+                ],
+                center_columns=['Image ID','Crack ID','Unique Crack ID'],
             )
 
             st.download_button(
@@ -1802,16 +1963,16 @@ def run_main_app():
                 ['Metric Group','Metric','Value','Description']
             ]
 
-            st.dataframe(
-                style_technical_table(review_metrics_df),
-                use_container_width=True,
-                hide_index=True,
+            render_html_table(
+                review_metrics_df,
+                center_columns=['Value'],
+                group_column='Metric Group',
             )
             st.markdown("</div>", unsafe_allow_html=True)
             st.markdown("## Scientific Charts")
             st.caption(
-                "Scientific visualizations of confidence, crack geometry, "
-                "width statistics, and crack-mask area composition."
+                "Clear image-level and instance-level visual summaries. "
+                "The charts automatically adapt when only one crack is detected."
             )
 
             crack_labels=[item['crack_id'] for item in crack_records]
@@ -1828,125 +1989,180 @@ def run_main_app():
 
             with chart_row1_col1:
                 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-                fig1,ax1=plt.subplots(figsize=(5.4,3.3), dpi=160)
+                st.markdown(
+                    "<div class='chart-title'>Detection Confidence</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    "<div class='chart-note'>Model confidence for each retained crack instance. "
+                    "Values closer to 100% indicate stronger model confidence.</div>",
+                    unsafe_allow_html=True,
+                )
+
+                fig1,ax1=plt.subplots(figsize=(5.4,2.7), dpi=170)
                 y_positions=np.arange(len(crack_labels))
-                ax1.barh(y_positions, confs, height=0.52)
+                ax1.barh(y_positions,[1.0]*len(crack_labels),height=0.42,alpha=0.15)
+                ax1.barh(y_positions,confs,height=0.42)
                 ax1.set_yticks(y_positions)
                 ax1.set_yticklabels(crack_labels)
                 ax1.set_xlim(0,1)
-                ax1.set_xlabel('Confidence')
-                ax1.set_title('Detection Confidence by Crack Instance', pad=10)
-                ax1.grid(axis='x', alpha=0.22)
+                ax1.set_xticks([0,.25,.5,.75,1.0])
+                ax1.set_xticklabels(['0%','25%','50%','75%','100%'])
+                ax1.set_xlabel('Model confidence')
+                ax1.grid(axis='x',alpha=.18)
                 ax1.spines['top'].set_visible(False)
                 ax1.spines['right'].set_visible(False)
+                ax1.spines['left'].set_visible(False)
+
                 for y_value,confidence in zip(y_positions,confs):
                     ax1.text(
-                        min(confidence+0.02,0.97),
+                        min(confidence+.025,.95),
                         y_value,
                         f'{confidence*100:.1f}%',
                         va='center',
-                        fontsize=8,
+                        fontsize=9,
+                        fontweight='bold',
                     )
+
                 fig1.tight_layout()
                 st.pyplot(fig1)
                 chart_confidence_png=fig_to_png(fig1)
                 plt.close(fig1)
-                st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("</div>",unsafe_allow_html=True)
 
             with chart_row1_col2:
                 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+                st.markdown(
+                    "<div class='chart-title'>Crack Area within the Image</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    "<div class='chart-note'>Percentage of image pixels classified as crack mask. "
+                    "This is image-space extent, not structural severity.</div>",
+                    unsafe_allow_html=True,
+                )
+
                 ratio=max(0.0,min(100.0,crack_ratio_percent))
-                fig2,ax2=plt.subplots(figsize=(5.4,3.3), dpi=160)
-                ax2.barh(['Analyzed image'],[ratio],label='Crack mask')
-                ax2.barh(
-                    ['Analyzed image'],
-                    [100-ratio],
-                    left=[ratio],
-                    label='Remaining area',
-                )
+                fig2,ax2=plt.subplots(figsize=(5.4,2.7), dpi=170)
+                ax2.barh(['Image area'],[100],height=.42,alpha=.15)
+                ax2.barh(['Image area'],[ratio],height=.42)
                 ax2.set_xlim(0,100)
-                ax2.set_xlabel('Image Area (%)')
-                ax2.set_title('Crack-Mask Area Composition', pad=10)
-                ax2.legend(
-                    loc='lower center',
-                    bbox_to_anchor=(0.5,-0.34),
-                    ncol=2,
-                )
-                ax2.text(
-                    ratio/2 if ratio>3 else ratio+1,
-                    0,
-                    f'{ratio:.2f}%',
-                    ha='center' if ratio>3 else 'left',
-                    va='center',
-                    fontsize=8,
-                )
+                ax2.set_xticks([0,25,50,75,100])
+                ax2.set_xticklabels(['0%','25%','50%','75%','100%'])
+                ax2.set_xlabel('Crack-mask area ratio')
+                ax2.grid(axis='x',alpha=.18)
                 ax2.spines['top'].set_visible(False)
                 ax2.spines['right'].set_visible(False)
+                ax2.spines['left'].set_visible(False)
+                ax2.text(
+                    min(ratio+2,92),
+                    0,
+                    f'{ratio:.2f}%',
+                    va='center',
+                    fontsize=10,
+                    fontweight='bold',
+                )
                 fig2.tight_layout()
                 st.pyplot(fig2)
                 chart_area_png=fig_to_png(fig2)
                 plt.close(fig2)
-                st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("</div>",unsafe_allow_html=True)
 
             chart_row2_col1,chart_row2_col2=st.columns(2)
 
             with chart_row2_col1:
                 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-                fig3,ax3=plt.subplots(figsize=(5.4,3.3), dpi=160)
-                x_positions=np.arange(len(crack_labels))
-                bars=ax3.bar(x_positions,lengths,width=0.48)
-                ax3.set_xticks(x_positions)
-                ax3.set_xticklabels(crack_labels)
-                ax3.set_ylabel('Centerline Length (px)')
-                ax3.set_title('Centerline Length by Crack Instance', pad=10)
-                ax3.grid(axis='y', alpha=0.22)
+                st.markdown(
+                    "<div class='chart-title'>Centerline Length</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    "<div class='chart-note'>Estimated centerline length for each crack instance. "
+                    "Values are reported in pixels unless calibration is enabled.</div>",
+                    unsafe_allow_html=True,
+                )
+
+                fig3,ax3=plt.subplots(figsize=(5.4,2.7), dpi=170)
+                y_positions=np.arange(len(crack_labels))
+                ax3.barh(y_positions,lengths,height=.42)
+                ax3.set_yticks(y_positions)
+                ax3.set_yticklabels(crack_labels)
+                ax3.set_xlabel('Centerline length (px)')
+                ax3.grid(axis='x',alpha=.18)
                 ax3.spines['top'].set_visible(False)
                 ax3.spines['right'].set_visible(False)
-                for bar,value in zip(bars,lengths):
+                ax3.spines['left'].set_visible(False)
+
+                max_length=max(lengths) if lengths else 1.0
+                ax3.set_xlim(0,max_length*1.18)
+
+                for y_value,value in zip(y_positions,lengths):
                     ax3.text(
-                        bar.get_x()+bar.get_width()/2,
-                        bar.get_height(),
-                        f'{value:.1f}',
-                        ha='center',
-                        va='bottom',
-                        fontsize=8,
+                        value+max_length*.02,
+                        y_value,
+                        f'{value:.1f} px',
+                        va='center',
+                        fontsize=9,
+                        fontweight='bold',
                     )
+
                 fig3.tight_layout()
                 st.pyplot(fig3)
                 chart_length_png=fig_to_png(fig3)
                 plt.close(fig3)
-                st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("</div>",unsafe_allow_html=True)
 
             with chart_row2_col2:
                 st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
-                fig4,ax4=plt.subplots(figsize=(5.4,3.3), dpi=160)
-                x_positions=np.arange(len(crack_labels))
-                bar_width=0.34
-                ax4.bar(
-                    x_positions-bar_width/2,
+                st.markdown(
+                    "<div class='chart-title'>Crack Width Comparison</div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    "<div class='chart-note'>Average and maximum width are shown side by side "
+                    "for each crack instance.</div>",
+                    unsafe_allow_html=True,
+                )
+
+                width_df=pd.DataFrame({
+                    'Crack ID':crack_labels,
+                    'Average width':avg_widths,
+                    'Maximum width':max_widths,
+                }).set_index('Crack ID')
+
+                st.bar_chart(
+                    width_df,
+                    use_container_width=True,
+                )
+
+                fig4,ax4=plt.subplots(figsize=(5.4,2.7), dpi=170)
+                y_positions=np.arange(len(crack_labels))
+                bar_height=.28
+                ax4.barh(
+                    y_positions-bar_height/2,
                     avg_widths,
-                    width=bar_width,
+                    height=bar_height,
                     label='Average width',
                 )
-                ax4.bar(
-                    x_positions+bar_width/2,
+                ax4.barh(
+                    y_positions+bar_height/2,
                     max_widths,
-                    width=bar_width,
+                    height=bar_height,
                     label='Maximum width',
                 )
-                ax4.set_xticks(x_positions)
-                ax4.set_xticklabels(crack_labels)
-                ax4.set_ylabel('Width (px)')
-                ax4.set_title('Average and Maximum Width Comparison', pad=10)
-                ax4.grid(axis='y', alpha=0.22)
-                ax4.legend()
+                ax4.set_yticks(y_positions)
+                ax4.set_yticklabels(crack_labels)
+                ax4.set_xlabel('Width (px)')
+                ax4.grid(axis='x',alpha=.18)
+                ax4.legend(loc='lower right')
                 ax4.spines['top'].set_visible(False)
                 ax4.spines['right'].set_visible(False)
+                ax4.spines['left'].set_visible(False)
                 fig4.tight_layout()
-                st.pyplot(fig4)
                 chart_width_png=fig_to_png(fig4)
                 plt.close(fig4)
-                st.markdown("</div>", unsafe_allow_html=True)
+
+                st.markdown("</div>",unsafe_allow_html=True)
 
             pdf_buf=export_pdf(
                 orig_img,
