@@ -326,14 +326,64 @@ def inject_global_styles():
     .status-danger{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;}
 
     .legend-box{
-        background:rgba(15,23,42,.82);
-        color:white;
+        display:flex;
+        flex-wrap:wrap;
+        gap:8px 14px;
+        align-items:center;
+        background:#ffffff;
+        color:#334155;
+        border:1px solid #dce6f2;
         border-radius:12px;
-        padding:10px 12px;
-        font-size:11px;
-        line-height:1.8;
-        display:inline-block;
+        padding:8px 10px;
+        font-size:10px;
+        line-height:1.4;
         margin-top:8px;
+        box-shadow:0 6px 16px rgba(31,58,120,.05);
+    }
+
+    .legend-item{
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        white-space:nowrap;
+        font-weight:700;
+    }
+
+    .legend-dot{
+        width:8px;
+        height:8px;
+        border-radius:50%;
+        display:inline-block;
+    }
+
+    .legend-yellow{background:#facc15;}
+    .legend-blue{background:#2daaff;}
+    .legend-green{background:#22c55e;}
+    .legend-red{background:#ef4444;}
+
+    .table-section{
+        background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+        border:1px solid #dce6f2;
+        border-radius:18px;
+        padding:18px;
+        box-shadow:0 10px 28px rgba(31,58,120,.06);
+        margin-bottom:16px;
+    }
+
+    .table-note{
+        font-size:12px;
+        color:#64748b;
+        line-height:1.5;
+        margin:4px 0 12px;
+    }
+
+    .chart-card{
+        background:#ffffff;
+        border:1px solid #dce6f2;
+        border-radius:16px;
+        padding:10px;
+        box-shadow:0 8px 22px rgba(31,58,120,.06);
+        margin-bottom:14px;
     }
 
     .assessment-card{
@@ -393,6 +443,60 @@ inject_global_styles()
 
 def fig_to_png(fig):
     buf = io.BytesIO(); fig.savefig(buf, format='PNG', dpi=200, bbox_inches='tight'); buf.seek(0); return buf
+
+
+def style_technical_table(df, numeric_columns=None):
+    if df is None or df.empty:
+        return df
+
+    numeric_columns = numeric_columns or []
+
+    styler = (
+        df.style
+        .set_table_styles([
+            {
+                'selector':'thead th',
+                'props':[
+                    ('background-color','#1769e0'),
+                    ('color','#ffffff'),
+                    ('font-weight','700'),
+                    ('border','1px solid #dce6f2'),
+                    ('text-align','center'),
+                ],
+            },
+            {
+                'selector':'tbody td',
+                'props':[
+                    ('border','1px solid #e5edf7'),
+                    ('padding','8px'),
+                ],
+            },
+            {
+                'selector':'tbody tr:nth-child(even)',
+                'props':[('background-color','#f7faff')],
+            },
+            {
+                'selector':'tbody tr:hover',
+                'props':[('background-color','#eef5ff')],
+            },
+        ])
+        .set_properties(**{
+            'font-size':'12px',
+            'color':'#0f172a',
+        })
+    )
+
+    for column in numeric_columns:
+        if column in df.columns:
+            styler = styler.set_properties(
+                subset=[column],
+                **{
+                    'text-align':'center',
+                    'font-variant-numeric':'tabular-nums',
+                },
+            )
+
+    return styler
 
 def extract_poly_points(points_field, img_w, img_h):
     pts=[]
@@ -809,7 +913,18 @@ def render_metrics_dashboard(metrics_df):
     if summary_value:
         st.markdown(f"<div class='metric-summary {sev}'><div class='metric-summary-title'>Summary</div><div class='metric-summary-text'>{summary_value}</div><div class='metric-help' style='margin-top:8px;'>{summary_desc}</div></div>", unsafe_allow_html=True)
 
-def export_pdf(original_img, analyzed_img, metrics_df, chart_bar_png=None, chart_pie_png=None, measurement_visual_img=None, filename='bkai_report_pro_plus.pdf'):
+def export_pdf(
+    original_img,
+    analyzed_img,
+    metrics_df,
+    chart_bar_png=None,
+    chart_pie_png=None,
+    measurement_visual_img=None,
+    filename='bkai_report_pro_plus.pdf',
+    chart_length_png=None,
+    chart_width_png=None,
+    per_crack_df=None,
+):
     buf=io.BytesIO(); c=canvas.Canvas(buf, pagesize=A4)
     page_w,page_h=A4; LEFT=20*mm; RIGHT=20*mm; TOP=20*mm; BOTTOM=20*mm; CONTENT_W=page_w-LEFT-RIGHT
     def draw_header(title, subtitle=None, page_no=None):
@@ -858,6 +973,129 @@ def export_pdf(original_img, analyzed_img, metrics_df, chart_bar_png=None, chart
         if i%2==0: c.setFillColor(colors.HexColor('#f7fbff')); c.rect(LEFT, y-row_h, CONTENT_W, row_h, stroke=0, fill=1)
         c.setStrokeColor(colors.HexColor('#dbe7f5')); c.rect(LEFT, y-row_h, CONTENT_W, row_h, stroke=1, fill=0); c.line(LEFT+col1, y, LEFT+col1, y-row_h)
         c.setFillColor(colors.black); c.setFont(FONT_NAME,9); c.drawString(LEFT+3, y-5.7*mm, label[:48]); c.drawString(LEFT+col1+3, y-5.7*mm, val[:60]); y-=row_h
+    if (
+        chart_length_png is not None
+        or chart_width_png is not None
+        or per_crack_df is not None
+    ):
+        c.showPage()
+        top=draw_header(
+            'ANALYSIS REPORT',
+            subtitle='Scientific Charts and Per-Crack Measurements',
+            page_no=3,
+        )
+
+        chart_gap=8*mm
+        chart_slot=(CONTENT_W-chart_gap)/2
+        chart_height=52*mm
+
+        if chart_length_png is not None:
+            chart_length_png.seek(0)
+            chart_image=ImageReader(chart_length_png)
+            iw,ih=chart_image.getSize()
+            scale=min(chart_slot/iw,chart_height/ih)
+            c.drawImage(
+                chart_image,
+                LEFT,
+                top-ih*scale,
+                width=iw*scale,
+                height=ih*scale,
+                mask='auto',
+            )
+
+        if chart_width_png is not None:
+            chart_width_png.seek(0)
+            chart_image=ImageReader(chart_width_png)
+            iw,ih=chart_image.getSize()
+            scale=min(chart_slot/iw,chart_height/ih)
+            c.drawImage(
+                chart_image,
+                LEFT+chart_slot+chart_gap,
+                top-ih*scale,
+                width=iw*scale,
+                height=ih*scale,
+                mask='auto',
+            )
+
+        table_top=top-chart_height-12*mm
+
+        if per_crack_df is not None and not per_crack_df.empty:
+            c.setFillColor(colors.black)
+            c.setFont(FONT_NAME,11)
+            c.drawString(LEFT,table_top+5*mm,'Per-Crack Measurement Table')
+
+            compact_columns=[
+                column
+                for column in [
+                    'Crack ID','Confidence (%)','Length (px)',
+                    'Avg Width (px)','Max Width (px)',
+                    'Orientation (°)','Tortuosity',
+                ]
+                if column in per_crack_df.columns
+            ]
+            compact_df=per_crack_df[compact_columns].copy()
+            row_height=8*mm
+            table_y=table_top-row_height
+            column_width=CONTENT_W/max(len(compact_columns),1)
+
+            c.setFillColor(colors.HexColor('#1769e0'))
+            c.rect(LEFT,table_y,CONTENT_W,row_height,stroke=0,fill=1)
+            c.setFillColor(colors.white)
+            c.setFont(FONT_NAME,7)
+
+            for column_index,column_name in enumerate(compact_columns):
+                c.drawCentredString(
+                    LEFT+column_width*(column_index+.5),
+                    table_y+2.8*mm,
+                    column_name[:18],
+                )
+
+            current_y=table_y-row_height
+
+            for row_index,row in compact_df.astype(str).iterrows():
+                if current_y < BOTTOM+12*mm:
+                    break
+
+                if row_index%2==0:
+                    c.setFillColor(colors.HexColor('#f7faff'))
+                    c.rect(
+                        LEFT,
+                        current_y,
+                        CONTENT_W,
+                        row_height,
+                        stroke=0,
+                        fill=1,
+                    )
+
+                c.setStrokeColor(colors.HexColor('#dce6f2'))
+                c.rect(
+                    LEFT,
+                    current_y,
+                    CONTENT_W,
+                    row_height,
+                    stroke=1,
+                    fill=0,
+                )
+                c.setFillColor(colors.black)
+                c.setFont(FONT_NAME,7)
+
+                for column_index,value in enumerate(row.tolist()):
+                    c.drawCentredString(
+                        LEFT+column_width*(column_index+.5),
+                        current_y+2.8*mm,
+                        str(value)[:18],
+                    )
+
+                current_y-=row_height
+
+        c.setFillColor(colors.HexColor('#475569'))
+        c.setFont(FONT_NAME,8)
+        c.drawString(
+            LEFT,
+            BOTTOM+6*mm,
+            'Note: Image-based measurements depend on segmentation quality, image resolution, perspective, and calibration.',
+        )
+
     c.save(); buf.seek(0); return buf
 
 def export_pdf_no_crack(original_img):
@@ -1388,10 +1626,10 @@ def run_main_app():
                         st.markdown(
                             '''
                             <div class="legend-box">
-                                <div>🟡 Centerline</div>
-                                <div>🔵 Crack contour</div>
-                                <div>🟢 Endpoints</div>
-                                <div>🔴 Maximum-width point</div>
+                                <span class="legend-item"><span class="legend-dot legend-yellow"></span>Centerline</span>
+                                <span class="legend-item"><span class="legend-dot legend-blue"></span>Crack contour</span>
+                                <span class="legend-item"><span class="legend-dot legend-green"></span>Endpoints</span>
+                                <span class="legend-item"><span class="legend-dot legend-red"></span>Maximum-width point</span>
                             </div>
                             ''',
                             unsafe_allow_html=True,
@@ -1462,7 +1700,7 @@ def run_main_app():
             confs=[float(p.get('confidence',0)) for p in preds_conf]; avg_conf=(sum(confs)/len(confs)) if confs else 0.0
             crack_ratio_percent, crack_area_px2 = crack_area_ratio_percent(preds_conf, img_w, img_h)
             severity=estimate_severity_from_ratio(crack_ratio_percent)
-            summary_text='Detected cracks may indicate structural concern and should be further inspected.' if severity=='Severe' else 'Detected cracks are minor or moderate; continuous monitoring is recommended.'
+            summary_text='High crack-mask extent within the analyzed image; engineering severity is not determined without calibration and an adopted standard.' if severity=='Severe' else 'Low-to-moderate crack-mask extent within the analyzed image; continue technical review and monitoring.'
             metrics=[
                 {'Metric':'Image Name','Value':uploaded_file.name,'Description':'Uploaded image filename'},
                 {'Metric':'Total Processing Time','Value':f'{total_time:.2f} s','Description':'Total execution time'},
@@ -1473,78 +1711,254 @@ def run_main_app():
                 {'Metric':f'Crack Length ({unit_text})','Value':f'{length_value:.2f}','Description':'Estimated crack centerline length'},
                 {'Metric':f'Average Width ({unit_text})','Value':f'{avg_width_value:.2f}','Description':'Average crack width estimated from distance transform'},
                 {'Metric':f'Maximum Width ({unit_text})','Value':f'{max_width_value:.2f}','Description':'Maximum local crack width'},
-                {'Metric':'Severity Level','Value':severity,'Description':'Severity estimated by crack ratio'},
+                {'Metric':'Image-based Crack Extent','Value':severity,'Description':'Image-space extent estimated from crack mask area ratio'},
                 {'Metric':'Timestamp','Value':datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),'Description':'Execution timestamp'},
                 {'Metric':'Summary','Value':summary_text,'Description':'Automatic system conclusion'},
             ]
             metrics_df=pd.DataFrame(metrics)
 
-            st.markdown("<div class='section-card'>", unsafe_allow_html=True)
+            st.markdown("<div class='table-section'>", unsafe_allow_html=True)
             st.markdown("<div class='subsection-title'>Per-Crack Measurement Table</div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div class='table-note'>Instance-level geometric measurements. "
+                "Physical units are displayed only when scale calibration is enabled.</div>",
+                unsafe_allow_html=True,
+            )
 
             image_id=os.path.splitext(uploaded_file.name)[0]
+            per_crack_rows=[]
 
-            per_crack_df=pd.DataFrame([
-                {
-                    'Image ID': image_id,
-                    'Crack ID': item['crack_id'],
-                    'Unique Crack ID': f"{image_id}-{item['crack_id']}",
-                    'Confidence': f"{item['confidence']*100:.1f}%",
-                    'Length (px)': f"{item['length_px']:.2f}",
-                    'Length (mm)': f"{item['length_px']*mm_per_pixel:.2f}",
-                    'Avg Width (px)': f"{item['avg_width_px']:.2f}",
-                    'Avg Width (mm)': f"{item['avg_width_px']*mm_per_pixel:.2f}",
-                    'Max Width (px)': f"{item['max_width_px']:.2f}",
-                    'Max Width (mm)': f"{item['max_width_px']*mm_per_pixel:.2f}",
-                    'Orientation (°)': f"{item['geometry']['orientation_deg']:.2f}",
-                    'Tortuosity': f"{item['geometry']['tortuosity']:.3f}",
+            for item in crack_records:
+                row={
+                    'Image ID':image_id,
+                    'Crack ID':item['crack_id'],
+                    'Unique Crack ID':f"{image_id}-{item['crack_id']}",
+                    'Confidence (%)':round(item['confidence']*100,1),
+                    'Length (px)':round(item['length_px'],2),
+                    'Avg Width (px)':round(item['avg_width_px'],2),
+                    'Max Width (px)':round(item['max_width_px'],2),
+                    'Orientation (°)':round(item['geometry']['orientation_deg'],2),
+                    'Tortuosity':round(item['geometry']['tortuosity'],3),
                 }
-                for item in crack_records
-            ])
+
+                if use_scale:
+                    row.update({
+                        'Length (mm)':round(item['length_value'],3),
+                        'Avg Width (mm)':round(item['avg_width_value'],3),
+                        'Max Width (mm)':round(item['max_width_value'],3),
+                    })
+
+                per_crack_rows.append(row)
+
+            per_crack_df=pd.DataFrame(per_crack_rows)
 
             st.dataframe(
-                per_crack_df,
+                style_technical_table(
+                    per_crack_df,
+                    numeric_columns=[
+                        'Confidence (%)','Length (px)','Avg Width (px)',
+                        'Max Width (px)','Orientation (°)','Tortuosity',
+                        'Length (mm)','Avg Width (mm)','Max Width (mm)',
+                    ],
+                ),
                 use_container_width=True,
                 hide_index=True,
             )
 
             st.download_button(
-                '📗 Export CSV Data',
+                'Export CSV Data',
                 data=per_crack_df.to_csv(index=False).encode('utf-8-sig'),
                 file_name=f"BKAI_Measurements_{uploaded_file.name.split('.')[0]}.csv",
                 mime='text/csv',
                 key=f'csv_btn_{idx}_{uploaded_file.name}',
             )
-
             st.markdown("</div>", unsafe_allow_html=True)
 
-            st.markdown("<div class='section-card'>", unsafe_allow_html=True)
+            st.markdown("<div class='table-section'>", unsafe_allow_html=True)
             st.markdown("<div class='subsection-title'>Review Metrics Table</div>", unsafe_allow_html=True)
             st.markdown(
-                "<div class='section-subtitle'>Complete image-level analysis results for technical review.</div>",
+                "<div class='table-note'>Image-level model output, processing metadata, "
+                "and geometric summary for technical review.</div>",
                 unsafe_allow_html=True,
             )
+
+            review_metrics_df=metrics_df.copy()
+            review_metrics_df['Metric Group']=review_metrics_df['Metric'].map({
+                'Image Name':'Identification',
+                'Timestamp':'Identification',
+                'Total Processing Time':'Model Performance',
+                'Inference Speed':'Model Performance',
+                'Average Confidence':'Model Performance',
+                'Crack Area (px²)':'Crack Geometry',
+                'Crack Area Ratio (%)':'Crack Geometry',
+                f'Crack Length ({unit_text})':'Crack Geometry',
+                f'Average Width ({unit_text})':'Crack Geometry',
+                f'Maximum Width ({unit_text})':'Crack Geometry',
+                'Image-based Crack Extent':'Assessment',
+                'Summary':'Assessment',
+            }).fillna('Other')
+
+            review_metrics_df=review_metrics_df[
+                ['Metric Group','Metric','Value','Description']
+            ]
+
             st.dataframe(
-                metrics_df,
+                style_technical_table(review_metrics_df),
                 use_container_width=True,
                 hide_index=True,
             )
             st.markdown("</div>", unsafe_allow_html=True)
-            st.subheader('Statistical Charts')
-            c1,c2=st.columns(2); bar_png=None; pie_png=None
-            with c1:
-                fig1,ax=plt.subplots(figsize=(5.2,3.2), dpi=150); xs=list(range(1,len(confs)+1))
-                if xs:
-                    ax.bar(xs, confs, width=0.35); ax.set_ylim(0,1); ax.set_xticks(xs); ax.set_xlabel('Crack #'); ax.set_ylabel('Confidence'); ax.set_title('Confidence of each crack region', pad=8); ax.grid(axis='y', alpha=0.25); ax.spines['top'].set_visible(False); ax.spines['right'].set_visible(False)
-                    for x,v in zip(xs, confs): ax.text(x, min(1.0,v)+0.02, f'{v*100:.0f}%', ha='center', va='bottom', fontsize=8)
-                    if len(xs)==1: ax.set_xlim(0.5,1.5)
-                else:
-                    ax.text(0.5,0.5,'No data', ha='center', va='center'); ax.set_axis_off()
-                fig1.tight_layout(); st.pyplot(fig1); bar_png=fig_to_png(fig1); plt.close(fig1)
-            with c2:
-                ratio=max(0.0,min(1.0, crack_ratio_percent/100.0)); fig2,ax2=plt.subplots(figsize=(4.2,3.2), dpi=150)
-                ax2.pie([ratio,1-ratio], labels=['Crack region (mask)','Remaining image area'], autopct='%1.1f%%', startangle=140); ax2.set_title('Crack area ratio relative to full image', pad=8); fig2.tight_layout(); st.pyplot(fig2); pie_png=fig_to_png(fig2); plt.close(fig2)
-            pdf_buf=export_pdf(orig_img, analyzed_img, metrics_df, chart_bar_png=bar_png, chart_pie_png=pie_png, measurement_visual_img=measurement_visual_img)
+            st.markdown("## Scientific Charts")
+            st.caption(
+                "Scientific visualizations of confidence, crack geometry, "
+                "width statistics, and crack-mask area composition."
+            )
+
+            crack_labels=[item['crack_id'] for item in crack_records]
+            lengths=[item['length_px'] for item in crack_records]
+            avg_widths=[item['avg_width_px'] for item in crack_records]
+            max_widths=[item['max_width_px'] for item in crack_records]
+
+            chart_confidence_png=None
+            chart_area_png=None
+            chart_length_png=None
+            chart_width_png=None
+
+            chart_row1_col1,chart_row1_col2=st.columns(2)
+
+            with chart_row1_col1:
+                st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+                fig1,ax1=plt.subplots(figsize=(5.4,3.3), dpi=160)
+                y_positions=np.arange(len(crack_labels))
+                ax1.barh(y_positions, confs, height=0.52)
+                ax1.set_yticks(y_positions)
+                ax1.set_yticklabels(crack_labels)
+                ax1.set_xlim(0,1)
+                ax1.set_xlabel('Confidence')
+                ax1.set_title('Detection Confidence by Crack Instance', pad=10)
+                ax1.grid(axis='x', alpha=0.22)
+                ax1.spines['top'].set_visible(False)
+                ax1.spines['right'].set_visible(False)
+                for y_value,confidence in zip(y_positions,confs):
+                    ax1.text(
+                        min(confidence+0.02,0.97),
+                        y_value,
+                        f'{confidence*100:.1f}%',
+                        va='center',
+                        fontsize=8,
+                    )
+                fig1.tight_layout()
+                st.pyplot(fig1)
+                chart_confidence_png=fig_to_png(fig1)
+                plt.close(fig1)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            with chart_row1_col2:
+                st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+                ratio=max(0.0,min(100.0,crack_ratio_percent))
+                fig2,ax2=plt.subplots(figsize=(5.4,3.3), dpi=160)
+                ax2.barh(['Analyzed image'],[ratio],label='Crack mask')
+                ax2.barh(
+                    ['Analyzed image'],
+                    [100-ratio],
+                    left=[ratio],
+                    label='Remaining area',
+                )
+                ax2.set_xlim(0,100)
+                ax2.set_xlabel('Image Area (%)')
+                ax2.set_title('Crack-Mask Area Composition', pad=10)
+                ax2.legend(
+                    loc='lower center',
+                    bbox_to_anchor=(0.5,-0.34),
+                    ncol=2,
+                )
+                ax2.text(
+                    ratio/2 if ratio>3 else ratio+1,
+                    0,
+                    f'{ratio:.2f}%',
+                    ha='center' if ratio>3 else 'left',
+                    va='center',
+                    fontsize=8,
+                )
+                ax2.spines['top'].set_visible(False)
+                ax2.spines['right'].set_visible(False)
+                fig2.tight_layout()
+                st.pyplot(fig2)
+                chart_area_png=fig_to_png(fig2)
+                plt.close(fig2)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            chart_row2_col1,chart_row2_col2=st.columns(2)
+
+            with chart_row2_col1:
+                st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+                fig3,ax3=plt.subplots(figsize=(5.4,3.3), dpi=160)
+                x_positions=np.arange(len(crack_labels))
+                bars=ax3.bar(x_positions,lengths,width=0.48)
+                ax3.set_xticks(x_positions)
+                ax3.set_xticklabels(crack_labels)
+                ax3.set_ylabel('Centerline Length (px)')
+                ax3.set_title('Centerline Length by Crack Instance', pad=10)
+                ax3.grid(axis='y', alpha=0.22)
+                ax3.spines['top'].set_visible(False)
+                ax3.spines['right'].set_visible(False)
+                for bar,value in zip(bars,lengths):
+                    ax3.text(
+                        bar.get_x()+bar.get_width()/2,
+                        bar.get_height(),
+                        f'{value:.1f}',
+                        ha='center',
+                        va='bottom',
+                        fontsize=8,
+                    )
+                fig3.tight_layout()
+                st.pyplot(fig3)
+                chart_length_png=fig_to_png(fig3)
+                plt.close(fig3)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            with chart_row2_col2:
+                st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
+                fig4,ax4=plt.subplots(figsize=(5.4,3.3), dpi=160)
+                x_positions=np.arange(len(crack_labels))
+                bar_width=0.34
+                ax4.bar(
+                    x_positions-bar_width/2,
+                    avg_widths,
+                    width=bar_width,
+                    label='Average width',
+                )
+                ax4.bar(
+                    x_positions+bar_width/2,
+                    max_widths,
+                    width=bar_width,
+                    label='Maximum width',
+                )
+                ax4.set_xticks(x_positions)
+                ax4.set_xticklabels(crack_labels)
+                ax4.set_ylabel('Width (px)')
+                ax4.set_title('Average and Maximum Width Comparison', pad=10)
+                ax4.grid(axis='y', alpha=0.22)
+                ax4.legend()
+                ax4.spines['top'].set_visible(False)
+                ax4.spines['right'].set_visible(False)
+                fig4.tight_layout()
+                st.pyplot(fig4)
+                chart_width_png=fig_to_png(fig4)
+                plt.close(fig4)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            pdf_buf=export_pdf(
+                orig_img,
+                analyzed_img,
+                review_metrics_df,
+                chart_bar_png=chart_confidence_png,
+                chart_pie_png=chart_area_png,
+                measurement_visual_img=measurement_visual_img,
+                chart_length_png=chart_length_png,
+                chart_width_png=chart_width_png,
+                per_crack_df=per_crack_df,
+            )
             st.download_button('📄 Download PDF Report for This Image', data=pdf_buf.getvalue(), file_name=f"BKAI_CrackReport_{uploaded_file.name.split('.')[0]}.pdf", mime='application/pdf', key=f'pdf_btn_{idx}_{uploaded_file.name}')
         with tab2:
             show_stage2_demo(key_prefix=f'stage2_{idx}')
